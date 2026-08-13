@@ -1,8 +1,8 @@
 # TokTickIT — Lab 1: Full-Stack Hello World Starter
 
-A vertical slice proving React (Vite + Bootstrap) → Express (TypeScript) → Prisma → PostgreSQL
-work together as one system. Opening the app shows a [Check System] button; clicking it calls
-the backend health check and loads the four seeded IT request categories.
+Project foundation for a vertical slice proving React (Vite + Bootstrap) → Express (TypeScript) →
+Prisma → PostgreSQL work together as one system. This PR scaffolds the client and server; the
+health check, category seed, and category list are built out in the follow-up feature PRs.
 
 ## Prerequisites
 
@@ -27,13 +27,14 @@ the backend health check and loads the four seeded IT request categories.
    # edit .env with your real PostgreSQL username/password
    ```
 
-3. Create the database, run the migration, and seed it:
+3. Create the database and run the migration:
 
    ```
    psql -h localhost -p 5433 -U postgres -d postgres -c "CREATE DATABASE toktickit;"
    npx prisma migrate dev
-   npx prisma db seed
    ```
+
+   Seeding (`npx prisma db seed`) is added in the category seed PR, once a seed script exists.
 
 ## Run the app
 
@@ -45,7 +46,7 @@ cd server && npm run dev      # http://localhost:4000
 cd client && npm run dev      # http://localhost:5173
 ```
 
-Open http://localhost:5173 and click **Check System**.
+Open http://localhost:5173 to see the app shell.
 
 ## Run the tests
 
