@@ -7,24 +7,22 @@
 
 ## My reviewer (reviewed my Pull Requests)
 
-- **Name:** นายรัฐธรรมนูญ บูรณพัฒนา
-- **Student ID:** 67070501037
-- **GitHub username:** TauForge
-- **PR links reviewed by them:**
-  - https://github.com/Bank848/toktickit/pull/7
-  - https://github.com/Bank848/toktickit/pull/8
-  - https://github.com/Bank848/toktickit/pull/9
+- **Assigned peer partner:** นายรัฐธรรมนูญ บูรณพัฒนา, Student ID 67070501037, GitHub username TauForge
+- **Other reviewer:** นายกมลภพ วิทยารัฐ, Student ID 67070501002, GitHub username ArmmyC — reviewed PR #5 and #6
+- **PR links reviewed and by whom:**
+  - https://github.com/Bank848/toktickit/pull/5 — reviewed by ArmmyC (นายกมลภพ วิทยารัฐ, 67070501002) and N0M3KM (TauForge was not requested on this PR)
+  - https://github.com/Bank848/toktickit/pull/6 — reviewed by ArmmyC (นายกมลภพ วิทยารัฐ, 67070501002) (TauForge was not requested on this PR)
+  - https://github.com/Bank848/toktickit/pull/7 — reviewed by TauForge
+  - https://github.com/Bank848/toktickit/pull/8 — reviewed by TauForge
+  - https://github.com/Bank848/toktickit/pull/9 — reviewed by TauForge
 - **Review comments received and my response:**
-  - PR #7 (Category model, migration, seed) — TauForge: "LGTM. Checked the schema, migration, seed, and README. Everything looks good and matches the changes in this PR. No issues from my side. Approved." No changes requested, so the PR merged as submitted.
-  - PR #8 (Category list API + UI) — TauForge approved with no inline comments, then followed up on the issue thread: "LGTM. Checked the API, UI, and tests. Everything looks good and matches the requirements of this PR. No issues from my side. Approved." No changes requested.
-  - PR #9 (promote lab1-staging to main) — TauForge: "Checked the changes and the lab documentation. Everything looks good and the previous PR changes are included correctly. No issues from my side. Approved." No changes requested.
+  - PR #5 (project foundation) — **ArmmyC** requested changes: "I reviewed this foundation PR against Issue #1. I cannot approve it yet. 1. Server test setup is incomplete. `server/package.json` declares only `@types/supertest`, not the runtime `supertest` package, and the PR adds no `server/tests/**/*.test.ts` file... 2. The README documents work that is not in this branch. It tells users to run `npx prisma db seed`, but there is no `server/prisma/seed.ts`..." **N0M3KM** also commented: "The code is clean and organized, but I have a small request. According to the required repository structure, the tests/lab-01 directory should be inside the server folder. It looks like this commit is missing those folders. Could you please add them?" I responded in commit `21ce25a` by adding the runtime `supertest` dependency and a smoke test at `server/tests/lab-01/app.test.ts`, and by trimming the README back to only the foundation scope. ArmmyC then re-reviewed and approved: "I re-reviewed the updated foundation PR at 21ce25a. The requested fixes are complete... Approved." N0M3KM's review was dismissed once the same fix landed.
+  - PR #6 (health check) — **ArmmyC** approved: "I reviewed PR #6 against Issue #2. The API exposes GET /api/health with HTTP 200 and the required JSON response, and the Supertest test verifies it. The React page makes a real health-check request and handles loading, success, and backend-unavailable error states. The README is scoped to this feature. Approved." No changes requested.
+  - PR #7 (Category model, migration, seed) — **TauForge**: "LGTM. Checked the schema, migration, seed, and README. Everything looks good and matches the changes in this PR. No issues from my side. Approved." No changes requested, so the PR merged as submitted.
+  - PR #8 (Category list API + UI) — **TauForge** approved with no inline comments, then followed up on the issue thread: "LGTM. Checked the API, UI, and tests. Everything looks good and matches the requirements of this PR. No issues from my side. Approved." No changes requested.
+  - PR #9 (promote lab1-staging to main) — **TauForge**: "Checked the changes and the lab documentation. Everything looks good and the previous PR changes are included correctly. No issues from my side. Approved." No changes requested.
 
-### Additional community review received
-
-Two classmates outside my assigned pairing also reviewed PR #5 and PR #6 on my repository:
-
-- **ArmmyC** requested changes on PR #5 (project foundation): "I reviewed this foundation PR against Issue #1. I cannot approve it yet. 1. Server test setup is incomplete. `server/package.json` declares only `@types/supertest`, not the runtime `supertest` package, and the PR adds no `server/tests/**/*.test.ts` file... 2. The README documents work that is not in this branch. It tells users to run `npx prisma db seed`, but there is no `server/prisma/seed.ts`..." I responded in commit `21ce25a` by adding the runtime `supertest` dependency and a smoke test at `server/tests/lab-01/app.test.ts`, and by trimming the README back to only the foundation scope. ArmmyC then re-reviewed and approved: "I re-reviewed the updated foundation PR at 21ce25a. The requested fixes are complete... Approved." ArmmyC also approved PR #6 (health check) directly: "The API exposes GET /api/health with HTTP 200 and the required JSON response, and the Supertest test verifies it... Approved."
-- **N0M3KM** commented on PR #5 (dismissed once addressed): "The code is clean and organized, but I have a small request. According to the required repository structure, the tests/lab-01 directory should be inside the server folder. It looks like this commit is missing those folders. Could you please add them?" This was covered by the same fix in `21ce25a` that added `server/tests/lab-01/app.test.ts`, so the review was resolved.
+TauForge was not assigned as a reviewer on PR #5 or #6 (confirmed via GitHub's `requested_reviewers` and timeline API — only ArmmyC and N0M3KM were requested on those two). TauForge became my requested reviewer starting with PR #7 onward.
 
 ## Who I reviewed (reviewed my partner's Pull Requests)
 
