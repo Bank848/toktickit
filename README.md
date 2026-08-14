@@ -2,8 +2,7 @@
 
 A vertical slice proving React (Vite + Bootstrap) → Express (TypeScript) → Prisma → PostgreSQL
 work together as one system. Opening the app shows a [Check System] button; clicking it calls
-the backend health check. The database now seeds the four IT request categories; displaying
-them in the UI is added in the follow-up category-list feature PR.
+the backend health check and loads the four seeded IT request categories from PostgreSQL.
 
 ## Prerequisites
 
