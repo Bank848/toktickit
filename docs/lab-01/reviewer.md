@@ -1,7 +1,7 @@
 # Peer Review Evidence — Lab 1
 
-- **My name:** นายกมลภพ วิทยารัฐ
-- **My student ID:** 67070501002
+- **My name:** สิทธิชัย ภิรมย์ปั่น
+- **My student ID:** 67070501074
 - **My GitHub username:** Bank848
 - **Repository:** https://github.com/Bank848/toktickit
 
