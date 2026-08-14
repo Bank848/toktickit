@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { fetchHealth } from './api';
+import { fetchHealth, fetchCategories } from './api';
+import type { Category } from './api';
 
 type CheckState = 'idle' | 'loading' | 'success' | 'error';
 
 function App() {
   const [checkState, setCheckState] = useState<CheckState>('idle');
   const [backendOnline, setBackendOnline] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
 
   const handleCheckSystem = async () => {
@@ -15,9 +17,12 @@ function App() {
     try {
       await fetchHealth();
       setBackendOnline(true);
+      const fetchedCategories = await fetchCategories();
+      setCategories(fetchedCategories);
       setCheckState('success');
-    } catch (error) {
+    } catch {
       setBackendOnline(false);
+      setCategories([]);
       setErrorMessage('Unable to connect to TokTickIT API');
       setCheckState('error');
     }
@@ -33,9 +38,17 @@ function App() {
       {checkState === 'loading' && <p>Loading...</p>}
 
       {checkState === 'success' && (
-        <p>
-          System Status: <strong>{backendOnline ? 'Online' : 'Offline'}</strong>
-        </p>
+        <>
+          <p>
+            System Status: <strong>{backendOnline ? 'Online' : 'Offline'}</strong>
+          </p>
+          <h2>Supported Request Categories</h2>
+          <ul>
+            {categories.map((category) => (
+              <li key={category.id}>{category.name}</li>
+            ))}
+          </ul>
+        </>
       )}
 
       {checkState === 'error' && (
