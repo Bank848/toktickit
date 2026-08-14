@@ -2,8 +2,8 @@
 
 A vertical slice proving React (Vite + Bootstrap) → Express (TypeScript) → Prisma → PostgreSQL
 work together as one system. Opening the app shows a [Check System] button; clicking it calls
-the backend health check. Loading the four seeded IT request categories is added in the
-follow-up category-seed and category-list feature PRs.
+the backend health check. The database now seeds the four IT request categories; displaying
+them in the UI is added in the follow-up category-list feature PR.
 
 ## Prerequisites
 
@@ -28,14 +28,13 @@ follow-up category-seed and category-list feature PRs.
    # edit .env with your real PostgreSQL username/password
    ```
 
-3. Create the database and run the migration:
+3. Create the database, run the migration, and seed it:
 
    ```
    psql -h localhost -p 5433 -U postgres -d postgres -c "CREATE DATABASE toktickit;"
    npx prisma migrate dev
+   npx prisma db seed
    ```
-
-   Seeding (`npx prisma db seed`) is added in the category-seed feature PR, once a seed script exists.
 
 ## Run the app
 
