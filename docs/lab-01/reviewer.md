@@ -1,7 +1,7 @@
 # Peer Review Evidence — Lab 1
 
-- **My name:** [FILL IN: your real name]
-- **My student ID:** [FILL IN: your student ID]
+- **My name:** นายกมลภพ วิทยารัฐ
+- **My student ID:** 67070501002
 - **My GitHub username:** Bank848
 - **Repository:** https://github.com/Bank848/toktickit
 
