@@ -36,3 +36,12 @@ bite immediately:
 every mandatory business-rule test above passes; server and client coverage ≥80%; Lab 1's five
 tests still pass; `docs/lab-02/tests.md` records the test-ID → file → requirement mapping in the
 same table format Lab 1 used; passing terminal output captured for the submission.
+
+**W3 interim measurement (Issues 5–8 only, 2026-08-18):** `server` — 47/47 tests passing,
+`npm run test:coverage` reports 68.6% statements / 79.16% branch / 71.42% functions overall;
+every W3 source file itself is 85–100% covered (`ticketNumber.ts`, `createTicketRequest.ts`,
+`errorEnvelope.ts` at 100%; `tickets.ts` 88.4%; `currentUser.ts` 93.5%) — the overall percentage
+is pulled down by `seed.ts`/`verify-seed*.ts`/`server.ts`, which are boot/ops scripts with no
+tests by design, not W3 feature code. `client` — 3/3 existing tests passing (no new client code
+in W3). The ≥80% overall target above is the full Lab 2 (W4) bar and is not expected to be met
+until the remaining features (My Tickets, Ticket Detail, Comments, Attachments) land.
