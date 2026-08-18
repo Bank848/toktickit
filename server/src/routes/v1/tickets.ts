@@ -1,14 +1,22 @@
 import { Router } from 'express';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma';
-import { resolveCurrentUser } from '../../auth/currentUser';
 import { validateCreateTicketRequest } from '../../validators/createTicketRequest';
 import { generateTicketNumber } from '../../services/ticketNumber';
 import { HttpError, ValidationHttpError } from '../../middleware/errorEnvelope';
 
 export const ticketsRouter = Router();
 
-ticketsRouter.post('/', resolveCurrentUser, async (req, res, next) => {
+// Prisma's P2003 error names the FK column that failed (e.g. "Ticket_categoryId_fkey"). Both
+// categoryId and relatedSystemId go through the same check-then-insert pattern below, so both
+// can lose the same race (the referenced row is deleted between the pre-check and the insert) --
+// this map lets one catch clause handle either field instead of special-casing just one.
+const FK_RACE_FIELDS: Record<string, { field: string; message: string }> = {
+  categoryId: { field: 'categoryId', message: 'Referenced record no longer exists' },
+  relatedSystemId: { field: 'relatedSystemId', message: 'Referenced record no longer exists' },
+};
+
+ticketsRouter.post('/', async (req, res, next) => {
   try {
     const validated = validateCreateTicketRequest(req.body ?? {});
     if (!validated.ok) {
@@ -16,18 +24,21 @@ ticketsRouter.post('/', resolveCurrentUser, async (req, res, next) => {
     }
     const { summary, description, categoryId, relatedSystemId, requestedPriority } = validated.value;
 
-    const category = await prisma.category.findUnique({ where: { id: categoryId } });
+    const [category, relatedSystem] = await Promise.all([
+      prisma.category.findUnique({ where: { id: categoryId } }),
+      relatedSystemId !== null
+        ? prisma.relatedSystem.findUnique({ where: { id: relatedSystemId } })
+        : Promise.resolve(null),
+    ]);
+
     if (!category || !category.isActive) {
       throw new ValidationHttpError([{ field: 'categoryId', message: 'categoryId must reference an active category' }]);
     }
 
-    if (relatedSystemId !== null) {
-      const relatedSystem = await prisma.relatedSystem.findUnique({ where: { id: relatedSystemId } });
-      if (!relatedSystem || !relatedSystem.isActive) {
-        throw new ValidationHttpError([
-          { field: 'relatedSystemId', message: 'relatedSystemId must reference an active related system' },
-        ]);
-      }
+    if (relatedSystemId !== null && (!relatedSystem || !relatedSystem.isActive)) {
+      throw new ValidationHttpError([
+        { field: 'relatedSystemId', message: 'relatedSystemId must reference an active related system' },
+      ]);
     }
 
     const requesterId = req.user!.id;
@@ -91,19 +102,21 @@ ticketsRouter.post('/', resolveCurrentUser, async (req, res, next) => {
       return;
     }
     // Only a specific, expected failure gets rewritten to a 422: a foreign-key violation on
-    // the relatedSystem FK (P2003), meaning the row was deleted between the pre-check above
-    // and the insert -- a genuine race, not a server bug. Everything else (an unrelated Prisma
-    // error, a DB connectivity failure, a bug) must fall through to errorEnvelope's generic
-    // 500/INTERNAL_ERROR path unchanged. Silently relabeling arbitrary failures as "your
-    // relatedSystemId doesn't exist" would hide real errors behind a misleading, specific
-    // client-facing message -- exactly what "never silently swallow errors" forbids.
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === 'P2003' &&
-      (error.meta?.field_name as string | undefined)?.includes('relatedSystemId')
-    ) {
-      next(new ValidationHttpError([{ field: 'relatedSystemId', message: 'Referenced record no longer exists' }]));
-      return;
+    // categoryId or relatedSystemId (P2003), meaning the row was deleted between the pre-check
+    // above and the insert -- a genuine race, not a server bug. Everything else (an unrelated
+    // Prisma error, a DB connectivity failure, a bug) must fall through to errorEnvelope's
+    // generic 500/INTERNAL_ERROR path unchanged. Silently relabeling arbitrary failures as "your
+    // field doesn't exist" would hide real errors behind a misleading, specific client-facing
+    // message -- exactly what "never silently swallow errors" forbids.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+      const fkFieldName = error.meta?.field_name as string | undefined;
+      const matchedField = fkFieldName
+        ? Object.keys(FK_RACE_FIELDS).find((field) => fkFieldName.includes(field))
+        : undefined;
+      if (matchedField) {
+        next(new ValidationHttpError([FK_RACE_FIELDS[matchedField]]));
+        return;
+      }
     }
     next(error);
   }

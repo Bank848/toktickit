@@ -8,8 +8,8 @@ import { correlationId, errorEnvelope } from './middleware/errorEnvelope';
 export const app = express();
 
 app.use(cors());
-app.use(express.json());
 app.use(correlationId);
+app.use(express.json());
 
 app.use('/api/health', healthRouter);
 app.use('/api/categories', categoriesRouter);

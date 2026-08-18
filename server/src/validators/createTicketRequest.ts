@@ -1,7 +1,6 @@
-export interface FieldError {
-  field: string;
-  message: string;
-}
+import { FieldError } from '../middleware/errorEnvelope';
+
+export type { FieldError };
 
 export interface ValidatedCreateTicketRequest {
   summary: string;

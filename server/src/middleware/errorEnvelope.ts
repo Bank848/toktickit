@@ -6,6 +6,15 @@ export interface FieldError {
   message: string;
 }
 
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      correlationId?: string;
+    }
+  }
+}
+
 export class HttpError extends Error {
   status: number;
   code: string;
@@ -26,7 +35,7 @@ export class ValidationHttpError extends HttpError {
 }
 
 export function correlationId(req: Request, _res: Response, next: NextFunction) {
-  (req as Request & { correlationId: string }).correlationId = randomUUID();
+  req.correlationId = randomUUID();
   next();
 }
 
@@ -37,7 +46,7 @@ export function errorEnvelope(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction
 ) {
-  const id = (req as Request & { correlationId?: string }).correlationId ?? 'unknown';
+  const id = req.correlationId ?? 'unknown';
 
   if (err instanceof HttpError) {
     res.status(err.status).json({
