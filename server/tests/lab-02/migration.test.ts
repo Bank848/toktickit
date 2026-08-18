@@ -12,6 +12,7 @@ describe('Lab 2 migration', () => {
       'Software',
       'Network',
     ]);
+    expect(categories.map((c) => c.code)).toEqual(['ACCESS', 'HARDWARE', 'SOFTWARE', 'NETWORK']);
     for (const category of categories) {
       expect(typeof category.isActive).toBe('boolean');
       expect(category.isActive).toBe(true);
