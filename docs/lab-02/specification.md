@@ -94,6 +94,17 @@ loading/empty/error states behave) that later sprints reuse rather than reinvent
   the ticket insert. This event exists for audit continuity (BR-15) but is not read back or
   displayed anywhere in Lab 2.
 
+**Create Ticket field-level validation:**
+
+| Field | Rule | On violation |
+|---|---|---|
+| Summary | Required, 5..150 characters, trimmed | 422, field-level message |
+| Description | Required, 10..5000 characters, trimmed | 422, field-level message |
+| Category | Required, must reference an ACTIVE category | 422, field-level message |
+| Related System | Optional; if present, must reference an ACTIVE related system | 422, field-level message |
+| Requested Priority | Required, one of Low/Medium/High/Urgent | 422, field-level message |
+| Ticket Number, Ticket Date, Requester | Read-only, system-generated — never rendered as editable inputs and never accepted from the request body | n/a |
+
 ### My Tickets
 
 - **FR-13** The system shall allow a Requester to view a list ("My Tickets") of every ticket they
@@ -182,6 +193,28 @@ four screens meet the responsive rules in `ui-spec.md` §7 (desktop ≥ 992 px m
 768–991 px two-column, mobile < 768 px stacked with no horizontal scroll) and the accessibility
 rules in §8.
 
+### Non-Functional Requirements
+
+- **NFR-01 Performance.** List and detail reads target p95 < 500 ms under seeded data volumes;
+  file uploads are excluded from this target (large-file I/O dominates, not application logic).
+- **NFR-02 Accessibility.** WCAG 2.2 AA: labelled form controls, visible focus indicators,
+  keyboard-operable controls, accessible names on icon-only buttons.
+- **NFR-03 Theming.** Every screen uses the Zen Green token set (`ui-spec.md` §1) exclusively — no
+  hardcoded colors outside the token definitions.
+- **NFR-04 Responsiveness.** Desktop ≥ 992 px, tablet 768–991 px, and mobile < 768 px each render
+  with no horizontal page scroll and no clipped/overlapping content, per `ui-spec.md` §7.
+- **NFR-05 Timestamp handling.** All timestamps are stored and transmitted in UTC (ISO-8601) and
+  localized only at render time.
+- **NFR-06 Identity-mechanism boundary.** The Development Requester Selection screen and its
+  `x-dev-user-id` header are explicitly not an authentication mechanism; Lab 3 replaces them with
+  real session-based login without changing any other endpoint's contract.
+- **NFR-07 Auditability.** Ticket creation, attachment addition, and attachment removal each write
+  an audit event in the same transaction as the underlying change, even though Lab 2 has no
+  endpoint to read that history back.
+- **NFR-08 Upload safety.** Attachment uploads are validated in layers per OWASP file-upload
+  guidance: extension, declared MIME type, and magic-byte content sniff must all agree before a
+  file is written to storage.
+
 ## 7. Data Changes
 
 Entities needed for Lab 2 (full field lists in `references/TokTickIT-System-Level-SDS-v1.0.md`;
@@ -211,6 +244,12 @@ be used by many Tickets. Indexes: `(requesterId, createdAt)` and `(requesterId, 
 `(requesterId, summary)` for search, `(status)`, `(categoryId)` for My Tickets filtering; soft
 removal is represented by nullable `deletedAt`/`deletedById`/`deletedReason` on `Attachment`, never
 a row delete.
+
+**Migration approach.** The Lab 2 delta (new `RelatedSystem` table, new `deletedReason` column on
+`Attachment`, the Lab-2-only `TicketEvent` types) ships as an additive Prisma migration on top of
+the Lab 1 schema — no destructive column drops or renames. `role` on `User` and the
+Comment/ServiceAction/Notification/Session tables from the SDS baseline stay present but unused,
+so Lab 3 can turn them on without another migration that touches Lab 2's tables.
 
 ## 8. API Contract
 
@@ -289,9 +328,23 @@ Lab 2 is done when:
 - README setup and test instructions are current.
 - Lab 2's own Kanban (GitHub Project) has every planned Issue in Done.
 
+**Review and demonstration evidence** (labsheet §8.10 row 10): a rendered `reviewer.md` naming the
+reviewer, linking every PR reviewed, and recording comments given/received and responses; and, for
+each of Create Ticket, My Tickets, and Ticket Detail, readable screenshots demonstrating the
+initial/loading/validation/submitting/success/failure states called for in §8.6 and the `ui-spec.md`
+state definitions — both required as submission evidence per §14, not merely as internal QA.
+
+GitHub Issue decomposition for this sprint lives in the repository's GitHub Issues and Project
+board, not duplicated in this document — see §10's Kanban-in-Done requirement above. The required
+submission PDF (labsheet §13.2/§14) is compiled at submission time from this document set plus the
+screenshot/link evidence in the table above; it is not a separate authored document.
+
 ## 11. Assumptions and Decisions
 
-Explicit record of where this spec set had to fill a gap the labsheet doesn't pin down exactly:
+Explicit record of where this spec set had to fill a gap the labsheet leaves as a fixed handout
+value to operationalize rather than an open question — the Zen Green tokens and seed counts below
+are the labsheet's own numbers, restated here so they are testable, not assumptions this spec
+invents:
 
 - **Zen Green tokens.** The labsheet's §7 table (page 8) gives the exact published values used
   throughout: Primary `#006B3C`, Secondary `#0B7A46`, Pale `#EAF6EF`, page background `#F5F7F6`,

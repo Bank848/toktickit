@@ -1,7 +1,7 @@
 # Feature-F — Attachments
 
 **Identity.** FEAT-F, Attachments, v1.0, Lab 2.
-**Traceability.** FR-012, FR-026…FR-028, FR-030, FR-031 · BR-012, BR-013, BR-015 · D-06, D-11,
+**Traceability.** FR-11, FR-20…FR-24 · BR-08, BR-09, BR-15 · NFR-01, NFR-03, NFR-08 · D-06, D-11,
 D-20b.
 **Behavior.** Actor: any user who can read the ticket (upload, from Create Ticket per Feature-B
 or from Ticket Detail); the uploader only (removal). Upload with client-side pre-checks (size,
@@ -52,11 +52,11 @@ only), upload control disabled at 5 active. List rows: filename, size, uploader,
 Remove (own active uploads only, with a confirm-and-reason dialog). Removed rows render
 de-emphasized with a "Removed" badge, showing reason/remover/removal date, download control
 disabled. Empty state (zero attachments ever): "No attachments yet."
-**NFRs.** Uploads excluded from the p95 target. Layered validation per OWASP file-upload
-guidance. Zen Green theme (NFR-008).
+**NFRs.** Uploads excluded from the p95 target (NFR-01). Layered validation per OWASP file-upload
+guidance (NFR-08). Zen Green theme (NFR-03).
 **Dependencies.** Feature-B (create-time uploads reuse this upload path), Feature-D (Ticket
-Detail hosts the tab), storage adapter (LocalDiskStorage per D-20b), Feature-A (Development
-Requester Selection).
+Detail hosts the Attachments section), storage adapter (LocalDiskStorage per D-20b), Feature-G
+(Development Requester Selection).
 **Out of scope.** IT-Staff removal-with-reason for another user's upload (Lab 3), image
 thumbnails/inline preview, drag-and-drop multi-file upload, virus scanning, SeaweedFS driver
 enablement (interface only, D-20b), un-removing/restoring a removed attachment.

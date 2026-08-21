@@ -1,7 +1,7 @@
 # Feature-C — My Tickets
 
 **Identity.** FEAT-C, My Tickets, v1.0, Lab 2.
-**Traceability.** FR-007, FR-014…FR-018 · BR-019 · NFR-001, NFR-003 · D-13, D-17, D-18.
+**Traceability.** FR-05, FR-13…FR-17 · BR-13 · NFR-01, NFR-02, NFR-03, NFR-04 · D-13, D-17, D-18.
 **Behavior.** Actor: Requester. Requester sees only their own tickets, all statuses, newest
 first; filter by status and category, **search by free text across ticket number and summary
 (D-17, corrected — search is in Lab 2 scope, not deferred)**, combined with AND semantics;
@@ -25,7 +25,7 @@ query string. Desktop (md+): table with columns Ticket No, Summary, Category, St
 Updated — whole row a real `<a>` link to detail. Mobile (< md): stacked cards instead of a
 horizontally-scrolling table. States: loading skeleton rows, two distinct empty states, error
 with Retry, pagination footer ("Showing 1-10 of 37"), hidden when totalPages === 1.
-**NFRs.** p95 < 500ms; WCAG 2.2 AA; Zen Green theme tokens (NFR-008); responsive with no
-horizontal scroll (NFR-009).
-**Dependencies.** Feature-B (tickets must exist), Feature-A (Development Requester Selection).
+**NFRs.** p95 < 500ms (NFR-01); WCAG 2.2 AA (NFR-02); Zen Green theme tokens (NFR-03); responsive
+with no horizontal scroll (NFR-04).
+**Dependencies.** Feature-B (tickets must exist), Feature-G (Development Requester Selection).
 **Out of scope.** Saved views, CSV export, bulk actions, cross-requester views.

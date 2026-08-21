@@ -50,6 +50,23 @@ test that asserts these computed values.
 - Shared components (per SDS): one treatment each for forms, buttons, tables, badges,
   confirmation dialogs, loading/empty/error states, used identically across Create Ticket, My
   Tickets, and Ticket Detail.
+- **Mobile navigation:** below the `md` (768 px) breakpoint, the primary nav (My Tickets, Create
+  Ticket) collapses behind a Bootstrap navbar-toggler (hamburger) button in the header; the
+  selected-requester display and "Change Requester" control stay visible in the collapsed header
+  bar rather than moving into the collapsed menu. Expanding the toggler shows the nav items
+  stacked full-width; it closes on item selection or on a second toggle press. This satisfies the
+  labsheet's §8 "responsive mobile navigation" requirement.
+
+### Typography and Spacing
+
+- **Font stack:** system font stack (`-apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+  sans-serif`) — no custom web font is loaded in Lab 2.
+- **Type scale:** page/section headings `1.25rem`/`600` weight; field labels and table headers
+  `0.875rem`/`600`; body text and input values `1rem`/`400`; helper/muted text and timestamps
+  `0.8125rem`/`400` using the Muted token.
+- **Spacing:** Bootstrap's default spacing scale (`0.25rem` increments) throughout; form fields use
+  `1rem` vertical gap between rows, `0.5rem` between a label and its control; cards use `1.5rem`
+  internal padding on desktop, `1rem` on mobile.
 
 ### Button hierarchy (labsheet §17)
 
@@ -110,19 +127,25 @@ in E2E (see `tests.md`).
 
 Single-column card. Fields, in order:
 
-1. **Summary** — text input, required, live character counter to 150.
-2. **Category** — select, required, active categories only, placeholder "Select a category".
-3. **Related System** — select, optional, "Not applicable" default, active related systems only.
-4. **Requested Priority** — select, required, default Medium.
-5. **Description** — textarea, 6 rows, required, character counter to 5000.
-6. **Attachments** — file picker (multi-select), accepting `.jpg .jpeg .png .webp .pdf`, client-
+1. **Ticket Number**, **Ticket Date**, **Requester** — read-only display fields (Read-only-field
+   token background, `#F0F3F1`), shown near the top per the labsheet's §8.2 "system-generated
+   fields near the top" arrangement. Ticket Number and Ticket Date show placeholder text
+   ("Assigned on save" / "Today") until the ticket is created; Requester shows the currently
+   selected Development Requester's display name. None of the three is ever rendered as an
+   editable input or accepted from the request body.
+2. **Summary** — text input, required, live character counter to 150.
+3. **Category** — select, required, active categories only, placeholder "Select a category".
+4. **Related System** — select, optional, "Not applicable" default, active related systems only.
+5. **Requested Priority** — select, required, default Medium.
+6. **Description** — textarea, 6 rows, required, character counter to 5000.
+7. **Attachments** — file picker (multi-select), accepting `.jpg .jpeg .png .webp .pdf`, client-
    side pre-check of extension and size (advisory only — server re-validates everything, per
    `api-spec.md`). Staged files are listed with a remove-before-submit control; nothing uploads
    until the ticket itself is created.
 
 **Actions:** Create Ticket (primary, Zen Green Primary) and Cancel (link back to My Tickets).
 
-**Submit sequence (FR-012):** `POST /tickets` first; on success, for each staged file, upload via
+**Submit sequence (FR-11):** `POST /tickets` first; on success, for each staged file, upload via
 `POST /tickets/:id/attachments` in sequence; navigate to the new Ticket Detail regardless of
 individual upload outcomes, with a per-file success/failure summary shown as a dismissible alert
 on Ticket Detail if any upload failed ("2 of 3 files attached. 1 failed: invoice.exe — file type
@@ -141,8 +164,11 @@ Detail with a success alert carrying the new ticket number).
 **Route:** `/tickets`.
 
 **Filter bar** (above the table/cards): search input (placeholder "Search by ticket number or
-summary"), status multi-select, category select, all combined with AND semantics (D-17/BR-019).
-Changing any filter or the search box (debounced ~300 ms) refetches and resets to page 1.
+summary"), status multi-select, category select, a Sort control (whitelist per `api-spec.md` #7:
+Newest first (default), Oldest first, Recently updated, Ticket No.), and a secondary "Clear
+filters" button that resets search/filters/sort to their defaults and is disabled when nothing is
+active — all combined with AND semantics (D-17/BR-13). Changing any filter, the sort, or the
+search box (debounced ~300 ms) refetches and resets to page 1.
 
 **Desktop (≥ `md`, 768 px):** table — columns Ticket No., Summary, Category, Status, Last
 Updated. Status shown as a text+icon badge, never color alone.
@@ -150,7 +176,7 @@ Updated. Status shown as a text+icon badge, never color alone.
 **Mobile (< `md`):** the same rows render as stacked cards (label: value pairs), per the SDS
 "card layout" responsive requirement — never a horizontally scrolling table.
 
-**Row selection:** clicking a row/card navigates to that ticket's Detail (FR-018).
+**Row selection:** clicking a row/card navigates to that ticket's Detail (FR-17).
 
 **Pagination:** page-size-aware controls below the list, standard Bootstrap pagination component.
 
@@ -163,9 +189,10 @@ with retry.
 
 **Route:** `/tickets/:id`.
 
-**Header block:** ticket number, date, category, requester, owner ("Unassigned" — always, in
-Lab 2), Requested Priority badge, IT Priority badge, current status badge, description,
-resolution summary ("No resolution yet" — always, in Lab 2).
+**Header block:** ticket number, date, category, related system ("Not applicable" when none was
+selected), requester, owner ("Unassigned" — always, in Lab 2), Requested Priority badge, IT
+Priority badge, current status badge, summary, description, resolution summary ("No resolution
+yet" — always, in Lab 2) — matching `specification.md` FR-18's full field list.
 
 **Attachments section** (corrected 2026-08-21: no tab chrome, no Service Actions placeholder, no
 Event Log — Lab 2 Ticket Detail is read-only fields plus the attachment lifecycle only, per
@@ -198,7 +225,7 @@ endpoint, no Event Log UI. Public Comments remain out of scope per D-15.
 **States:** loading, not-found/not-accessible (403 — a generic "You don't have access to this
 ticket" message, never revealing whether the ticket exists), error with retry.
 
-## 7. Responsive Rules (D-19/NFR-09, labsheet §8.7)
+## 7. Responsive Rules (D-19/NFR-04, labsheet §8.7)
 
 | Viewport | Required Behavior |
 |---|---|

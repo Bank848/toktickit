@@ -109,7 +109,7 @@ returns 422; a requester's search never returns another requester's tickets (sti
 `req.user.id` — search does not bypass the ownership scope from D-13/the Authorization Model);
 an empty/whitespace `q` behaves identically to omitting `q`.
 
-**Status:** CORRECTED — search is in Lab 2 scope. See `specification.md` FR-016 and
+**Status:** CORRECTED — search is in Lab 2 scope. See `specification.md` FR-15 and
 `api-spec.md` endpoint `GET /api/v1/tickets`.
 
 ## D-18 — Corrected: Lab 2 ships a real Development Requester Selection screen, not a header/env seam
@@ -228,15 +228,15 @@ or identity path exists. Lab 2 explicitly excludes real role-based authorization
 extra "role" of caller that can never actually occur in this lab is speculative code, not
 correctness.
 
-**Status:** CONFIRMED. See `specification.md` §2 (rewritten), `api-spec.md` endpoint #8, and
-`feature-d-ticket-detail.md` Permissions.
+**Status:** CONFIRMED. See `specification.md` §3 Scope (Excluded) and FR-04, `api-spec.md`
+endpoint #8, and `feature-d-ticket-detail.md` Permissions.
 
 ## D-22 — New 2026-08-21: Event Log and Service Actions are removed from Lab 2's Ticket Detail
 
 **Decision.** Ticket Detail in Lab 2 shows read-only ticket fields and the Attachments list only.
 There is no Event Log tab/section, no `GET .../events` endpoint, and no Service Actions
 tab/section — not even as an empty placeholder. `TicketEvent` rows (`TICKET_CREATED`,
-`ATTACHMENT_ADDED`, `ATTACHMENT_REMOVED`) are still written, because BR-015/NFR-004 require that
+`ATTACHMENT_ADDED`, `ATTACHMENT_REMOVED`) are still written, because BR-15/NFR-07 require that
 independently of any UI — only the read/display path is removed from Lab 2.
 
 **Why.** The original D-15 rationale (and the first correction pass) read the eventual full
@@ -246,7 +246,7 @@ eventual full view." The second review pass rejected that: the labsheet scopes t
 read-only ticket details plus the attachment lifecycle, and a placeholder for a feature that
 doesn't exist yet is out-of-scope UI/API surface, not a helpful head start.
 
-**Status:** CONFIRMED. See `specification.md` FR-021 (corrected) and §9 AC-19, `ui-spec.md` §6,
+**Status:** CONFIRMED. See `specification.md` FR-19 (corrected) and §9 AC-19, `ui-spec.md` §6,
 `api-spec.md` (events endpoint removed), `feature-d-ticket-detail.md`.
 
 ## D-23 — New 2026-08-21: explicit, testable seed data baseline

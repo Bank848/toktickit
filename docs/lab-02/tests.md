@@ -76,7 +76,13 @@ rather than spawning additional top-level files beyond this minimum set.
 | UI-07 | UI | AC-12 | Ticket Detail for a non-owned ticket | Access-denied state rendered, no field data present | `client/.../lab-02 tests/RequesterTicketDetail.test.tsx` | Pending |
 | UI-08 | UI | AC-13 | Attachment removal dialog | Submit disabled until a non-empty reason is entered; confirmed removal shows removed metadata, disabled download | `client/.../lab-02 tests/AttachmentSection.test.tsx` | Pending |
 | UI-09 | UI | AC-15, AC-16 | Attachment list at the 5-active limit / with an invalid staged file | Upload control disabled at 5; invalid file rejected client-side with a visible message | `client/.../lab-02 tests/AttachmentSection.test.tsx` | Pending |
-| E2E-01 | E2E | AC-01–AC-13, AC-17 | Complete responsive requester journey: select requester, create ticket with one valid attachment, find it via search in My Tickets, open Detail, remove the attachment with a reason, verify at a mobile viewport | Every step succeeds; confirmation shows the official Ticket Number; removed attachment shows blocked content | `e2e/lab-02/requester-ticket-flow.spec.ts` | Pending |
+| UI-10 | UI | FR-02, FR-03, AC-04 | Header identity display and "Change Requester" reload | Header shows selected Requester's name; activating Change Requester clears the stored selection and discards cached requester-scoped data before the picker renders | `client/.../lab-02 tests/CreateTicket.test.tsx` (shared app-shell fixture) | Pending |
+| UI-11 | UI | `ui-spec.md` §2, §8 (component rules) | Required-field asterisks, `aria-describedby` wiring, editable-vs-read-only field styling, button-hierarchy classes | Required fields show the asterisk marker and are wired to their validation message via `aria-describedby`; read-only fields carry the read-only token class distinct from editable inputs; primary/secondary/tertiary/destructive/disabled/busy buttons each render their designated class | `client/.../lab-02 tests/CreateTicket.test.tsx` | Pending |
+| E2E-01 | E2E | AC-01, AC-02, AC-05, AC-09, AC-13, AC-17 | Complete responsive requester journey: select requester, create ticket with one valid attachment, find it via search in My Tickets, open Detail, remove the attachment with a reason, verify at a mobile viewport | Every step succeeds; confirmation shows the official Ticket Number; removed attachment shows blocked content | `e2e/lab-02/requester-ticket-flow.spec.ts` | Pending |
+| API-14 | API | FR-12, BR-11 | `TICKET_CREATED` audit event on ticket creation | Event row exists with correct ticketId, type, and timestamp inside the same transaction as the ticket insert | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
+| API-15 | API | FR-23, BR-15 | `ATTACHMENT_REMOVED` audit event on soft removal | Event row exists recording filename, uploader, remover, reason, timestamp | `server/tests/lab-02/attachments.api.test.ts` | Pending |
+| UNIT-06 | Unit | BR-07 | Related System deactivation path | Deactivating sets `isActive = false`; no code path hard-deletes a Related System referenced by any ticket | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
+| UNIT-07 | Unit | BR-12 | Ticket/TicketEvent hard-delete guard | No route or service function performs a hard delete on `Ticket` or `TicketEvent` — asserted by absence (no such handler reachable) | `server/tests/lab-02/ticket-detail.api.test.ts` | Pending |
 
 ## 3. Acceptance-Criterion Traceability
 
@@ -84,17 +90,18 @@ Every criterion in `specification.md` §9 maps to at least one planned test abov
 
 | Requirement / Feature | AC(s) | Test(s) |
 |---|---|---|
-| Development Requester Selection (FR-01–FR-05) | AC-01, AC-02, AC-03, AC-04 | UI-01, E2E-01 |
+| Development Requester Selection (FR-01–FR-05) | AC-01, AC-02, AC-03, AC-04 | UI-01, UI-10, E2E-01 (AC-01, AC-02 only) |
 | BR-03, BR-14 (selector is testing-only, server-validated every request) | AC-18 | API-06 |
-| Ticket Creation (FR-06–FR-12) | AC-05, AC-06, AC-07 | UNIT-01, UNIT-02, API-01, API-02, API-03, UI-02, UI-03, E2E-01 |
+| Ticket Creation (FR-06–FR-12) | AC-05, AC-06, AC-07 | UNIT-01, UNIT-02, API-01, API-02, API-03, API-14, UI-02, UI-03, UI-11, E2E-01 (AC-05 only) |
 | BR-01, BR-02, BR-04, BR-06, BR-10 | AC-05 | API-01 |
-| My Tickets (FR-13–FR-17) | AC-08, AC-09, AC-10, AC-11 | UNIT-03, API-04, API-05, UI-04, E2E-01 |
+| BR-11 (create/removal audit event, same transaction) | — (folded into FR-12/FR-23 tests) | API-14, API-15 |
+| My Tickets (FR-13–FR-17) | AC-08, AC-09, AC-10, AC-11 | UNIT-03, API-04, API-05, UI-04, E2E-01 (AC-09 only) |
 | BR-13 (search scope and AND semantics) | AC-09 | API-04, UNIT-03 |
 | Ownership scope, IDOR guard | AC-12, AC-18 | API-06, API-08, UI-07 |
 | Requester Ticket Detail (FR-18–FR-19) | AC-12, AC-19 | API-07, API-08, API-09, UI-06, UI-07 |
-| Attachments (FR-20–FR-24) | AC-13, AC-14, AC-15, AC-16 | UNIT-04, UNIT-05, API-10, API-11, API-12, API-13, UI-08, UI-09, E2E-01 |
-| BR-07, BR-08, BR-09, BR-11, BR-12, BR-15 | AC-13, AC-14, AC-15, AC-16 | UNIT-04, UNIT-05, API-10, API-11, API-12 |
-| Responsive (§7 breakpoints) | AC-17 | UI-05, E2E-01 |
+| Attachments (FR-20–FR-24) | AC-13, AC-14, AC-15, AC-16 | UNIT-04, UNIT-05, API-10, API-11, API-12, API-13, API-15, UI-08, UI-09, E2E-01 (AC-13 only) |
+| BR-07, BR-08, BR-09, BR-11, BR-12, BR-15 | AC-13, AC-14, AC-15, AC-16 | UNIT-04, UNIT-05, UNIT-06, UNIT-07, API-10, API-11, API-12, API-15 |
+| Responsive (§7 breakpoints) | AC-17 | UI-05, E2E-01 (AC-17 only) |
 | Zen Green tokens (`ui-spec.md` §1) | — (visual, not a numbered AC) | manual checklist, §4 below |
 | Seed baseline (`specification.md` §7) | AC-03, AC-18 | migration/seed check, folded into API-06 setup and UI-01 fixture data |
 

@@ -40,12 +40,12 @@ D-20a). Lab 1's `GET /api/categories` (no `/v1`) also stays mounted, unchanged.
   not implement, do not add a `CommentDto`.
 - `GET /api/v1/tickets/:id/events` (D-22, second review pass) — the Event Log is out of Lab 2's
   Ticket Detail scope. `TicketEvent` rows are still written server-side for audit continuity
-  (BR-015/NFR-004); there is simply no endpoint to read them back in Lab 2. Do not implement, do
+  (BR-15/NFR-07); there is simply no endpoint to read them back in Lab 2. Do not implement, do
   not add a `TicketEventDto`.
 
 **Endpoint #12 changed from the earlier draft:** was a hard `DELETE` returning 204 with no body
 and no reason; is now a soft removal requiring a `reason` field in the request body and returning
-the updated (removed-state) `AttachmentDto`, per the FR-028/BR-013 required-reason soft-removal
+the updated (removed-state) `AttachmentDto`, per the FR-22/BR-09 required-reason soft-removal
 correction — see §3 below for the full validation sequence.
 
 ## 2. Request/response DTOs
@@ -64,7 +64,7 @@ CreateTicketRequest {
 ListTicketsQuery {
   status?: string[]         // repeatable, validated against the Ticket status enum
   categoryId?: number
-  q?: string                 // free-text search, 1..100 chars after trim (BR-019/D-17); omitted or blank = no search
+  q?: string                 // free-text search, 1..100 chars after trim (BR-13/D-17); omitted or blank = no search
   page?: number               // default 1, min 1
   pageSize?: number           // default 10, clamped to max 50
   sort?: 'createdAt:desc' | 'createdAt:asc' | 'updatedAt:desc' | 'ticketNo:asc'   // whitelist only; default createdAt:desc
@@ -111,7 +111,7 @@ UserDto         { id, email, displayName }
 ## 3. Endpoint notes a coding agent will otherwise get wrong
 
 **#7 `GET /api/v1/tickets`** — the requester scope is never a query parameter: the server always
-scopes to the selected requester's id (BR-019). Do not add `?requesterId=`; that is an IDOR
+scopes to the selected requester's id (BR-13). Do not add `?requesterId=`; that is an IDOR
 handed to the client. `q` matches `ticketNo` and `summary` (case-insensitive `contains`,
 Prisma-parameterized — never build raw SQL from `q`), combined with `status`/`categoryId` using
 AND semantics, and applies on top of the same ownership scope. `q` over 100 characters after trim
@@ -131,7 +131,7 @@ success the client stores `userId` and sends it as `x-dev-user-id` on every subs
 `resolveCurrentUser` validates that header against the active-Requester list **on every request**,
 not only at selection time — a since-deactivated id gets 401, which the client treats as "return
 to picker," never a silent fallback to some other identity. These two endpoints, and the header
-they enable, are explicitly not an authentication mechanism (NFR-002) — Lab 3 replaces them with
+they enable, are explicitly not an authentication mechanism (NFR-06) — Lab 3 replaces them with
 real session-based login without changing any other endpoint's contract.
 
 **#10 upload validation order** (fail before touching storage): authorize → ticket exists and
@@ -143,7 +143,7 @@ application/pdf} **and** magic-byte sniff of the first bytes agrees with both (e
 `ATTACHMENT_TYPE_REJECTED`). Only then write to storage under a generated key, then insert
 metadata + `ATTACHMENT_ADDED` event in one transaction. If the transaction fails, delete the
 just-written object (compensating cleanup, per SDS) — and if this upload was part of the Create
-Ticket flow (FR-012), the already-created ticket is untouched either way.
+Ticket flow (FR-11), the already-created ticket is untouched either way.
 
 **#11 download headers** — `Content-Disposition: attachment; filename="<sanitized original>"`,
 `X-Content-Type-Options: nosniff`, and serve the **stored** mimeType, never a client-supplied
@@ -172,7 +172,7 @@ can render the now-visible-but-blocked metadata without a second fetch.
 
 **#6 transaction** — ticket number + ticket insert + `TICKET_CREATED` event, all in one
 `prisma.$transaction`. `itPriority` is set equal to `requestedPriority` server-side and is
-**not** accepted from the request body (FR-011 + BR-009). Attachment uploads triggered by
-Create Ticket (FR-012) happen as separate, subsequent requests against the new ticket id — they
+**not** accepted from the request body (FR-10 + BR-06). Attachment uploads triggered by
+Create Ticket (FR-11) happen as separate, subsequent requests against the new ticket id — they
 are not part of this transaction, by design, so a later upload failure cannot roll back the
 ticket.
