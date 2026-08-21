@@ -3,8 +3,8 @@
 **Identity.** FEAT-B, Ticket Creation, v1.0, Lab 2.
 **Traceability.** FR-008…FR-013, FR-008b · BR-001, BR-002, BR-009, BR-014, BR-015 ·
 NFR-001, NFR-003 · D-03, D-10, D-13, D-16, D-18.
-**Behavior.** Actor: Requester (IT Staff/Admin also permitted per the labsheet, but no IT screen
-exists in Lab 2). Precondition: a Development Requester is selected (D-18), >=1 active category.
+**Behavior.** Actor: the currently selected Development Requester — Lab 2 has no other kind of
+caller (D-21). Precondition: a Development Requester is selected (D-18), >=1 active category.
 Main flow: open Create Ticket -> fill summary/description/category/priority (+optional related
 system) -> optionally stage one or more attachment files -> submit -> server creates the ticket
 (validates, allocates ticket number, persists, emits `TICKET_CREATED`, all in one transaction)
@@ -18,8 +18,9 @@ or hidden — Detail shows it with a failure summary, and the Requester can retr
 the Attachments tab (see Feature-F). Acceptance: a created ticket has status NEW, ownerId null,
 itPriority === requestedPriority, a unique TKT-YYYY-NNNNN, and exactly one TICKET_CREATED event,
 regardless of whether any staged attachment upload succeeded.
-**Permissions.** Any authenticated user creates; requesterId is always req.user.id and is never
-accepted from the body.
+**Permissions.** Any selected Development Requester creates; requesterId is always
+req.user.id (the selected requester) and is never accepted from the body. No role check — Lab 2
+has no roles (D-21).
 **Workflow.** Entry into NEW only. No transitions defined here.
 **Data.** Ticket, TicketCounter, TicketEvent. Transaction boundary = number + insert + event.
 **API.** POST /api/v1/tickets (#6 in `api-spec.md`, + GET /categories, GET /related-systems for

@@ -8,9 +8,9 @@ first; filter by status and category, **search by free text across ticket number
 paginate; click row -> Detail. Empty state distinguishes "you have no tickets yet" (offers Create
 Ticket) from "no tickets/no matches for your filters or search" (offers Clear filters) — these
 are different user situations and must not share one message.
-**Permissions.** Server-side scoping only — a REQUESTER cannot widen the scope by any query
-parameter (the server always scopes to req.user.id for a REQUESTER; `?requesterId=` is never
-honoured, per §3.3 #5 of the API contract).
+**Permissions.** Server-side scoping only — the selected requester cannot widen the scope by any
+query parameter (the server always scopes to req.user.id; `?requesterId=` is never honoured, per
+`api-spec.md` §3). Lab 2 has no role-based branch to widen this with (D-21).
 **Workflow.** Read-only; no state transitions.
 **Data.** Read-only. Indexes `(requesterId, createdAt)`, `(status)`, `(categoryId)`, and a
 `(requesterId, ticketNo)`/`(requesterId, summary)` search-friendly index pair for `q`.

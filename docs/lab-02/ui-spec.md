@@ -1,27 +1,32 @@
 # TokTickIT — Lab 2 UI Specification
 
-Corrected 2026-08-21 (PR #14 review, D-19). Implements the labsheet's mandatory Zen Green design
-tokens and responsive presentation rules. Extends the SDS System-Wide UI Standards
+**Status:** Reconciled 2026-08-21, third pass, against the actual official Lab 2 labsheet
+(§7 "Zen Green Theme UI Specification" and §17 "Appendix C. Suggested ui-spec.md Checklist").
+Implements the labsheet's mandatory Zen Green design tokens, full component-state set, and
+responsive presentation rules. Extends the SDS System-Wide UI Standards
 (`references/TokTickIT-System-Level-SDS-v1.0.md`) — shared component treatment, form labelling,
 focus visibility, WCAG 2.2 AA target — with Lab 2's concrete tokens and screens.
 
 ## 1. Zen Green Design Tokens
 
-Corrected 2026-08-21 (second review pass): the labsheet does publish exact Zen Green values.
-This table uses those published values in place of the earlier invented palette.
+Table below matches the labsheet's §7 token table exactly (page 8), including the rows the
+earlier draft of this spec omitted (Surface/cards, Editable field, Read-only field, Warning).
 
-| Token | Value | Use | Contrast note |
+| Token / Element | Value | Required Style (per labsheet) | Contrast note |
 |---|---|---|---|
-| Zen Green Primary | `#006B3C` | App header/nav background (white text/icons), primary buttons | White text on `#006B3C` ≈ 6.6:1 (AA) |
-| Zen Green Secondary | `#0B7A46` | Secondary actions, active nav indicator, focus ring, link emphasis on light backgrounds | On page background ≈ 5.4:1 (AA) |
-| Zen Green Pale | `#EAF6EF` | Hover/selected row background, info banners, badge tints | Paired only with the Text token below — high contrast |
-| Page background | `#F5F7F6` | Application background (replaces plain white) | Text on it ≈ 15:1 |
-| Text | `#1F2937` | Primary text | On page background ≈ 15:1 |
-| Muted | `#5B6573` | Secondary labels, metadata, timestamps | On page background ≈ 5.1:1 (AA) |
-| Border/icon | `#7A8B80` | Borders, dividers, non-text decorative icons | Non-text; no AA text requirement |
-| Success | `#1E7D34` | Completed/success state, always with text/icon (not a status color alone) | On page background ≈ 4.6:1 (AA) |
-| Warning | `#8A6D1B` | Warning surfaces, always with text/icon | On page background ≈ 5.0:1 (AA); paired with a light `#FFF6DA` surface |
-| Danger | `#B3261E` | Destructive/error state, always with text/icon | On page background ≈ 6.0:1 (AA) |
+| Primary green | `#006B3C` | App header, primary actions, strong emphasis | White text on `#006B3C` ≈ 6.6:1 (AA) |
+| Secondary green | `#0B7A46` | Active tabs, focus accents, links, hover states | On page background ≈ 5.4:1 (AA) |
+| Pale green | `#EAF6EF` | Selected, success, and subtle section emphasis | Paired only with the Text token — high contrast |
+| Page background | `#F5F7F6` | Application background (or similarly quiet near-white) | Text on it ≈ 15:1 |
+| Surface / cards | White (`#FFFFFF`) | White with subtle border and restrained shadow | Cards sit above the page background |
+| Text | `#1F2937` | Dark charcoal-green, not pure black, for comfortable reading | On page background ≈ 15:1 |
+| Editable field | White background, `#7A8B80` border | White background with clear neutral border | Distinct from read-only fields |
+| Read-only field | `#F0F3F1` background | Soft gray-green shading, clearly distinct but still readable | Never the same fill as an editable input |
+| Error | `#B3261E` | Dark red text and border; message appears immediately below the field | On page background ≈ 6.0:1 (AA) |
+| Warning | `#8A6D1B` on `#FFF6DA` | Amber callout or badge; never used as ordinary decoration | On page background ≈ 5.0:1 (AA) |
+| Success | `#1E7D34` | Green confirmation with readable text, never color alone | On page background ≈ 4.6:1 (AA) |
+| Muted (supplementary) | `#5B6573` | Secondary labels, metadata, timestamps | On page background ≈ 5.1:1 (AA) |
+| Border/icon (supplementary) | `#7A8B80` | Borders, dividers, non-text decorative icons | Non-text; no AA text requirement |
 
 Status and priority badges use text + an icon, never color alone (SDS System-Wide UI Standards).
 Badge background tints use Zen Green Pale or the neutral/warning/danger surfaces above with the
@@ -38,29 +43,59 @@ test that asserts these computed values.
 
 - App header (Zen Green Primary background, white text): product name "TokTickIT" (left), primary
   nav — My Tickets, Create Ticket (center/left-aligned per Bootstrap navbar), and the
-  **selected-requester display + "Change Requester" control** (right, see §3).
+  **selected-requester display + "Change Requester" control** (right, see §3). The active nav item
+  is indicated with the Secondary green underline/pill, never color alone (also carries an
+  `aria-current="page"`).
 - Content area: Bootstrap container, responsive grid, system font stack, Bootstrap spacing scale.
 - Shared components (per SDS): one treatment each for forms, buttons, tables, badges,
   confirmation dialogs, loading/empty/error states, used identically across Create Ticket, My
   Tickets, and Ticket Detail.
 
-## 3. Development Requester Selection (D-18)
+### Button hierarchy (labsheet §17)
+
+| Style | Visual | Use |
+|---|---|---|
+| Primary | Solid Zen Green Primary fill, white text | The one main action per screen (Create Ticket submit, Continue on the selector) |
+| Secondary | White fill, Zen Green Secondary border and text | Supporting actions alongside a primary (e.g. "Clear filters" next to search) |
+| Tertiary | No fill, no border, Zen Green Secondary text, underline on hover | Low-emphasis actions (e.g. "Cancel" links back to a list) |
+| Destructive | White fill, Danger border and text; solid Danger fill on confirm-dialog submit | Attachment removal confirm |
+| Disabled | Muted gray fill/border/text, `cursor: not-allowed`, `aria-disabled="true"` | Any button whose action cannot currently be taken (e.g. Continue with nothing selected) |
+| Busy | Primary/Destructive styling plus an inline spinner, text unchanged, `aria-busy="true"`, click-disabled | Submit while the request is in flight |
+
+Icon-only controls (e.g. a table-row remove icon) always carry a visible text label via
+`aria-label` and a hover tooltip — an icon never replaces the required visible text on a button.
+
+## 3. Development Requester Selection (D-18, labsheet §8.1)
 
 **Route:** `/dev/select-requester` (also the fallback the app redirects to whenever no valid
 requester is currently selected).
 
-**Purpose banner** (always visible on this screen, Zen Green Pale surface, dark text, an info
-icon — not color alone): *"Development Requester Selection — this stands in for sign-in in
-Lab 2. Lab 3 replaces it with real authentication."*
+**Layout** (matches the labsheet's §8.1 illustration): a centered card below the app header and a
+"Home > Development Requester Selection" breadcrumb, containing, top to bottom:
 
-**Body:** a list of seeded active Requesters, each row showing display name and email, fetched
-from `GET /api/v1/dev/requesters`. Selecting a row (click or Enter/Space when focused — full
-keyboard support) calls `POST /api/v1/dev/session` with the selected user id and, on success,
-navigates to My Tickets.
+1. An icon and the title **"Select Development Requester."**
+2. One line of explanatory text: *"Choose a development requester to simulate the current
+   requester context for Lab 2. This is for testing only and is not a login screen."*
+3. A labelled **Development Requester dropdown** (required, red asterisk), populated from
+   `GET /api/v1/dev/requesters` (active Requesters only).
+4. An info line, Zen Green Pale surface with an info icon: *"Only active development requesters
+   are shown."*
+5. A secondary note, neutral surface with a shield icon: *"Authentication coming in Lab 3 — in
+   Lab 3, this selection will be replaced with secure authentication so you can access the system
+   with your own account."*
+6. Two buttons, right-aligned: **Cancel** (tertiary — no-ops back to the header/home when a prior
+   selection exists, disabled with no effect when this is the first-load fallback) and
+   **Continue** (primary; disabled until a Requester is chosen).
 
-**States:** loading (skeleton rows), empty (no active Requesters seeded — an error state with
-guidance, not a silent blank list, since the app is unusable without at least one), error with
-retry (the fetch itself failed).
+Choosing a Requester and activating Continue calls `POST /api/v1/dev/session` with the selected
+user id; on success the app navigates to My Tickets. The dropdown and both buttons are fully
+keyboard-operable (Tab to focus, Enter/Space/arrow keys per native `<select>` and `<button>`
+semantics — no custom widget that breaks native keyboard behavior).
+
+**States:** loading (dropdown shows a disabled "Loading requesters…" placeholder while the fetch
+is in flight), empty (no active Requesters seeded — a labelled error state with guidance, not a
+silent empty dropdown, since the app is unusable without at least one), API-failure (the fetch
+itself failed — an inline error banner with a Retry action, Continue stays disabled).
 
 **Header integration:** once a requester is selected, the app header shows "Testing as: `<display
 name>`" and a "Change Requester" button. Activating it clears the stored selection
@@ -145,22 +180,39 @@ binary). Removing an attachment opens a confirmation dialog requiring a reason (
 field, 1..200 characters, submit disabled until non-empty) before the request is sent. Empty
 state (zero attachments ever, not even removed ones): "No attachments yet."
 
+**Attachment states (labsheet §17 checklist):**
+
+| State | Presentation |
+|---|---|
+| Active | Normal row: filename, size, uploader, date, working Download, Remove shown only for the current requester's own uploads |
+| Uploading | Row shows the staged filename with a progress/busy indicator in place of Download/Remove; not yet persisted |
+| Invalid | Client-side pre-check (wrong extension or over 5 MB) renders an inline error next to the staged file and blocks it from being included in the upload request; the server re-validates independently and returns the same class of error if a client check is bypassed |
+| Removed | De-emphasized (muted text, "Removed" badge with icon), shows reason/remover/removal date, Download replaced with a disabled control — never a working link to the deleted binary |
+| Unavailable | If a fetch for the attachment list itself fails, the whole section shows an inline error with Retry rather than a partial/broken list |
+
 **Not part of Lab 2 (removed 2026-08-21):** a Service Actions tab/placeholder and an Event Log
 tab. `TICKET_CREATED`/`ATTACHMENT_ADDED`/`ATTACHMENT_REMOVED` events are still written for audit
-continuity (BR-015/NFR-004) but are not read back or displayed anywhere in Lab 2 — no events
+continuity (BR-11/BR-15) but are not read back or displayed anywhere in Lab 2 — no events
 endpoint, no Event Log UI. Public Comments remain out of scope per D-15.
 
 **States:** loading, not-found/not-accessible (403 — a generic "You don't have access to this
 ticket" message, never revealing whether the ticket exists), error with retry.
 
-## 7. Responsive Rules (D-19/NFR-009)
+## 7. Responsive Rules (D-19/NFR-09, labsheet §8.7)
 
-- Bootstrap breakpoints (`xs < 576px`, `sm ≥ 576`, `md ≥ 768`, `lg ≥ 992`, `xl ≥ 1200`) apply
-  everywhere; no custom breakpoints without a documented reason.
-- No screen produces horizontal page scroll at any breakpoint from 320 px upward — verified in
-  E2E at 375 px (see `tests.md` J3).
-- My Tickets switches table → card layout at the `md` breakpoint (§5).
-- Touch targets (buttons, row taps, form controls) are at least 44×44 CSS px on `xs`/`sm`.
+| Viewport | Required Behavior |
+|---|---|
+| Desktop ≥ 992 px | Multi-column layout as specified in §4/§5/§6; content centered with a sensible maximum width |
+| Tablet 768–991 px | Two-column layout where practical; Summary and Description receive enough width |
+| Mobile < 768 px | Fields stack vertically; buttons remain touch-friendly (≥ 44×44 CSS px); no horizontal page scrolling |
+| All sizes | No clipped labels, overlapping messages, hidden buttons, or unreadable attachment names |
+
+My Tickets switches table → stacked-card layout at the 768 px boundary (§5). Verified in E2E at a
+sub-768px viewport (see `tests.md` E2E-01) and by the manual/screenshot checklist in `tests.md` §4.
+
+**Screenshot path convention:** `artifacts/lab-02/screenshots/create-ticket/`,
+`.../my-tickets/`, `.../ticket-detail/`, one subfolder per screen, filenames stating the viewport
+and state (e.g. `create-ticket/mobile-validation-failure.png`).
 
 ## 8. Accessibility (WCAG 2.2 AA)
 

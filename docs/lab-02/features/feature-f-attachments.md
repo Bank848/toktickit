@@ -11,14 +11,14 @@ viewer's own active uploads). **Removal is a soft removal requiring a reason**: 
 confirmation dialog with a required reason field (1..200 chars, submit disabled until non-empty),
 and on confirm the attachment's metadata — filename, uploader, upload date, removal reason,
 remover, removal date — **stays visible** in the list, clearly marked as removed, with
-preview/download replaced by a disabled control; the removal shows in the Event Log. The row is
-never hidden or removed from the list, and the binary is deleted from storage so it can never be
-served again.
-**Permissions.** Upload: anyone who can read the ticket. Removal: uploader only
-(attachment.uploadedById === req.user.id), and only while ticket.status !== 'CLOSED' (Lab 2), and
-only with a non-empty reason. A non-uploader, including IT_STAFF/ADMINISTRATOR, gets 403 on
-removal — the IT-Staff removal-with-reason-for-another-user's-upload path is Lab 3, not
-half-implemented in Lab 2. Download: anyone who can read the ticket, via the authenticated
+preview/download replaced by a disabled control; an `ATTACHMENT_REMOVED` audit event is written
+(not displayed anywhere in Lab 2 — no Event Log exists, per D-22). The row is never hidden or
+removed from the list, and the binary is deleted from storage so it can never be served again.
+**Permissions.** Upload: the currently selected Development Requester, for any ticket they can
+read. Removal: uploader only (attachment.uploadedById === req.user.id), and only while
+ticket.status !== 'CLOSED' (Lab 2), and only with a non-empty reason. Any other Development
+Requester gets 403 on removal — Lab 2 has no role-based access control (D-21), so this is a flat
+"uploader only" rule with no elevated-role exception to half-implement. Download: anyone who can read the ticket, via the authenticated
 content endpoint only, and only while the attachment is active (410 once removed).
 **Workflow.** No status impact; attachment add/remove writes an audit event but does not change
 ticket status.

@@ -46,9 +46,12 @@ additions, alongside role-specific IT Staff controls and workflow.
 (`GET/POST /api/v1/tickets/:id/comments`), UI tab, and tests are removed from the Lab 2 spec set
 entirely — not deferred-with-scaffolding, removed. FR-024/FR-025/BR-018 (comment behavior) move
 to a later-lab feature inventory entry and are out of scope for every Lab 2 deliverable
-(`specification.md`, `ui-spec.md`, `api-spec.md`, `tests.md`). Ticket Detail in Lab 2 therefore
-ships three tabs — Attachments, Service Actions (read-only placeholder, empty in Lab 2), Event
-Log — not four; there is no Public Comments tab.
+(`specification.md`, `ui-spec.md`, `api-spec.md`, `tests.md`). At the time of this decision, Ticket
+Detail in Lab 2 was understood to ship three tabs — Attachments, Service Actions (read-only
+placeholder), Event Log — not four, with no Public Comments tab. **D-22 below (third review pass)
+subsequently removed the Service Actions and Event Log tabs too**, so Ticket Detail in Lab 2 ships
+no tab chrome at all: read-only fields plus the Attachments section only. This paragraph is kept
+for historical accuracy; D-22 is the current state.
 
 **Why this reverses the original W3 sign-off.** The original D-15 read the mockup's default-open
 "Public Comments" tab and the Requester's "respond to IT Staff" ability as evidence comments were
