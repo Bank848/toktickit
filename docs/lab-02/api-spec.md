@@ -30,15 +30,18 @@ model), 201 create / 401 auth / 403 authz / 404 missing / 409 conflict / 422 val
 | 10 | `POST /api/v1/tickets/:id/attachments` | Upload (multipart, field `file`) | **201** `AttachmentDto` | 401, 403, 404, **409** limit, **413** too large, 422 type |
 | 11 | `GET /api/v1/attachments/:id/content` | Authenticated download (active only) | 200 stream | 401, 403, 404, **410** if removed |
 | 12 | `DELETE /api/v1/attachments/:id` | Uploader soft-removes own attachment, reason required | **200** `AttachmentDto` (removed state) | 401, 403, 404, 409 (ticket Closed), 422 (missing/empty reason) |
-| 13 | `GET /api/v1/tickets/:id/events` | Event Log tab (newest→oldest) | 200 paged `TicketEventDto` | 401, 403, 404 |
-| 14 | `GET /api/health` | Lab 1 health endpoint, unchanged alias | 200 | — |
+| 13 | `GET /api/health` | Lab 1 health endpoint, unchanged alias | 200 | — |
 
-Endpoint #14 stays exactly as Lab 1 shipped it (no `/api/v1/health` alias is added in Lab 2, per
+Endpoint #13 stays exactly as Lab 1 shipped it (no `/api/v1/health` alias is added in Lab 2, per
 D-20a). Lab 1's `GET /api/categories` (no `/v1`) also stays mounted, unchanged.
 
-**Endpoints removed from the earlier (incorrect) draft of this contract, per D-15:**
-`GET/POST /api/v1/tickets/:id/comments` — Public Comments are out of Lab 2 scope. Do not
-implement, do not add a `CommentDto`.
+**Endpoints removed from the earlier (incorrect) drafts of this contract:**
+- `GET/POST /api/v1/tickets/:id/comments` (D-15) — Public Comments are out of Lab 2 scope. Do
+  not implement, do not add a `CommentDto`.
+- `GET /api/v1/tickets/:id/events` (D-22, second review pass) — the Event Log is out of Lab 2's
+  Ticket Detail scope. `TicketEvent` rows are still written server-side for audit continuity
+  (BR-015/NFR-004); there is simply no endpoint to read them back in Lab 2. Do not implement, do
+  not add a `TicketEventDto`.
 
 **Endpoint #12 changed from the earlier draft:** was a hard `DELETE` returning 204 with no body
 and no reason; is now a soft removal requiring a `reason` field in the request body and returning
@@ -99,25 +102,27 @@ AttachmentDto {
 // #12 request
 RemoveAttachmentRequest { reason: string }   // required, 1..200 chars, trimmed
 
-TicketEventDto  { id, eventType, createdAt, actor: { id, displayName }, summaryText }
-UserDto         { id, email, displayName, role }
+UserDto         { id, email, displayName }
+// UserDto has no `role` field exposed in Lab 2 — Lab 2 has no role-based behavior to key off of
+// client-side (D-21). The column exists in the database (SDS baseline) but is not part of the
+// Lab 2 API surface.
 ```
 
 ## 3. Endpoint notes a coding agent will otherwise get wrong
 
 **#7 `GET /api/v1/tickets`** — the requester scope is never a query parameter: the server always
-scopes to `req.user.id` for a REQUESTER (D-13/BR-019). Do not add `?requesterId=`; that is an
-IDOR handed to the client. `q` matches `ticketNo` and `summary` (case-insensitive `contains`,
+scopes to the selected requester's id (BR-019). Do not add `?requesterId=`; that is an IDOR
+handed to the client. `q` matches `ticketNo` and `summary` (case-insensitive `contains`,
 Prisma-parameterized — never build raw SQL from `q`), combined with `status`/`categoryId` using
 AND semantics, and applies on top of the same ownership scope. `q` over 100 characters after trim
 → 422; blank/whitespace-only `q` behaves as if omitted (no search). `pageSize` clamps silently to
 50 rather than erroring. Unknown `sort` → 422, never a raw string into `orderBy`.
 
-**#8 access rule** — a REQUESTER may read a ticket only if `ticket.requesterId === req.user.id`,
-else **403** (not 404, to avoid confirming existence to a scanning client — actually 403 vs 404
-is a deliberate choice: SDS convention here is 403 for "exists but not yours," matching the error
-table above). IT_STAFF/ADMINISTRATOR may read all — implemented now even with no IT Staff screen,
-because the rule is cheap and proves FR-007/D-13.
+**#8 access rule (corrected 2026-08-21 — no role branch, D-21)** — the selected requester may
+read a ticket only if `ticket.requesterId` matches their id, else **403** (not 404, to avoid
+confirming existence to a scanning client). There is no second branch for any other role — Lab 2
+has exactly one kind of caller. Do not add an IT Staff/Administrator read-all path; it has no
+reachable caller and no Lab 2 test can exercise it.
 
 **#4/#5 dev-selector endpoints (D-18)** — `GET /dev/requesters` requires no identity (it exists
 to bootstrap identity) and returns only `isActive = true` Requesters. `POST /dev/session` takes
@@ -155,8 +160,10 @@ same `API_BASE_URL` the client already uses, or the API layer must compose it cl
 **#12 soft removal, corrected** — Lab 2 permits removal only by the uploader
 (`attachment.uploadedById === req.user.id`) while `ticket.status !== 'CLOSED'`. The request body
 must include a non-empty `reason` (1..200 chars, trimmed) — missing or empty reason is 422, not
-a silently-defaulted value. The IT-Staff "remove another user's attachment with reason" path is
-Lab 3; return 403 for it now rather than half-implementing it. Removal sets `deletedAt` /
+a silently-defaulted value. Any other Development Requester gets 403 for someone else's
+attachment; Lab 2 has no elevated-role removal path to half-implement (D-21) — an IT-Staff
+"remove another user's attachment with reason" capability is a later lab's addition, not
+something to stub out now. Removal sets `deletedAt` /
 `deletedById` / `deletedReason`, writes `ATTACHMENT_REMOVED` in the same transaction, then deletes
 the binary from storage; if the binary delete fails, log with correlation ID and leave it queued
 for retry — never restore visibility, and never re-attempt exposing the old `storageKey`. The

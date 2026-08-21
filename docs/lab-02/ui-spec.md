@@ -7,34 +7,36 @@ focus visibility, WCAG 2.2 AA target — with Lab 2's concrete tokens and screen
 
 ## 1. Zen Green Design Tokens
 
-No hex values are published in the labsheet or lecture deck beyond the "Zen Green" name and the
-Figure 1 mockup's dark-green header/accent chrome. The table below is this spec set's concrete
-interpretation, chosen to visually match that mockup while meeting WCAG 2.2 AA contrast on every
-pairing actually used in the UI. If the course later publishes exact tokens, only this table (and
-its two consumers below) need to change.
+Corrected 2026-08-21 (second review pass): the labsheet does publish exact Zen Green values.
+This table uses those published values in place of the earlier invented palette.
 
 | Token | Value | Use | Contrast note |
 |---|---|---|---|
-| Zen Green 900 (header) | `#14532D` | App header/nav background, with white text/icons | White text on `#14532D` ≈ 10.9:1 (AAA) |
-| Zen Green 600 (primary) | `#1F7A45` | Primary buttons, primary links, active nav indicator | White text on `#1F7A45` ≈ 4.6:1 (AA for normal text) |
-| Zen Green 100 (surface) | `#E6F4EA` | Hover/selected row background, subtle info surfaces | Paired only with dark text below |
-| Zen Green 700 (interactive dark) | `#155A32` | Visited/active link emphasis on light backgrounds | Text on white ≈ 8.4:1 |
-| Text | `#1F2937` | Primary text | On white ≈ 15.6:1 |
-| Muted | `#5B6573` | Secondary labels, metadata, timestamps | On white ≈ 5.1:1 (AA) |
-| Background | `#FFFFFF` | Application background | — |
+| Zen Green Primary | `#006B3C` | App header/nav background (white text/icons), primary buttons | White text on `#006B3C` ≈ 6.6:1 (AA) |
+| Zen Green Secondary | `#0B7A46` | Secondary actions, active nav indicator, focus ring, link emphasis on light backgrounds | On page background ≈ 5.4:1 (AA) |
+| Zen Green Pale | `#EAF6EF` | Hover/selected row background, info banners, badge tints | Paired only with the Text token below — high contrast |
+| Page background | `#F5F7F6` | Application background (replaces plain white) | Text on it ≈ 15:1 |
+| Text | `#1F2937` | Primary text | On page background ≈ 15:1 |
+| Muted | `#5B6573` | Secondary labels, metadata, timestamps | On page background ≈ 5.1:1 (AA) |
 | Border/icon | `#7A8B80` | Borders, dividers, non-text decorative icons | Non-text; no AA text requirement |
-| Success | `#1E7D34` | Completed/success state, always with text/icon (not a status color alone) | On white ≈ 4.6:1 (AA) |
-| Warning | `#8A6D1B` | Warning surfaces, always with text/icon | On white ≈ 5.0:1 (AA); paired with a light `#FFF6DA` surface, never used as text-on-Zen-Green |
-| Danger | `#B3261E` | Destructive/error state, always with text/icon | On white ≈ 6.0:1 (AA) |
+| Success | `#1E7D34` | Completed/success state, always with text/icon (not a status color alone) | On page background ≈ 4.6:1 (AA) |
+| Warning | `#8A6D1B` | Warning surfaces, always with text/icon | On page background ≈ 5.0:1 (AA); paired with a light `#FFF6DA` surface |
+| Danger | `#B3261E` | Destructive/error state, always with text/icon | On page background ≈ 6.0:1 (AA) |
 
 Status and priority badges use text + an icon, never color alone (SDS System-Wide UI Standards).
-Badge background tints are light neutral/warning/danger surfaces with the corresponding dark
-text color above, not raw Zen Green 600/900 (those are reserved for header/primary-action
-chrome so the palette does not read as "everything is a button").
+Badge background tints use Zen Green Pale or the neutral/warning/danger surfaces above with the
+corresponding dark text color, not raw Primary/Secondary (those are reserved for header/
+primary-action chrome so the palette does not read as "everything is a button").
+
+**Verification checklist (screenshot/computed-style check, per review request):** app header and
+primary buttons render `#006B3C`; secondary actions, the active nav indicator, and the visible
+focus ring render `#0B7A46`; hover/selected rows and info banners render `#EAF6EF`; the page
+background (`<body>`/app shell, not individual cards) renders `#F5F7F6`. See `tests.md` for the
+test that asserts these computed values.
 
 ## 2. Global Layout
 
-- App header (Zen Green 900 background, white text): product name "TokTickIT" (left), primary
+- App header (Zen Green Primary background, white text): product name "TokTickIT" (left), primary
   nav — My Tickets, Create Ticket (center/left-aligned per Bootstrap navbar), and the
   **selected-requester display + "Change Requester" control** (right, see §3).
 - Content area: Bootstrap container, responsive grid, system font stack, Bootstrap spacing scale.
@@ -47,7 +49,7 @@ chrome so the palette does not read as "everything is a button").
 **Route:** `/dev/select-requester` (also the fallback the app redirects to whenever no valid
 requester is currently selected).
 
-**Purpose banner** (always visible on this screen, Zen Green 100 surface, dark text, an info
+**Purpose banner** (always visible on this screen, Zen Green Pale surface, dark text, an info
 icon — not color alone): *"Development Requester Selection — this stands in for sign-in in
 Lab 2. Lab 3 replaces it with real authentication."*
 
@@ -83,13 +85,13 @@ Single-column card. Fields, in order:
    `api-spec.md`). Staged files are listed with a remove-before-submit control; nothing uploads
    until the ticket itself is created.
 
-**Actions:** Create Ticket (primary, Zen Green 600) and Cancel (link back to My Tickets).
+**Actions:** Create Ticket (primary, Zen Green Primary) and Cancel (link back to My Tickets).
 
 **Submit sequence (FR-012):** `POST /tickets` first; on success, for each staged file, upload via
 `POST /tickets/:id/attachments` in sequence; navigate to the new Ticket Detail regardless of
 individual upload outcomes, with a per-file success/failure summary shown as a dismissible alert
 on Ticket Detail if any upload failed ("2 of 3 files attached. 1 failed: invoice.exe — file type
-not allowed. Retry from the Attachments tab."). The ticket itself is never rolled back or hidden
+not allowed. Retry from Attachments below."). The ticket itself is never rolled back or hidden
 because an attachment upload failed.
 
 **States:** loading (initial categories/related-systems fetch), empty (no active categories —
@@ -130,23 +132,23 @@ with retry.
 Lab 2), Requested Priority badge, IT Priority badge, current status badge, description,
 resolution summary ("No resolution yet" — always, in Lab 2).
 
-**Tabs:** Attachments (default open), Service Actions, Event Log — three tabs, not four; there is
-no Public Comments tab (D-15 correction).
+**Attachments section** (corrected 2026-08-21: no tab chrome, no Service Actions placeholder, no
+Event Log — Lab 2 Ticket Detail is read-only fields plus the attachment lifecycle only, per
+review). Renders directly below the header block: upload control (constraints stated in visible
+text: "JPG, PNG, WEBP or PDF, up to 5 MB, maximum 5 files", count shown as "3 of 5 used",
+disabled at 5 active). List rows: filename, size, uploader, upload date, Download (active
+attachments only), Remove (own uploads only, while ticket is not Closed). **Removed attachments
+remain in the list**, visually de-emphasized (muted text, a "Removed" badge with icon), showing
+filename, uploader, original upload date, removal reason, remover, and removal date —
+Download/preview is replaced with a disabled control (never a working link to the deleted
+binary). Removing an attachment opens a confirmation dialog requiring a reason (required text
+field, 1..200 characters, submit disabled until non-empty) before the request is sent. Empty
+state (zero attachments ever, not even removed ones): "No attachments yet."
 
-- **Attachments tab:** upload control (constraints stated in visible text: "JPG, PNG, WEBP or
-  PDF, up to 5 MB, maximum 5 files", count shown as "3 of 5 used", disabled at 5 active). List
-  rows: filename, size, uploader, upload date, Download (active attachments only), Remove (own
-  uploads only, while ticket is not Closed). **Removed attachments remain in the list**, visually
-  de-emphasized (muted text, a "Removed" badge with icon), showing filename, uploader, original
-  upload date, removal reason, remover, and removal date — Download/preview is replaced with a
-  disabled control (never a working link to the deleted binary). Removing an attachment opens a
-  confirmation dialog requiring a reason (required text field, 1..200 characters, submit disabled
-  until non-empty) before the request is sent. Empty state (zero attachments ever, not even
-  removed ones): "No attachments yet."
-- **Service Actions tab:** always empty in Lab 2 — "No service actions yet. Service Actions are
-  added by IT Staff in a later lab." (labelled empty state, not a hidden tab).
-- **Event Log tab:** read-only list, newest-first, of `TICKET_CREATED`, `ATTACHMENT_ADDED`,
-  `ATTACHMENT_REMOVED` events, each showing actor, a plain-language summary, and timestamp.
+**Not part of Lab 2 (removed 2026-08-21):** a Service Actions tab/placeholder and an Event Log
+tab. `TICKET_CREATED`/`ATTACHMENT_ADDED`/`ATTACHMENT_REMOVED` events are still written for audit
+continuity (BR-015/NFR-004) but are not read back or displayed anywhere in Lab 2 — no events
+endpoint, no Event Log UI. Public Comments remain out of scope per D-15.
 
 **States:** loading, not-found/not-accessible (403 — a generic "You don't have access to this
 ticket" message, never revealing whether the ticket exists), error with retry.
@@ -164,7 +166,7 @@ ticket" message, never revealing whether the ticket exists), error with retry.
 
 - Every form control has a programmatic label; validation messages are associated with their
   field via `aria-describedby` and announced to assistive tech on submit failure.
-- Keyboard focus is visible (a Zen Green 700 focus ring, never suppressed) and follows a logical
+- Keyboard focus is visible (a Zen Green Secondary focus ring, never suppressed) and follows a logical
   tab order; the confirmation dialog (attachment removal) traps focus and returns it to the
   control that opened it on close.
 - Status/priority/removed-attachment states communicate via text and icon, never color alone.

@@ -1,10 +1,10 @@
 # TokTickIT SDS — Decision Register Addendum (Lab 2)
 
 Continues the Decision Register in `references/TokTickIT-System-Level-SDS-v1.0.md`. D-13...D-20
-were originally signed off 2026-08-18. Following PR #14 review against the official Lab 2
-labsheet and lecture deck, D-15, D-17, D-18, and D-19 below were corrected on 2026-08-21 (see the
-"Corrected" status marker on each). D-13, D-14, D-16, D-20 are unchanged. Status: CONFIRMED,
-same weight as D-01...D-12.
+were originally signed off 2026-08-18. Following the first PR #14 review pass, D-15, D-17, D-18,
+and D-19 were corrected on 2026-08-21 (see the "Corrected" status marker on each). Following a
+second PR #14 review pass the same day, D-19's exact tokens were updated and D-21, D-22, D-23
+were added. D-13, D-14, D-16, D-20 are unchanged. Status: CONFIRMED, same weight as D-01...D-12.
 
 ## D-13 — Requester status authority is corrected to match the Labsheet (supersedes part of D-02)
 
@@ -131,13 +131,14 @@ E2E assertions) the labsheet asks for.
   Requester"** control. Activating it clears the stored identity and returns to the picker.
   Switching requesters reloads all requester-scoped data (My Tickets, any open Ticket Detail) —
   no stale data from the previous requester may remain visible after a switch.
-- Every subsequent authenticated request carries the selected `userId` via the
-  `x-dev-user-id` header (server-validated against the active-Requester list on every request,
-  not just at selection time — a deactivated or unknown id in the header is rejected with 401,
-  which also forces the client back to the picker). This keeps the actual identity-resolution
-  mechanism (`resolveCurrentUser` middleware, `req.user`) unchanged from the original design;
-  only the source of the identity value changes, from an invisible header/env default to a
-  visible, user-driven selection captured through a real screen.
+- Every subsequent request carries the selected `userId` via the `x-dev-user-id` header
+  (server-validated against the active-Requester list on every request, not just at selection
+  time — a deactivated or unknown id in the header is rejected with 401, which also forces the
+  client back to the picker). This is a plain identity-presence check, not role-based
+  authorization (see D-21) — it keeps the actual identity-resolution mechanism
+  (`resolveCurrentUser` middleware, `req.user`) unchanged from the original design; only the
+  source of the identity value changes, from an invisible header/env default to a visible,
+  user-driven selection captured through a real screen.
 - The picker and "Change Requester" control are **clearly labelled as development/testing
   scaffolding, not authentication**: the picker screen carries a visible banner — "Development
   Requester Selection — this stands in for sign-in in Lab 2; Lab 3 replaces it with real
@@ -184,14 +185,16 @@ tokens. SDS D-09 (System-Level SDS, `references/TokTickIT-System-Level-SDS-v1.0.
 for TokTickIT specifically by this decision; D-09's general course guidance is otherwise
 unaffected.
 
-**Exact tokens.** No hex values are given in the labsheet or lecture deck beyond the "Zen Green"
-name and the Figure 1 screenshot's green header/accent chrome — this spec set defines a concrete
-token set (below) chosen to match that visual language while meeting WCAG 2.2 AA contrast. If the
-course later publishes exact Zen Green hex values, this decision updates to match them without
-changing anything else in this addendum.
+**Exact tokens — updated 2026-08-21, second review pass.** The first pass here defined an
+invented token set because no hex values were visible in the source material at the time. The
+second review pass supplied the labsheet's actual published values: Primary `#006B3C`, Secondary
+`#0B7A46`, Pale `#EAF6EF`, page background `#F5F7F6`. `ui-spec.md` §1 now uses these exact values,
+carried into a verification checklist (computed-style/screenshot check) so implementation and
+submission evidence are objectively checkable against them.
 
-**Status:** CORRECTED — Zen Green is the Lab 2 theme. See `ui-spec.md` for the full token table,
-component treatment, and responsive rules.
+**Status:** CORRECTED — Zen Green, with the exact published tokens, is the Lab 2 theme. See
+`ui-spec.md` §1 for the full token table, component treatment, verification checklist, and
+responsive rules.
 
 ## D-20 — API versioning and storage staging
 
@@ -206,3 +209,53 @@ autoincrement PK — migrating it would break the Lab 1 migration/seed/tests/sub
 no benefit. `RelatedSystem` uses `Int` too, for symmetry with Category.
 
 **Status:** CONFIRMED.
+
+## D-21 — New 2026-08-21: Lab 2 has no role-based access control
+
+**Decision.** Lab 2 code never branches on `User.role`. There is no IT Staff or Administrator
+code path anywhere in the Lab 2 contract — not server middleware, not an API endpoint, not a UI
+control. The only access rule is ownership: a ticket is visible to the Development Requester who
+created it, checked identically regardless of role. `User.role` remains a column (SDS baseline
+schema, D-01...D-12) but is otherwise inert in Lab 2.
+
+**Why.** The second PR #14 review pass flagged the earlier "implement the IT Staff/Administrator
+read-all branch now, since it's cheap" language (feature-d.md, api-spec.md) as unjustified scope:
+that branch has no reachable caller and no Lab 2 test can exercise it, since no IT Staff screen
+or identity path exists. Lab 2 explicitly excludes real role-based authorization — modeling one
+extra "role" of caller that can never actually occur in this lab is speculative code, not
+correctness.
+
+**Status:** CONFIRMED. See `specification.md` §2 (rewritten), `api-spec.md` endpoint #8, and
+`feature-d-ticket-detail.md` Permissions.
+
+## D-22 — New 2026-08-21: Event Log and Service Actions are removed from Lab 2's Ticket Detail
+
+**Decision.** Ticket Detail in Lab 2 shows read-only ticket fields and the Attachments list only.
+There is no Event Log tab/section, no `GET .../events` endpoint, and no Service Actions
+tab/section — not even as an empty placeholder. `TicketEvent` rows (`TICKET_CREATED`,
+`ATTACHMENT_ADDED`, `ATTACHMENT_REMOVED`) are still written, because BR-015/NFR-004 require that
+independently of any UI — only the read/display path is removed from Lab 2.
+
+**Why.** The original D-15 rationale (and the first correction pass) read the eventual full
+ticket-detail mockup, which does show an Event Log and later a Service Actions area, as
+justification for shipping an empty/placeholder version now so "the tab structure matches the
+eventual full view." The second review pass rejected that: the labsheet scopes this increment to
+read-only ticket details plus the attachment lifecycle, and a placeholder for a feature that
+doesn't exist yet is out-of-scope UI/API surface, not a helpful head start.
+
+**Status:** CONFIRMED. See `specification.md` FR-021 (corrected) and §9 AC-19, `ui-spec.md` §6,
+`api-spec.md` (events endpoint removed), `feature-d-ticket-detail.md`.
+
+## D-23 — New 2026-08-21: explicit, testable seed data baseline
+
+**Decision.** The seed script guarantees, deterministically: at least 4 active Development
+Requesters and exactly 1 inactive Requester (fixed, predictable identities, not randomly
+generated), exactly 4 active Categories (Lab 1 carryover), and at least 6 active Related Systems.
+Seeding is idempotent — upserts by natural key (`email` for `User`, `code` for
+`Category`/`RelatedSystem`), not blind inserts, so running it twice doesn't duplicate or error.
+
+**Why.** The second review pass asked for a seed baseline explicit and testable enough to assert
+against, rather than "some rows exist." The inactive Requester specifically exists to test that
+D-18's picker and session endpoints correctly exclude/reject inactive users.
+
+**Status:** CONFIRMED. See `specification.md` §7 and the migration/seed tests in `tests.md`.
