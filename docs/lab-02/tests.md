@@ -24,10 +24,10 @@ locations, per the labsheet's §12 minimum repository structure:
 - `server/tests/lab-02/my-tickets.api.test.ts`
 - `server/tests/lab-02/ticket-detail.api.test.ts`
 - `server/tests/lab-02/attachments.api.test.ts`
-- `client/.../lab-02 tests/CreateTicket.test.tsx`
-- `client/.../lab-02 tests/MyTickets.test.tsx`
-- `client/.../lab-02 tests/RequesterTicketDetail.test.tsx`
-- `client/.../lab-02 tests/AttachmentSection.test.tsx`
+- `client/tests/lab-02/CreateTicket.test.tsx`
+- `client/tests/lab-02/MyTickets.test.tsx`
+- `client/tests/lab-02/RequesterTicketDetail.test.tsx`
+- `client/tests/lab-02/AttachmentSection.test.tsx`
 - `e2e/lab-02/requester-ticket-flow.spec.ts`
 
 These are the only required test files; every scenario in §2 below lives in one of them under a
@@ -67,17 +67,17 @@ rather than spawning additional top-level files beyond this minimum set.
 | API-11 | API | AC-15 | 6th active attachment upload, then upload after one removal | 409 on the 6th; success after a removal frees a slot | `server/tests/lab-02/attachments.api.test.ts` | Pending |
 | API-12 | API | AC-13, AC-14 | Remove attachment with reason / with missing reason | 200 removed-state DTO with reason/remover/date visible and 410 on content; 422 when reason missing | `server/tests/lab-02/attachments.api.test.ts` | Pending |
 | API-13 | API | FR-24 | Download headers and removed-attachment access | `Content-Disposition`/`nosniff`/stored mimeType present; `storageKey` never in any response body | `server/tests/lab-02/attachments.api.test.ts` | Pending |
-| UI-01 | UI | AC-01, AC-02, AC-03 | Development Requester Selection renders/selects/excludes inactive | Picker blocks navigation until selection; inactive requester absent | `client/.../lab-02 tests/CreateTicket.test.tsx` (shared app-shell fixture) | Pending |
-| UI-02 | UI | AC-07 | Submit Create Ticket without Summary | Field message renders next to the input; API not called | `client/.../lab-02 tests/CreateTicket.test.tsx` | Pending |
-| UI-03 | UI | AC-06 | Post-create per-file upload failure | Failure summary renders without hiding the created ticket | `client/.../lab-02 tests/CreateTicket.test.tsx` | Pending |
-| UI-04 | UI | AC-09, AC-10, AC-11 | My Tickets filters/search/pagination and both empty states | Refetch resets to page 1; correct empty state per scenario | `client/.../lab-02 tests/MyTickets.test.tsx` | Pending |
-| UI-05 | UI | AC-17 | My Tickets at a sub-768px viewport | Renders as stacked cards, no horizontal scroll | `client/.../lab-02 tests/MyTickets.test.tsx` | Pending |
-| UI-06 | UI | FR-18, AC-19 | Ticket Detail header render | All specified fields present; no Event Log/Service Actions/Comments section anywhere in the DOM | `client/.../lab-02 tests/RequesterTicketDetail.test.tsx` | Pending |
-| UI-07 | UI | AC-12 | Ticket Detail for a non-owned ticket | Access-denied state rendered, no field data present | `client/.../lab-02 tests/RequesterTicketDetail.test.tsx` | Pending |
-| UI-08 | UI | AC-13 | Attachment removal dialog | Submit disabled until a non-empty reason is entered; confirmed removal shows removed metadata, disabled download | `client/.../lab-02 tests/AttachmentSection.test.tsx` | Pending |
-| UI-09 | UI | AC-15, AC-16 | Attachment list at the 5-active limit / with an invalid staged file | Upload control disabled at 5; invalid file rejected client-side with a visible message | `client/.../lab-02 tests/AttachmentSection.test.tsx` | Pending |
-| UI-10 | UI | FR-02, FR-03, AC-04 | Header identity display and "Change Requester" reload | Header shows selected Requester's name; activating Change Requester clears the stored selection and discards cached requester-scoped data before the picker renders | `client/.../lab-02 tests/CreateTicket.test.tsx` (shared app-shell fixture) | Pending |
-| UI-11 | UI | `ui-spec.md` §2, §8 (component rules) | Required-field asterisks, `aria-describedby` wiring, editable-vs-read-only field styling, button-hierarchy classes | Required fields show the asterisk marker and are wired to their validation message via `aria-describedby`; read-only fields carry the read-only token class distinct from editable inputs; primary/secondary/tertiary/destructive/disabled/busy buttons each render their designated class | `client/.../lab-02 tests/CreateTicket.test.tsx` | Pending |
+| UI-01 | UI | AC-01, AC-02, AC-03 | Development Requester Selection renders/selects/excludes inactive | Picker blocks navigation until selection; inactive requester absent | `client/tests/lab-02/CreateTicket.test.tsx` (shared app-shell fixture) | Pending |
+| UI-02 | UI | AC-07 | Submit Create Ticket without Summary | Field message renders next to the input; API not called | `client/tests/lab-02/CreateTicket.test.tsx` | Pending |
+| UI-03 | UI | AC-06 | Post-create per-file upload failure | Failure summary renders without hiding the created ticket | `client/tests/lab-02/CreateTicket.test.tsx` | Pending |
+| UI-04 | UI | AC-09, AC-10, AC-11 | My Tickets filters/search/pagination and both empty states | Refetch resets to page 1; correct empty state per scenario | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
+| UI-05 | UI | AC-17 | My Tickets at a sub-768px viewport | Renders as stacked cards, no horizontal scroll | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
+| UI-06 | UI | FR-18, AC-19 | Ticket Detail header render | All specified fields present; no Event Log/Service Actions/Comments section anywhere in the DOM | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Pending |
+| UI-07 | UI | AC-12 | Ticket Detail for a non-owned ticket | Access-denied state rendered, no field data present | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Pending |
+| UI-08 | UI | AC-13 | Attachment removal dialog | Submit disabled until a non-empty reason is entered; confirmed removal shows removed metadata, disabled download | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
+| UI-09 | UI | AC-15, AC-16 | Attachment list at the 5-active limit / with an invalid staged file | Upload control disabled at 5; invalid file rejected client-side with a visible message | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
+| UI-10 | UI | FR-02, FR-03, AC-04 | Header identity display and "Change Requester" reload | Header shows selected Requester's name; activating Change Requester clears the stored selection and discards cached requester-scoped data before the picker renders | `client/tests/lab-02/CreateTicket.test.tsx` (shared app-shell fixture) | Pending |
+| UI-11 | UI | `ui-spec.md` §2, §8 (component rules) | Required-field asterisks, `aria-describedby` wiring, editable-vs-read-only field styling, button-hierarchy classes | Required fields show the asterisk marker and are wired to their validation message via `aria-describedby`; read-only fields carry the read-only token class distinct from editable inputs; primary/secondary/tertiary/destructive/disabled/busy buttons each render their designated class | `client/tests/lab-02/CreateTicket.test.tsx` | Pending |
 | E2E-01 | E2E | AC-01, AC-02, AC-05, AC-09, AC-13, AC-17 | Complete responsive requester journey: select requester, create ticket with one valid attachment, find it via search in My Tickets, open Detail, remove the attachment with a reason, verify at a mobile viewport | Every step succeeds; confirmation shows the official Ticket Number; removed attachment shows blocked content | `e2e/lab-02/requester-ticket-flow.spec.ts` | Pending |
 | API-14 | API | FR-12, BR-11 | `TICKET_CREATED` audit event on ticket creation | Event row exists with correct ticketId, type, and timestamp inside the same transaction as the ticket insert | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
 | API-15 | API | FR-23, BR-15 | `ATTACHMENT_REMOVED` audit event on soft removal | Event row exists recording filename, uploader, remover, reason, timestamp | `server/tests/lab-02/attachments.api.test.ts` | Pending |
