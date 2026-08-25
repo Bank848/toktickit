@@ -28,15 +28,13 @@ export async function resolveCurrentUser(req: Request, _res: Response, next: Nex
       throw new HttpError(401, 'UNAUTHENTICATED', 'No identity source is configured');
     }
 
-    const headerEmail = req.header('x-dev-user-email');
-    const email = (headerEmail ?? process.env.DEV_DEFAULT_USER_EMAIL ?? '').trim().toLowerCase();
-
-    if (!email) {
+    const userId = req.header('x-dev-user-id');
+    if (!userId) {
       throw new HttpError(401, 'UNAUTHENTICATED', 'No identity source is configured');
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !user.isActive) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.isActive || user.role !== 'REQUESTER') {
       throw new HttpError(401, 'UNAUTHENTICATED', 'Identity could not be resolved');
     }
 
