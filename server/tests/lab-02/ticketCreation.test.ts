@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import request from 'supertest';
 import { app } from '../../src/app';
 import { prisma } from '../../src/prisma';
@@ -6,6 +6,15 @@ import { truncateTicketTables } from '../helpers/resetDb';
 import { generateTicketNumber } from '../../src/services/ticketNumber';
 
 describe('POST /api/v1/tickets', () => {
+  let requesterId: string;
+
+  beforeAll(async () => {
+    const requester = await prisma.user.findUniqueOrThrow({
+      where: { email: 'requester@toktickit.local' },
+    });
+    requesterId = requester.id;
+  });
+
   beforeEach(async () => {
     await truncateTicketTables();
   });
@@ -15,7 +24,7 @@ describe('POST /api/v1/tickets', () => {
 
     const response = await request(app)
       .post('/api/v1/tickets')
-      .set('x-dev-user-email', 'requester@toktickit.local')
+      .set('x-dev-user-id', requesterId)
       .send({
         summary: 'VPN keeps disconnecting',
         description: 'Drops every few minutes since this morning, on both wifi and ethernet.',
@@ -40,7 +49,7 @@ describe('POST /api/v1/tickets', () => {
 
     const response = await request(app)
       .post('/api/v1/tickets')
-      .set('x-dev-user-email', 'requester@toktickit.local')
+      .set('x-dev-user-id', requesterId)
       .send({
         summary: 'Printer out of toner',
         description: 'The 3rd floor printer shows a toner-empty light and will not print.',
@@ -65,7 +74,7 @@ describe('POST /api/v1/tickets', () => {
   it('returns 422 with fieldErrors for an invalid body', async () => {
     const response = await request(app)
       .post('/api/v1/tickets')
-      .set('x-dev-user-email', 'requester@toktickit.local')
+      .set('x-dev-user-id', requesterId)
       .send({ summary: 'ab', description: 'too short', categoryId: 1, requestedPriority: 'HIGH' });
 
     expect(response.status).toBe(422);
@@ -79,7 +88,7 @@ describe('POST /api/v1/tickets', () => {
 
     const response = await request(app)
       .post('/api/v1/tickets')
-      .set('x-dev-user-email', 'requester@toktickit.local')
+      .set('x-dev-user-id', requesterId)
       .send({
         summary: 'Testing inactive category rejection',
         description: 'This request targets a category that has been deactivated on purpose.',
@@ -100,7 +109,7 @@ describe('POST /api/v1/tickets', () => {
       Array.from({ length: 10 }, (_, i) =>
         request(app)
           .post('/api/v1/tickets')
-          .set('x-dev-user-email', 'requester@toktickit.local')
+          .set('x-dev-user-id', requesterId)
           .send({
             summary: `Concurrency test ticket ${i}`,
             description: 'Body text long enough to pass the 10-character minimum requirement.',
@@ -126,7 +135,7 @@ describe('POST /api/v1/tickets', () => {
     // transaction, not transaction rollback itself (see the next test for that).
     const response = await request(app)
       .post('/api/v1/tickets')
-      .set('x-dev-user-email', 'requester@toktickit.local')
+      .set('x-dev-user-id', requesterId)
       .send({
         summary: 'Nonexistent related system test',
         description: 'relatedSystemId below does not exist and must be rejected before insert.',
