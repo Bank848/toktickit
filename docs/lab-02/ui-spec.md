@@ -222,8 +222,9 @@ tab. `TICKET_CREATED`/`ATTACHMENT_ADDED`/`ATTACHMENT_REMOVED` events are still w
 continuity (BR-11/BR-15) but are not read back or displayed anywhere in Lab 2 — no events
 endpoint, no Event Log UI. Public Comments remain out of scope per D-15.
 
-**States:** loading, not-found/not-accessible (403 — a generic "You don't have access to this
-ticket" message, never revealing whether the ticket exists), error with retry.
+**States:** loading, not-found/not-accessible (404, corrected 2026-08-22 PR #14 peer review, D-24
+— a generic "Ticket not found" message, never revealing whether the ticket exists; 403 would have
+confirmed existence, so it's never used here), error with retry.
 
 ## 7. Responsive Rules (D-19/NFR-04, labsheet §8.7)
 

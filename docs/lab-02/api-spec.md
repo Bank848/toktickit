@@ -25,10 +25,10 @@ model), 201 create / 401 auth / 403 authz / 404 missing / 409 conflict / 422 val
 | 5 | `POST /api/v1/dev/session` | Select the active dev-testing Requester (D-18) | 200 `UserDto` | 404 unknown/inactive id, 422 |
 | 6 | `POST /api/v1/tickets` | Create a ticket | **201** `TicketDetailDto` | 401, 422 |
 | 7 | `GET /api/v1/tickets` | My Tickets: filtered, searched, sorted, paged | 200 paged `TicketListItemDto` | 401, 422 |
-| 8 | `GET /api/v1/tickets/:id` | Ticket Detail | 200 `TicketDetailDto` | 401, 403, 404 |
-| 9 | `GET /api/v1/tickets/:id/attachments` | Attachments, active and removed | 200 `AttachmentDto[]` | 401, 403, 404 |
-| 10 | `POST /api/v1/tickets/:id/attachments` | Upload (multipart, field `file`) | **201** `AttachmentDto` | 401, 403, 404, **409** limit, **413** too large, 422 type |
-| 11 | `GET /api/v1/attachments/:id/content` | Authenticated download (active only) | 200 stream | 401, 403, 404, **410** if removed |
+| 8 | `GET /api/v1/tickets/:id` | Ticket Detail | 200 `TicketDetailDto` | 401, 404 |
+| 9 | `GET /api/v1/tickets/:id/attachments` | Attachments, active and removed | 200 `AttachmentDto[]` | 401, 404 |
+| 10 | `POST /api/v1/tickets/:id/attachments` | Upload (multipart, field `file`) | **201** `AttachmentDto` | 401, 404, **409** limit, **413** too large, 422 type |
+| 11 | `GET /api/v1/attachments/:id/content` | Authenticated download (active only) | 200 stream | 401, 404, **410** if removed |
 | 12 | `DELETE /api/v1/attachments/:id` | Uploader soft-removes own attachment, reason required | **200** `AttachmentDto` (removed state) | 401, 403, 404, 409 (ticket Closed), 422 (missing/empty reason) |
 | 13 | `GET /api/health` | Lab 1 health endpoint, unchanged alias | 200 | — |
 
@@ -118,11 +118,15 @@ AND semantics, and applies on top of the same ownership scope. `q` over 100 char
 → 422; blank/whitespace-only `q` behaves as if omitted (no search). `pageSize` clamps silently to
 50 rather than erroring. Unknown `sort` → 422, never a raw string into `orderBy`.
 
-**#8 access rule (corrected 2026-08-21 — no role branch, D-21)** — the selected requester may
-read a ticket only if `ticket.requesterId` matches their id, else **403** (not 404, to avoid
-confirming existence to a scanning client). There is no second branch for any other role — Lab 2
-has exactly one kind of caller. Do not add an IT Staff/Administrator read-all path; it has no
-reachable caller and no Lab 2 test can exercise it.
+**#8 access rule (corrected 2026-08-22, PR #14 peer review — no role branch, D-21; D-24)** — the
+selected requester may read a ticket only if `ticket.requesterId` matches their id, else **404**.
+A ticket that exists but belongs to someone else and a ticket that doesn't exist at all return the
+identical 404 response body, so a scanning client learns nothing either way — a 403 here would
+have confirmed the ticket's existence, which defeats the point. The same rule (inaccessible or
+missing → 404, never 403) applies to every ticket-scoped endpoint that inherits this ownership
+check: #9, #10, #11, and the ticket-access step of #12. There is no second branch for any other
+role — Lab 2 has exactly one kind of caller. Do not add an IT Staff/Administrator read-all path; it
+has no reachable caller and no Lab 2 test can exercise it.
 
 **#4/#5 dev-selector endpoints (D-18)** — `GET /dev/requesters` requires no identity (it exists
 to bootstrap identity) and returns only `isActive = true` Requesters. `POST /dev/session` takes
@@ -160,8 +164,11 @@ same `API_BASE_URL` the client already uses, or the API layer must compose it cl
 **#12 soft removal, corrected** — Lab 2 permits removal only by the uploader
 (`attachment.uploadedById === req.user.id`) while `ticket.status !== 'CLOSED'`. The request body
 must include a non-empty `reason` (1..200 chars, trimmed) — missing or empty reason is 422, not
-a silently-defaulted value. Any other Development Requester gets 403 for someone else's
-attachment; Lab 2 has no elevated-role removal path to half-implement (D-21) — an IT-Staff
+a silently-defaulted value. Any other Development Requester who can already see the ticket (per
+#8's ownership check) gets **403** for someone else's attachment — this is a different case from
+#8's 404: the caller already knows the ticket and attachment exist, so there is nothing left to
+hide, and 403 correctly signals "yours to view, not yours to remove." Lab 2 has no elevated-role
+removal path to half-implement (D-21) — an IT-Staff
 "remove another user's attachment with reason" capability is a later lab's addition, not
 something to stub out now. Removal sets `deletedAt` /
 `deletedById` / `deletedReason`, writes `ATTACHMENT_REMOVED` in the same transaction, then deletes

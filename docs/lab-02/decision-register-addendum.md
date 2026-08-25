@@ -262,3 +262,26 @@ against, rather than "some rows exist." The inactive Requester specifically exis
 D-18's picker and session endpoints correctly exclude/reject inactive users.
 
 **Status:** CONFIRMED. See `specification.md` §7 and the migration/seed tests in `tests.md`.
+
+## D-24 — New 2026-08-22: cross-owner Ticket Detail access returns 404, not 403
+
+**Decision.** When the selected Development Requester requests a ticket owned by someone else,
+the server returns 404, the same response it returns for a ticket id that doesn't exist at all.
+This applies to every endpoint that inherits the ticket-ownership check: `GET /tickets/:id`,
+`GET /tickets/:id/attachments`, `POST /tickets/:id/attachments`, and `GET
+/attachments/:id/content`. It does not apply to `DELETE /attachments/:id`'s separate
+uploader-only check, which stays 403 — a caller who fails that check can already see the ticket
+and attachment, so there's nothing left to hide.
+
+**Why.** A peer review on PR #14 (Jinnakan, 2026-08-25) flagged that the previous draft returned
+403 for this case while its own comment justified the choice as "avoids confirming existence to a
+scanning client" — but 403 confirms existence (404 doesn't), so the code contradicted its stated
+reason. The fix is to actually do what the rationale always claimed: return 404 for both "missing"
+and "not yours," so the two cases are indistinguishable from outside. `ui-spec.md` already
+described a single merged UI state for this ("not-found/not-accessible") before this fix; only the
+HTTP status code and `feature-d-ticket-detail.md`'s prose (which still described two separate
+views, Access Denied and Not Found) were wrong. `feature-d-ticket-detail.md` is corrected to match
+`ui-spec.md`'s existing single-state design rather than the other way around.
+
+**Status:** CONFIRMED. See `specification.md` §8/AC-12, `api-spec.md` endpoint #8 (and the note on
+#9-#12), `ui-spec.md` §6, `feature-d-ticket-detail.md`, and `tests.md` API-08/UI-07.

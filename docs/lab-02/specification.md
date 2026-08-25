@@ -259,8 +259,10 @@ Development Requester (session), create a Ticket, retrieve the selected Requeste
 (search/filter/sort/paginate), retrieve one owned Ticket, upload an Attachment, retrieve Attachment
 metadata, download an active Attachment, and soft-remove an Attachment. All routes are under
 `/api/v1`, JSON except upload/download, camelCase, ISO-8601 UTC timestamps, DTOs only. Standard
-statuses: 200 retrieval, 201 create, 401 no/invalid identity, 403 ownership failure, 404 missing
-resource, 409 conflict (attachment limit, stale version), 410 removed-attachment content, 413 file
+statuses: 200 retrieval, 201 create, 401 no/invalid identity, 403 attachment removal by a
+non-uploader who can already see the ticket (BR-09), 404 a ticket or attachment that's missing or
+not the caller's (D-24 — never 403 for this case, since 403 would confirm existence to a scanning
+client), 409 conflict (attachment limit, stale version), 410 removed-attachment content, 413 file
 too large, 422 validation failure.
 
 ## 9. Acceptance Criteria
@@ -292,8 +294,8 @@ too large, 422 validation failure.
 - **AC-11** Given a filter or search that matches nothing, when applied, then the "no tickets
   match" empty state with a working "Clear filters" action is shown, distinct from AC-10.
 - **AC-12** Given Requester B is selected, when a Ticket belonging to Requester A is requested
-  directly by its Detail URL, then the Ticket data is not returned and an access-denied state is
-  shown.
+  directly by its Detail URL, then the Ticket data is not returned and the same Not Found state
+  used for an unknown ticket id is shown (D-24 — the response is identical either way).
 - **AC-13** Given an active attachment, when the uploader removes it with a non-empty reason, then
   the attachment stays listed with removed status, its reason/remover/removal date visible, and
   its content endpoint returns 410.
