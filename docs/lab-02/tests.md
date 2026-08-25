@@ -35,6 +35,16 @@ nested `describe` block by scenario group (for example, `create-ticket.api.test.
 `describe('validation')`, `describe('attachment upload')`, `describe('ownership')` inside it),
 rather than spawning additional top-level files beyond this minimum set.
 
+One non-test helper module sits alongside them, `client/tests/lab-02/componentRules.ts`. The
+`ui-spec.md` §2/§8 component rules (required-field asterisk plus `aria-describedby` wiring,
+read-only versus editable field tokens, button-hierarchy classes) are a single contract that
+applies to all four Lab 2 screens, so the assertions are written once and each screen's test file
+calls them with its own selectors (UI-11 to UI-14 below). This keeps the contract from being
+verified on Create Ticket only, without duplicating the same assertion bodies four times. It is a
+helper module, not an additional test file, and it stays inside `client/tests/lab-02/`; no
+`client/tests/shared/` directory is introduced, since Lab 1 has no such convention and the
+labsheet's §12 structure does not call for one.
+
 **Harness fixes needed before writing tests:**
 
 1. `client/vite.config.ts` must include `.ts` unit tests, not only `.tsx`.
@@ -77,7 +87,10 @@ rather than spawning additional top-level files beyond this minimum set.
 | UI-08 | UI | AC-13 | Attachment removal dialog | Submit disabled until a non-empty reason is entered; confirmed removal shows removed metadata, disabled download | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
 | UI-09 | UI | AC-15, AC-16 | Attachment list at the 5-active limit / with an invalid staged file | Upload control disabled at 5; invalid file rejected client-side with a visible message | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
 | UI-10 | UI | FR-02, FR-03, AC-04 | Header identity display and "Change Requester" reload | Header shows selected Requester's name; activating Change Requester clears the stored selection and discards cached requester-scoped data before the picker renders | `client/tests/lab-02/CreateTicket.test.tsx` (shared app-shell fixture) | Pending |
-| UI-11 | UI | `ui-spec.md` §2, §8 (component rules) | Required-field asterisks, `aria-describedby` wiring, editable-vs-read-only field styling, button-hierarchy classes | Required fields show the asterisk marker and are wired to their validation message via `aria-describedby`; read-only fields carry the read-only token class distinct from editable inputs; primary/secondary/tertiary/destructive/disabled/busy buttons each render their designated class | `client/tests/lab-02/CreateTicket.test.tsx` | Pending |
+| UI-11 | UI | `ui-spec.md` §2, §4, §8 (component rules) | Create Ticket component rules, via the shared `componentRules` helper | Required fields show the asterisk marker and are wired to their validation message via `aria-describedby`; Ticket Number/Ticket Date/Requester carry the read-only token class, distinct from the editable inputs; submit renders the primary class, Cancel the tertiary class, and submit renders the disabled and busy classes in those states | `client/tests/lab-02/CreateTicket.test.tsx` | Pending |
+| UI-12 | UI | `ui-spec.md` §2, §6, §8 (component rules) | Ticket Detail component rules, same helper | Every header field renders with the read-only token class and none renders as an editable input; Remove carries the destructive class; Download on a removed attachment carries the disabled class | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Pending |
+| UI-13 | UI | `ui-spec.md` §2, §6, §8 (component rules) | Attachment removal dialog and upload control component rules, same helper | The reason field shows the asterisk marker and is wired to its message via `aria-describedby`; dialog submit carries the destructive class, the disabled class while the reason is empty, and the busy class while the request is in flight; the upload control carries the disabled class at 5 active files | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
+| UI-14 | UI | `ui-spec.md` §2, §5, §8 (component rules) | My Tickets filter-bar component rules, same helper | "Clear filters" carries the secondary class, plus the disabled class when no filter, sort, or search is active; pagination controls carry the disabled class at the first and last page | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
 | E2E-01 | E2E | AC-01, AC-02, AC-05, AC-09, AC-13, AC-17 | Complete responsive requester journey: select requester, create ticket with one valid attachment, find it via search in My Tickets, open Detail, remove the attachment with a reason, verify at a mobile viewport | Every step succeeds; confirmation shows the official Ticket Number; removed attachment shows blocked content | `e2e/lab-02/requester-ticket-flow.spec.ts` | Pending |
 | API-14 | API | FR-12, BR-11 | `TICKET_CREATED` audit event on ticket creation | Event row exists with correct ticketId, type, and timestamp inside the same transaction as the ticket insert | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
 | API-15 | API | FR-23, BR-15 | `ATTACHMENT_REMOVED` audit event on soft removal | Event row exists recording filename, uploader, remover, reason, timestamp | `server/tests/lab-02/attachments.api.test.ts` | Pending |
@@ -103,6 +116,7 @@ Every criterion in `specification.md` §9 maps to at least one planned test abov
 | BR-07, BR-08, BR-09, BR-11, BR-12, BR-15 | AC-13, AC-14, AC-15, AC-16 | UNIT-04, UNIT-05, UNIT-06, UNIT-07, API-10, API-11, API-12, API-15 |
 | Responsive (§7 breakpoints) | AC-17 | UI-05, E2E-01 (AC-17 only) |
 | Zen Green tokens (`ui-spec.md` §1) | — (visual, not a numbered AC) | manual checklist, §4 below |
+| Component rules (`ui-spec.md` §2, §8) — asterisk/`aria-describedby`, read-only vs editable, button hierarchy | — (component contract, not a numbered AC) | UI-11 (Create Ticket), UI-12 (Ticket Detail), UI-13 (Attachments), UI-14 (My Tickets) |
 | Seed baseline (`specification.md` §7) | AC-03, AC-18 | migration/seed check, folded into API-06 setup and UI-01 fixture data |
 
 ## 4. Responsive and Visual Checklist
