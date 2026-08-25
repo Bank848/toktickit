@@ -22,11 +22,20 @@ const USERS: {
   email: string;
   displayName: string;
   role: 'REQUESTER' | 'IT_STAFF' | 'ADMINISTRATOR';
+  isActive: boolean;
 }[] = [
-  { email: 'requester@toktickit.local', displayName: 'Nattapong R.', role: 'REQUESTER' },
-  { email: 'requester2@toktickit.local', displayName: 'Siriporn K.', role: 'REQUESTER' },
-  { email: 'itstaff@toktickit.local', displayName: 'IT Support', role: 'IT_STAFF' },
-  { email: 'admin@toktickit.local', displayName: 'System Admin', role: 'ADMINISTRATOR' },
+  { email: 'requester@toktickit.local', displayName: 'Nattapong R.', role: 'REQUESTER', isActive: true },
+  { email: 'requester2@toktickit.local', displayName: 'Siriporn K.', role: 'REQUESTER', isActive: true },
+  { email: 'requester3@toktickit.local', displayName: 'Somchai P.', role: 'REQUESTER', isActive: true },
+  { email: 'requester4@toktickit.local', displayName: 'Malee T.', role: 'REQUESTER', isActive: true },
+  {
+    email: 'requester5-inactive@toktickit.local',
+    displayName: 'Wichai S. (inactive)',
+    role: 'REQUESTER',
+    isActive: false,
+  },
+  { email: 'itstaff@toktickit.local', displayName: 'IT Support', role: 'IT_STAFF', isActive: true },
+  { email: 'admin@toktickit.local', displayName: 'System Admin', role: 'ADMINISTRATOR', isActive: true },
 ];
 
 async function main() {
@@ -49,8 +58,8 @@ async function main() {
   for (const user of USERS) {
     await prisma.user.upsert({
       where: { email: user.email },
-      update: { displayName: user.displayName, role: user.role, isActive: true },
-      create: { ...user, isActive: true },
+      update: { displayName: user.displayName, role: user.role, isActive: user.isActive },
+      create: user,
     });
   }
 }
