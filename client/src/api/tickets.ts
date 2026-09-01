@@ -52,6 +52,42 @@ export interface TicketDetailDto {
   version: number;
 }
 
+export interface TicketListItemDto {
+  id: string;
+  ticketNo: string;
+  summary: string;
+  category: { id: number; name: string };
+  status: string;
+  requestedPriority: string;
+  itPriority: string;
+  createdAt: string;
+  updatedAt: string;
+  attachmentCount: number;
+}
+
+export interface ListTicketsMeta {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface ListTicketsResult {
+  data: TicketListItemDto[];
+  meta: ListTicketsMeta;
+}
+
+// Mirrors the server's ValidatedListTicketsQuery shape (server/src/validators/listTicketsQuery.ts)
+// so MyTicketsPage can pass its filter-bar state straight through without re-mapping field names.
+export interface ListTicketsQuery {
+  status?: string[];
+  categoryId?: number | null;
+  q?: string | null;
+  page?: number;
+  pageSize?: number;
+  sort?: string;
+}
+
 async function throwApiError(response: Response, fallbackMessage: string): Promise<never> {
   const body = await response.json().catch(() => null);
   throw new ApiError(body?.error?.message ?? fallbackMessage, response.status, body?.error?.fieldErrors ?? []);
@@ -68,6 +104,30 @@ export async function createTicket(
   });
   if (!response.ok) {
     return throwApiError(response, 'Failed to create ticket');
+  }
+  return response.json();
+}
+
+export async function fetchTickets(
+  requesterId: string,
+  query: ListTicketsQuery = {},
+): Promise<ListTicketsResult> {
+  const params = new URLSearchParams();
+  for (const status of query.status ?? []) params.append('status', status);
+  if (query.categoryId !== undefined && query.categoryId !== null) {
+    params.set('categoryId', String(query.categoryId));
+  }
+  if (query.q) params.set('q', query.q);
+  if (query.page !== undefined) params.set('page', String(query.page));
+  if (query.pageSize !== undefined) params.set('pageSize', String(query.pageSize));
+  if (query.sort !== undefined) params.set('sort', query.sort);
+
+  const qs = params.toString();
+  const response = await fetch(`${API_BASE_URL}/api/v1/tickets${qs ? `?${qs}` : ''}`, {
+    headers: authHeaders(requesterId),
+  });
+  if (!response.ok) {
+    return throwApiError(response, 'Failed to load tickets');
   }
   return response.json();
 }
