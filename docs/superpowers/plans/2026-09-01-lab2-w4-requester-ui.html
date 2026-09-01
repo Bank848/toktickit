@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lab 2 W4 — Requester UI, My Tickets, Ticket Detail, Attachments — Plan</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: "dark", securityLevel: "loose" });</script>
+<style>
+  :root { --bg:#0d1117; --panel:#161b22; --border:#30363d; --fg:#e6edf3; --muted:#9da7b3;
+          --accent:#58a6ff; --add:#3fb950; --mod:#d29922; --del:#f85149; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:15px/1.6 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+  .wrap { max-width:1100px; margin:0 auto; padding:32px 24px 96px; }
+  h1 { font-size:28px; margin:0 0 4px; }
+  h2 { font-size:21px; margin:40px 0 12px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+  h3 { font-size:17px; margin:24px 0 8px; }
+  .tag { display:inline-block; font-size:12px; color:var(--muted); border:1px solid var(--border);
+         border-radius:999px; padding:2px 10px; margin-right:6px; }
+  .meta { color:var(--muted); margin:8px 0 0; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px 18px; margin:14px 0; }
+  .ba { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+  .ba > figure { margin:0; background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:12px; }
+  .ba figcaption { font-weight:600; margin-bottom:8px; color:var(--muted); }
+  .ba .before figcaption::before { content:"◀ BEFORE  "; color:var(--del); }
+  .ba .after  figcaption::before { content:"AFTER ▶  ";  color:var(--add); }
+  @media (max-width:820px){ .ba { grid-template-columns:1fr; } }
+  .mermaid { background:#0b0f14; border-radius:8px; padding:10px; overflow:auto; }
+  .changes li { list-style:none; margin:4px 0; }
+  .changes .add::before { content:"+ "; color:var(--add); font-weight:700; }
+  .changes .mod::before { content:"~ "; color:var(--mod); font-weight:700; }
+  .changes .del::before { content:"− "; color:var(--del); font-weight:700; }
+  code, pre { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
+  pre { background:#0b0f14; border:1px solid var(--border); border-radius:8px; padding:12px 14px; overflow:auto; font-size:13px; }
+  code:not(pre code){ background:#0b0f14; border:1px solid var(--border); border-radius:4px; padding:1px 5px; font-size:13px; }
+  .step { margin:6px 0; }
+  .step input { margin-right:8px; }
+  .pathline { color:var(--muted); font-size:13px; }
+  hr.section { border:0; border-top:2px dashed var(--border); margin:48px 0; }
+  .note { color:var(--muted); font-size:13px; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+  th, td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; font-size: 13.5px; }
+  th { background: #1c232c; }
+  .issuebox { border-left: 3px solid var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>TokTickIT Lab 2 W4</h1>
+  <p class="meta">
+    <span class="tag">2026-09-01</span>
+    <span class="tag">plan-pro</span>
+    <span class="tag">React + Vite</span>
+    <span class="tag">Express + Prisma</span>
+    <span class="tag">PostgreSQL</span>
+    <span class="tag">Vitest + Supertest</span>
+    <span class="tag">Playwright</span>
+  </p>
+
+  <h2>📖 Read this first</h2>
+
+  <div class="card">
+    <strong>Goal.</strong> Finish Lab 2 for <code>Bank848/toktickit</code>. W3 (GH Issues W4-2-13,
+    PRs W4-6-17, branches <code>feature/5</code> through <code>feature/8</code>) shipped the spec
+    docs, the Lab 2 data model, the <code>/api/v1</code> identity seam, and
+    <code>POST /api/v1/tickets</code> — but <strong>no client screen exists yet</strong> beyond
+    Lab 1's "Check System" button. W4 builds everything a Requester actually clicks: the
+    Development Requester selector, Create Ticket's UI, My Tickets, Ticket Detail, and the full
+    attachment lifecycle (upload/download/soft-remove) on both ends.
+    <br><br>
+    <strong>Key decisions.</strong> Five issues, sequenced by real dependency, not by feature
+    letter: <strong>W4-1 App Shell</strong> first (nothing else is reachable without a selected
+    Requester — D-18), then <strong>W4-2 Attachments backend</strong> (both Create Ticket and
+    Ticket Detail need it, so it ships once, standalone), then <strong>W4-3 Create Ticket UI</strong>,
+    <strong>W4-4 My Tickets</strong>, <strong>W4-5 Ticket Detail + Attachments UI</strong>, closing
+    with <strong>W4-6 E2E + visual verification</strong> mirroring the pattern ArmmyC's repo used
+    for its own Issue #19. Every 404-vs-403 and soft-delete rule below is taken verbatim from
+    <code>docs/lab-02/api-spec.md</code> §3 and <code>decision-register-addendum.md</code> D-15/
+    D-18/D-20b/D-21/D-22/D-24 — Feature-E (Comments) and the Event Log stay cut from scope
+    entirely, matching what W3 already committed to.
+  </div>
+
+  <h3>Before → After</h3>
+  <p class="note">Left: what a Requester can actually do today (main branch). Right: after W4.</p>
+  <div class="ba">
+    <figure class="before"><figcaption>Today — Lab 1 shell only</figcaption>
+      <div class="mermaid">
+flowchart TD
+  A["/ (App.tsx)"] --> B["Check System button"]
+  B --> C["GET /api/health + GET /api/categories"]
+  C --> D["Status + category list, no routing"]
+  style D fill:#2a1414,stroke:#f85149
+      </div>
+    </figure>
+    <figure class="after"><figcaption>After W4 — full requester flow</figcaption>
+      <div class="mermaid">
+flowchart TD
+  A["/select-requester (Feature-G)"] -->|POST /dev/session| B["AppShell + RequesterContext"]
+  B --> C["/tickets — My Tickets (Feature-C)"]
+  B --> D["/tickets/new — Create Ticket (Feature-B UI)"]
+  C -->|row click| E["/tickets/:id — Ticket Detail (Feature-D)"]
+  D -->|POST /tickets then sequential upload| E
+  E --> F["Attachments section (Feature-F): upload / download / soft-remove"]
+  style A fill:#0f2a1a,stroke:#3fb950
+  style E fill:#0f2a1a,stroke:#3fb950
+  style F fill:#0f2a1a,stroke:#3fb950
+      </div>
+    </figure>
+  </div>
+
+  <div class="ba">
+    <figure class="before"><figcaption>Server routes today</figcaption>
+      <div class="mermaid">
+flowchart LR
+  V1["/api/v1"] --> ME["GET /me"]
+  V1 --> CAT["GET /categories"]
+  V1 --> RS["GET /related-systems"]
+  V1 --> DEV["GET /dev/requesters, POST /dev/session"]
+  V1 --> TIX["POST /tickets only"]
+      </div>
+    </figure>
+    <figure class="after"><figcaption>Server routes after W4</figcaption>
+      <div class="mermaid">
+flowchart LR
+  V1["/api/v1"] --> TIX["/tickets"]
+  TIX --> POST["POST / (existing)"]
+  TIX --> LIST["GET / — Feature-C"]
+  TIX --> DETAIL["GET /:id — Feature-D"]
+  TIX --> ATTLIST["GET /:id/attachments — Feature-F"]
+  TIX --> UPLOAD["POST /:id/attachments — Feature-F"]
+  V1 --> ATT["/attachments/:id"]
+  ATT --> CONTENT["GET /content — Feature-F"]
+  ATT --> DEL["DELETE / — Feature-F"]
+  style LIST fill:#0f2a1a,stroke:#3fb950
+  style DETAIL fill:#0f2a1a,stroke:#3fb950
+  style ATTLIST fill:#0f2a1a,stroke:#3fb950
+  style UPLOAD fill:#0f2a1a,stroke:#3fb950
+  style CONTENT fill:#0f2a1a,stroke:#3fb950
+  style DEL fill:#0f2a1a,stroke:#3fb950
+      </div>
+    </figure>
+  </div>
+
+  <h3>What's changing</h3>
+  <ul class="changes">
+    <li class="add">client/src/context/RequesterContext.tsx — sessionStorage-backed identity context</li>
+    <li class="add">client/src/pages/SelectRequesterPage.tsx, CreateTicketPage.tsx, MyTicketsPage.tsx, TicketDetailPage.tsx</li>
+    <li class="add">client/src/components/AppShell.tsx, AttachmentPicker.tsx, AttachmentSection.tsx, RemovalConfirmDialog.tsx, TicketStatusBadge.tsx</li>
+    <li class="add">client/src/api/dev.ts, tickets.ts, attachments.ts</li>
+    <li class="mod">client/src/App.tsx — becomes the router root; Lab 1's Check System moves to <code>/system-check</code></li>
+    <li class="mod">client/src/main.tsx — wraps the app in <code>BrowserRouter</code></li>
+    <li class="add">client dependency: <code>react-router-dom</code></li>
+    <li class="add">server/src/lib/attachmentStorage.ts, validators/attachmentValidation.ts, validators/listTicketsQuery.ts, routes/v1/attachments.ts</li>
+    <li class="mod">server/src/routes/v1/tickets.ts — adds <code>GET /</code> and <code>GET /:id</code></li>
+    <li class="mod">server/src/routes/v1/index.ts — mounts the attachments router</li>
+    <li class="mod">server/.gitignore — ignore <code>storage/attachments/</code></li>
+    <li class="add">server dependencies: <code>multer</code>, <code>@types/multer</code>, <code>file-type</code></li>
+    <li class="add">playwright.config.ts, e2e/lab-02/requester-ticket-flow.spec.ts, artifacts/lab-02/screenshots/**</li>
+    <li class="mod">docs/lab-02/tests.md, ai-use.md, reviewer.md — evidence for Issues W4-6 through #18</li>
+  </ul>
+
+  <h3>⚡ Parallelization analysis</h3>
+  <div class="card">
+    <p>This repo's real workflow is branch-per-issue with peer review before merge (not
+    concurrent edits in one working tree), so "parallel" here means <em>safe to work in separate
+    git worktrees at the same time</em> — exactly how W3's <code>feature/5</code>..<code>8</code>
+    branches were built. File overlap is the constraint, not wall-clock convenience.</p>
+    <ul>
+      <li><strong>Batch 1:</strong> W4-1 (App Shell) + W4-2 (Attachments backend) —
+        genuinely disjoint: W4-1 touches only <code>client/src/**</code>, W4-2 touches only
+        <code>server/src/lib</code>, <code>server/src/validators/attachmentValidation.ts</code>,
+        and a new <code>server/src/routes/v1/attachments.ts</code>. Neither depends on the other.</li>
+      <li><strong>Batch 2:</strong> W4-3 (Create Ticket UI) — needs W4-1's router/context and
+        W4-2's upload endpoint, so it starts only after both land. <strong>Review fix:</strong> the
+        original draft claimed W4-4 (My Tickets) could start alongside W4-3 since it also only
+        needs W4-1's router — that's wrong: W4-3 Step 1 <em>creates</em>
+        <code>client/src/api/tickets.ts</code> for the first time, so a W4-4 branch cut before
+        W4-3 merges would independently create the same new file with different content, a real
+        conflict, not the "append" conflict the draft implied. Sequence W4-3 then W4-4, both
+        against <code>lab2-staging</code> only after the prior one is merged.</li>
+      <li><strong>Batch 3:</strong> W4-5 (Ticket Detail + Attachments UI) — depends on W4-2
+        (attachment endpoints it embeds) and touches <code>server/src/routes/v1/tickets.ts</code>
+        again (adds <code>GET /:id</code> next to W4-4's <code>GET /</code>), so branch it from
+        <code>lab2-staging</code> only after W4-4 is merged to avoid a same-file rebase against an
+        unmerged branch.</li>
+      <li><strong>Batch 4:</strong> W4-6 (E2E + visual) — last, needs every screen to exist.</li>
+    </ul>
+    <p class="note">Critical path: W4-1/W4-2 → W4-3 → W4-4 → W4-5 → W4-6 (5 sequential hops even with
+      Batch-1 parallelism, since W4-5 must follow W4-4 through <code>tickets.ts</code>).
+      Files that force sequencing: <code>server/src/routes/v1/tickets.ts</code> (W4-4 then W4-5),
+      <code>client/src/api/tickets.ts</code> (W4-3, W4-4, W4-5 all append to it — small, expected
+      conflicts only), <code>client/src/router config</code> (every issue adds one route).</p>
+  </div>
+
+  <hr class="section" />
+
+  <h2>🛠 Implementation plan</h2>
+  <p class="note">For agentic workers: use <code>superpowers:executing-plans</code> per issue,
+    branch from <code>lab2-staging</code>, TDD red-green-refactor, peer review by ArmmyC/Jinnakan
+    before merge — same process as W3. Complete code is given below for the pieces with real
+    correctness risk (validation order, ownership scoping, soft-delete, focus trap); the simpler
+    CRUD screens are given as exact contracts (props/state/calls) rather than full JSX, to keep
+    this plan a working reference instead of a restatement of <code>ui-spec.md</code> — read that
+    file's §3-§6 alongside each task for the visual/copy details (labels, button hierarchy, Zen
+    Green tokens) that are already fully specified there and not repeated here.</p>
+
+  <div class="card">
+    <strong>Goal:</strong> Ship every remaining Lab 2 screen and endpoint (Features G, B-UI, C, D, F).<br>
+    <strong>Architecture:</strong> Client: React Router root in <code>App.tsx</code>, a single
+    <code>RequesterContext</code> gating every ticket-scoped route, one API module per resource.
+    Server: extend the existing <code>/api/v1/tickets</code> router, add a sibling
+    <code>/api/v1/attachments</code> router, add a storage adapter behind an interface so Lab 3
+    can swap it without touching route code (D-20b).<br>
+    <strong>Tech Stack:</strong> React 19 + Vite + TypeScript + Bootstrap + react-router-dom 6,
+    Express + TypeScript + Prisma + multer + file-type, PostgreSQL, Vitest/Supertest, Playwright.
+  </div>
+
+  <h3>File structure</h3>
+  <ul class="changes">
+    <li class="add">client/src/context/RequesterContext.tsx</li>
+    <li class="add">client/src/api/dev.ts, tickets.ts, attachments.ts</li>
+    <li class="add">client/src/pages/SelectRequesterPage.tsx, CreateTicketPage.tsx, MyTicketsPage.tsx, TicketDetailPage.tsx, SystemCheckPage.tsx</li>
+    <li class="add">client/src/components/AppShell.tsx, AttachmentPicker.tsx, AttachmentSection.tsx, RemovalConfirmDialog.tsx, TicketStatusBadge.tsx</li>
+    <li class="add">server/src/lib/attachmentStorage.ts</li>
+    <li class="add">server/src/validators/attachmentValidation.ts, listTicketsQuery.ts</li>
+    <li class="add">server/src/routes/v1/attachments.ts</li>
+    <li class="mod">server/src/routes/v1/tickets.ts, index.ts</li>
+    <li class="add">playwright.config.ts, e2e/lab-02/requester-ticket-flow.spec.ts</li>
+  </ul>
+
+  <!-- ============================= ISSUE W4-1 ============================= -->
+  <h3 class="issuebox">W4-1 — App shell, routing, Development Requester selection</h3>
+  <p class="pathline">Branch: <code>feature/9-app-shell-requester-selection</code> · Depends on:
+    nothing (backend <code>/dev/requesters</code>, <code>/dev/session</code> already exist) ·
+    Blocks: everything else.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Add react-router-dom</strong></label></div>
+  <pre><code>cd client && npm install react-router-dom</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: RequesterContext (write the test first)</strong></label></div>
+  <p class="pathline">Create: <code>client/tests/lab-02/RequesterContext.test.tsx</code></p>
+  <pre><code>import { describe, it, expect, beforeEach } from 'vitest';
+import { renderHook, act } from '@testing-library/react';
+import { RequesterProvider, useRequester } from '../../src/context/RequesterContext';
+
+const STORAGE_KEY = 'toktickit.selectedRequesterId';
+
+function wrapper({ children }: { children: React.ReactNode }) {
+  return &lt;RequesterProvider&gt;{children}&lt;/RequesterProvider&gt;;
+}
+
+describe('RequesterContext', () => {
+  beforeEach(() => sessionStorage.clear());
+
+  it('starts with no requester when sessionStorage is empty', () => {
+    const { result } = renderHook(() => useRequester(), { wrapper });
+    expect(result.current.requester).toBeNull();
+  });
+
+  it('restores a previously selected requester from sessionStorage on mount', () => {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ id: 'u1', email: 'a@b.test', displayName: 'Ariya' }));
+    const { result } = renderHook(() => useRequester(), { wrapper });
+    expect(result.current.requester?.id).toBe('u1');
+  });
+
+  it('setRequester persists to sessionStorage', () => {
+    const { result } = renderHook(() => useRequester(), { wrapper });
+    act(() => result.current.setRequester({ id: 'u2', email: 'c@d.test', displayName: 'Narin' }));
+    expect(JSON.parse(sessionStorage.getItem(STORAGE_KEY)!).id).toBe('u2');
+    expect(result.current.requester?.id).toBe('u2');
+  });
+
+  it('clearRequester removes sessionStorage and resets state', () => {
+    const { result } = renderHook(() => useRequester(), { wrapper });
+    act(() => result.current.setRequester({ id: 'u2', email: 'c@d.test', displayName: 'Narin' }));
+    act(() => result.current.clearRequester());
+    expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+    expect(result.current.requester).toBeNull();
+  });
+});</code></pre>
+  <p class="note">Run: <code>cd client &amp;&amp; npx vitest run tests/lab-02/RequesterContext.test.tsx</code> — expected: fails, module doesn't exist.</p>
+
+  <p class="pathline">Create: <code>client/src/context/RequesterContext.tsx</code></p>
+  <pre><code>import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+
+export interface SelectedRequester {
+  id: string;
+  email: string;
+  displayName: string;
+}
+
+const STORAGE_KEY = 'toktickit.selectedRequesterId';
+
+interface RequesterContextValue {
+  requester: SelectedRequester | null;
+  setRequester: (requester: SelectedRequester) => void;
+  clearRequester: () => void;
+}
+
+const RequesterContext = createContext&lt;RequesterContextValue | undefined&gt;(undefined);
+
+function readStored(): SelectedRequester | null {
+  const raw = sessionStorage.getItem(STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as SelectedRequester;
+  } catch {
+    return null;
+  }
+}
+
+export function RequesterProvider({ children }: { children: ReactNode }) {
+  const [requester, setRequesterState] = useState&lt;SelectedRequester | null&gt;(readStored);
+
+  const setRequester = useCallback((next: SelectedRequester) => {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    setRequesterState(next);
+  }, []);
+
+  const clearRequester = useCallback(() => {
+    sessionStorage.removeItem(STORAGE_KEY);
+    setRequesterState(null);
+  }, []);
+
+  return (
+    &lt;RequesterContext.Provider value={{ requester, setRequester, clearRequester }}&gt;
+      {children}
+    &lt;/RequesterContext.Provider&gt;
+  );
+}
+
+export function useRequester(): RequesterContextValue {
+  const ctx = useContext(RequesterContext);
+  if (!ctx) throw new Error('useRequester must be used within a RequesterProvider');
+  return ctx;
+}</code></pre>
+  <p class="note">Run the test again — expected: green.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: dev API module</strong></label></div>
+  <p class="pathline">Create: <code>client/src/api/dev.ts</code></p>
+  <pre><code>const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000';
+
+export interface DevRequester {
+  id: string;
+  email: string;
+  displayName: string;
+}
+
+export async function fetchDevRequesters(): Promise&lt;DevRequester[]&gt; {
+  const response = await fetch(`${API_BASE_URL}/api/v1/dev/requesters`);
+  if (!response.ok) throw new Error('Failed to load Development Requesters');
+  return response.json();
+}
+
+export async function selectDevRequester(userId: string): Promise&lt;DevRequester&gt; {
+  const response = await fetch(`${API_BASE_URL}/api/v1/dev/session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId }),
+  });
+  if (!response.ok) throw new Error('Failed to select Development Requester');
+  return response.json();
+}</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 4: SelectRequesterPage — contract (write tests first per ui-spec.md §3)</strong></label></div>
+  <p class="pathline">Create: <code>client/src/pages/SelectRequesterPage.tsx</code>, test: <code>client/tests/lab-02/SelectRequesterPage.test.tsx</code></p>
+  <p>States and behavior (ui-spec.md §3, exact copy lives there — don't re-derive it):
+  loading (disabled "Loading requesters…" placeholder), empty (labelled error, app is unusable
+  without ≥1 active Requester), API-failure (inline banner + Retry, Continue stays disabled),
+  loaded (dropdown populated, Continue disabled until a selection exists). On Continue: call
+  <code>selectDevRequester(id)</code>, on success call <code>setRequester()</code> from context
+  and <code>navigate('/tickets')</code>; on failure show an inline error, do not navigate.
+  Cancel is a no-op when this is the first-load fallback (no prior selection in context) and
+  navigates back to the previous location otherwise. Every control keyboard-operable (native
+  <code>&lt;select&gt;</code> and <code>&lt;button&gt;</code> — no custom widget).</p>
+  <p class="note">Tests to write first: loading state renders disabled placeholder; empty
+    requester list renders the labelled empty state, not a blank dropdown; API failure renders
+    Retry and clicking it re-fetches; selecting a requester enables Continue; clicking Continue
+    calls <code>selectDevRequester</code> and, on success, updates context and navigates.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 5: AppShell + route guard</strong></label></div>
+  <p class="pathline">Create: <code>client/src/components/AppShell.tsx</code></p>
+  <pre><code>import { Outlet, Navigate, Link, useNavigate } from 'react-router-dom';
+import { useRequester } from '../context/RequesterContext';
+
+export function AppShell() {
+  const { requester, clearRequester } = useRequester();
+  const navigate = useNavigate();
+
+  if (!requester) {
+    return &lt;Navigate to="/select-requester" replace /&gt;;
+  }
+
+  const handleChangeRequester = () => {
+    clearRequester();
+    navigate('/select-requester');
+  };
+
+  return (
+    &lt;&gt;
+      &lt;header className="app-header"&gt;
+        &lt;span&gt;TokTickIT&lt;/span&gt;
+        &lt;nav aria-label="Main navigation"&gt;
+          &lt;Link to="/tickets"&gt;My Tickets&lt;/Link&gt;
+          &lt;Link to="/tickets/new"&gt;Create Ticket&lt;/Link&gt;
+        &lt;/nav&gt;
+        &lt;span&gt;Testing as: {requester.displayName}&lt;/span&gt;
+        &lt;button onClick={handleChangeRequester}&gt;Change Requester&lt;/button&gt;
+      &lt;/header&gt;
+      &lt;main className="container py-4"&gt;
+        &lt;Outlet /&gt;
+      &lt;/main&gt;
+    &lt;/&gt;
+  );
+}</code></pre>
+  <p class="note">This is the route guard from ui-spec.md §3's "Header integration" — clearing the
+    requester and switching to a new one must discard cached ticket-scoped data. Because
+    <code>MyTicketsPage</code>/<code>TicketDetailPage</code> (W4-4/W4-5) fetch fresh on every
+    mount rather than caching in a module-level variable, remounting via the navigate above is
+    sufficient — no extra cache-invalidation code needed. Add a one-line test in W4-4/W4-5's
+    test files asserting the list re-fetches after a requester switch, per <code>tests.md</code>'s
+    existing E2E-01 convention.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 6: Stub pages so the router compiles (review fix — W4-1 must build standalone)</strong></label></div>
+  <p class="pathline">Create: <code>client/src/pages/CreateTicketPage.tsx</code>,
+    <code>MyTicketsPage.tsx</code>, <code>TicketDetailPage.tsx</code> — each a one-line
+    placeholder owned by this issue as scaffolding:</p>
+  <pre><code>// client/src/pages/CreateTicketPage.tsx (and the other two, same shape)
+export function CreateTicketPage() {
+  return &lt;p&gt;Create Ticket — coming in a later issue.&lt;/p&gt;;
+}</code></pre>
+  <p class="note">These three files are <strong>created</strong> here so W4-1's own router and its
+    <code>npx vitest run</code> verification (next step) actually compile and pass standalone —
+    without them, <code>App.tsx</code>'s imports below resolve to nothing and the whole client
+    fails to build before W4-3/W4-4/W4-5 ever start. W4-3, W4-4, and W4-5 each <strong>modify</strong>
+    (never re-create) their one corresponding file — do not open new files with the same name.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 7: Wire the router, move Lab 1's Check System</strong></label></div>
+  <p class="pathline">Create: <code>client/src/pages/SystemCheckPage.tsx</code> (move the existing
+    body of <code>App.tsx</code> here verbatim — this preserves Lab 1's tests, which import
+    against this component's behavior, not its route). Modify: <code>client/src/App.tsx</code>,
+    <code>client/src/main.tsx</code>.</p>
+  <pre><code>// client/src/App.tsx
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { RequesterProvider } from './context/RequesterContext';
+import { AppShell } from './components/AppShell';
+import { SelectRequesterPage } from './pages/SelectRequesterPage';
+import { SystemCheckPage } from './pages/SystemCheckPage';
+import { CreateTicketPage } from './pages/CreateTicketPage';
+import { MyTicketsPage } from './pages/MyTicketsPage';
+import { TicketDetailPage } from './pages/TicketDetailPage';
+
+function App() {
+  return (
+    &lt;RequesterProvider&gt;
+      &lt;Routes&gt;
+        &lt;Route path="/select-requester" element={&lt;SelectRequesterPage /&gt;} /&gt;
+        &lt;Route path="/system-check" element={&lt;SystemCheckPage /&gt;} /&gt;
+        &lt;Route element={&lt;AppShell /&gt;}&gt;
+          &lt;Route path="/tickets" element={&lt;MyTicketsPage /&gt;} /&gt;
+          &lt;Route path="/tickets/new" element={&lt;CreateTicketPage /&gt;} /&gt;
+          &lt;Route path="/tickets/:id" element={&lt;TicketDetailPage /&gt;} /&gt;
+        &lt;/Route&gt;
+        &lt;Route path="/" element={&lt;Navigate to="/tickets" replace /&gt;} /&gt;
+      &lt;/Routes&gt;
+    &lt;/RequesterProvider&gt;
+  );
+}
+
+export default App;</code></pre>
+  <pre><code>// client/src/main.tsx additions — wrap &lt;App /&gt; in &lt;BrowserRouter&gt;
+import { BrowserRouter } from 'react-router-dom';
+// ...
+// &lt;BrowserRouter&gt;&lt;App /&gt;&lt;/BrowserRouter&gt;</code></pre>
+  <p class="note">Note the routes for <code>/tickets/new</code>, <code>/tickets</code>,
+    <code>/tickets/:id</code> exist here as placeholders pointing at components Issues W4-3-W4-5
+    create — this issue's own scope is only <code>/select-requester</code>, <code>/system-check</code>,
+    and the shell/guard; Issues W4-3-W4-5 fill in their page components without touching this file's
+    route table again (already declared here to avoid a router-config edit war across four
+    issues).</p>
+  <p class="note">Run: <code>cd client &amp;&amp; npx vitest run</code> — expected: all Lab 1 tests
+    still pass unchanged (SystemCheckPage has identical behavior to old App.tsx), new RequesterContext
+    and SelectRequesterPage tests pass.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 8: Route-guard test</strong></label></div>
+  <p class="pathline">Create: <code>client/tests/lab-02/routeGuard.test.tsx</code> — renders
+    <code>&lt;App /&gt;</code> at <code>/tickets</code> with an empty sessionStorage and asserts it
+    redirects to <code>/select-requester</code>; renders again with a requester pre-seeded in
+    sessionStorage and asserts <code>/tickets</code> renders without redirecting.</p>
+
+  <!-- ============================= W4-2 ============================= -->
+  <h3 class="issuebox">W4-2 — Attachment storage and lifecycle backend</h3>
+  <p class="pathline">Branch: <code>feature/10-attachment-lifecycle-api</code> · Depends on:
+    nothing (the Attachment table already exists from the real, already-merged GH Issue #11 "Data model increment, migration and seed", W3/PR #15) · Can run in parallel
+    with W4-1 (Batch 1).</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Dependencies</strong></label></div>
+  <pre><code>cd server && npm install multer file-type && npm install -D @types/multer</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: Storage adapter (test first)</strong></label></div>
+  <p class="pathline">Create: <code>server/tests/lab-02/attachmentStorage.test.ts</code></p>
+  <pre><code>import { describe, it, expect, afterEach } from 'vitest';
+import { promises as fs } from 'fs';
+import path from 'path';
+import { LocalDiskStorage } from '../../src/lib/attachmentStorage';
+
+const root = path.join(__dirname, '__tmp-storage__');
+const storage = new LocalDiskStorage(root);
+
+afterEach(async () => {
+  await fs.rm(root, { recursive: true, force: true });
+});
+
+describe('LocalDiskStorage', () => {
+  it('save writes the buffer under a generated key and read returns the same bytes', async () => {
+    const key = await storage.save(Buffer.from('hello world'));
+    const bytes = await storage.read(key);
+    expect(bytes.toString()).toBe('hello world');
+  });
+
+  it('save generates a different key per call, never reusing one', async () => {
+    const a = await storage.save(Buffer.from('a'));
+    const b = await storage.save(Buffer.from('b'));
+    expect(a).not.toBe(b);
+  });
+
+  it('remove deletes the file; a second remove on the same key does not throw', async () => {
+    const key = await storage.save(Buffer.from('x'));
+    await storage.remove(key);
+    await expect(storage.read(key)).rejects.toThrow();
+    await expect(storage.remove(key)).resolves.not.toThrow();
+  });
+});</code></pre>
+
+  <p class="pathline">Create: <code>server/src/lib/attachmentStorage.ts</code></p>
+  <pre><code>import { promises as fs } from 'fs';
+import path from 'path';
+import { randomUUID } from 'crypto';
+
+export interface AttachmentStorage {
+  save(bytes: Buffer): Promise&lt;string&gt;; // returns a storage key
+  read(key: string): Promise&lt;Buffer&gt;;
+  remove(key: string): Promise&lt;void&gt;;
+}
+
+// D-20b: Lab 2 defaults to local disk. The interface is what Lab 3's SeaweedFS adapter (D-06)
+// implements next -- route code below only ever calls these three methods, never touches fs
+// directly, so swapping the implementation later is a one-file change.
+export class LocalDiskStorage implements AttachmentStorage {
+  constructor(private readonly root: string) {}
+
+  async save(bytes: Buffer): Promise&lt;string&gt; {
+    await fs.mkdir(this.root, { recursive: true });
+    const key = randomUUID();
+    await fs.writeFile(this.resolve(key), bytes);
+    return key;
+  }
+
+  async read(key: string): Promise&lt;Buffer&gt; {
+    return fs.readFile(this.resolve(key));
+  }
+
+  async remove(key: string): Promise&lt;void&gt; {
+    try {
+      await fs.unlink(this.resolve(key));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+  }
+
+  private resolve(key: string): string {
+    // key comes only from randomUUID() above, never from user input, so no path-traversal
+    // surface exists here -- still validate the shape defensively in case a future caller
+    // passes a stored key back in from the database.
+    if (!/^[0-9a-f-]{36}$/.test(key)) throw new Error('Invalid storage key');
+    return path.join(this.root, key);
+  }
+}
+
+export const attachmentStorage = new LocalDiskStorage(
+  path.join(__dirname, '..', '..', 'storage', 'attachments')
+);</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: Validation helper (test first)</strong></label></div>
+  <p class="pathline">Create: <code>server/tests/lab-02/attachmentValidation.test.ts</code>,
+    <code>server/src/validators/attachmentValidation.ts</code>. Order matters (api-spec.md #10
+    note): extension in the allowed set AND declared MIME in the allowed set AND magic-byte sniff
+    of the first bytes agrees with both. Multer's own <code>limits.fileSize</code> handles the
+    5 MB / 413 case during streaming, so this helper doesn't re-check size.</p>
+  <pre><code>import { fileTypeFromBuffer } from 'file-type';
+
+const ALLOWED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'pdf']);
+const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
+const EXTENSION_TO_MIME: Record&lt;string, string&gt; = {
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', pdf: 'application/pdf',
+};
+
+export async function isAllowedAttachment(
+  originalFilename: string,
+  declaredMimeType: string,
+  buffer: Buffer
+): Promise&lt;boolean&gt; {
+  const extension = originalFilename.split('.').pop()?.toLowerCase() ?? '';
+  if (!ALLOWED_EXTENSIONS.has(extension)) return false;
+  if (!ALLOWED_MIME_TYPES.has(declaredMimeType)) return false;
+
+  const sniffed = await fileTypeFromBuffer(buffer);
+  if (!sniffed) return false;
+  // The sniffed MIME must agree with what the extension implies, not just be "some allowed type"
+  // -- a .pdf that is actually a renamed .png must still be rejected, since the declared
+  // extension and the real content disagree.
+  return sniffed.mime === EXTENSION_TO_MIME[extension];
+}</code></pre>
+  <p class="note">Test cases: valid PDF/JPEG/PNG/WEBP pass; disallowed extension (.exe) fails at
+    the extension check without needing a buffer; a .pdf-named file containing PNG bytes fails at
+    the sniff-agreement check; a .jpg-named file with a bare declared MIME of
+    <code>application/octet-stream</code> fails at the declared-MIME check.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 4: Attachments router (test first, this is the highest-risk file in W4)</strong></label></div>
+  <p class="pathline">Create: <code>server/tests/lab-02/attachments.api.test.ts</code> — cover, in
+    this order per api-spec.md #10 (review fix: the handler below now runs
+    <code>authorizeAndCheckLimit</code> <em>before</em> multer touches the body, so this order is
+    actually reachable): unauthenticated → 401; ticket not found/foreign → 404 (same body shape as
+    #8, D-24) — assert this 404 still fires even when the request body is oversized or malformed,
+    proving the ordering fix; 5 active attachments already present → 409
+    <code>ATTACHMENT_LIMIT_REACHED</code> (removed attachments don't count toward the 5); oversized
+    body on an otherwise-valid ticket → 413 <code>ATTACHMENT_TOO_LARGE</code> (via
+    <code>mapMulterError</code>, not the generic 500 an unhandled <code>MulterError</code> would
+    otherwise produce — assert with a body larger than 5 MB); disallowed type → 422
+    <code>ATTACHMENT_TYPE_REJECTED</code>; happy path → 201 with an absolute
+    <code>downloadUrl</code> and no <code>storageKey</code> anywhere in the body. For #11 download:
+    active → 200 with correct headers and stream bytes; removed → 410; a request for someone
+    else's ticket's attachment → 404. For #12 delete (review fix: reason is validated LAST, after
+    load/ownership/closed-status, so a malformed reason against a nonexistent attachment still
+    returns 404 — assert that case explicitly): missing/empty reason on an otherwise-valid removal
+    → 422; a different Requester's own-ticket-but-not-own-upload → 403 (distinct from #8's 404, per
+    the api-spec note — the caller already knows the ticket/attachment exist); ticket status
+    CLOSED → 409; happy path → 200 with <code>status: 'REMOVED'</code> and the removal fields
+    populated, and a follow-up download of that same attachment now returns 410. Also assert the
+    compensating cleanup: if the metadata insert in the upload transaction fails (simulate via a
+    bad <code>ticketId</code> race), the just-written storage object is removed, not left
+    orphaned.</p>
+
+  <pre><code>import { Router } from 'express';
+import multer from 'multer';
+import { prisma } from '../../prisma';
+import { attachmentStorage } from '../../lib/attachmentStorage';
+import { isAllowedAttachment } from '../../validators/attachmentValidation';
+import { HttpError, ValidationHttpError } from '../../middleware/errorEnvelope';
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+
+export const ticketAttachmentsRouter = Router({ mergeParams: true }); // mounted at /tickets/:id/attachments
+export const attachmentContentRouter = Router(); // mounted at /attachments/:id
+
+function absoluteDownloadUrl(req: import('express').Request, attachmentId: string): string {
+  // Fixes the real bug api-spec.md documents: a root-relative downloadUrl resolves against the
+  // Vite dev origin, not the API. Compose it server-side from the request's own host so no new
+  // env var is needed and it's correct in every environment without configuration.
+  return `${req.protocol}://${req.get('host')}/api/v1/attachments/${attachmentId}/content`;
+}
+
+function serializeAttachment(req: import('express').Request, attachment: {
+  id: string; originalFilename: string; mimeType: string; sizeBytes: number; createdAt: Date;
+  uploadedBy: { id: string; displayName: string };
+  deletedAt: Date | null; deletedReason: string | null;
+  deletedBy: { id: string; displayName: string } | null;
+}) {
+  const removed = attachment.deletedAt !== null;
+  return {
+    id: attachment.id,
+    originalFilename: attachment.originalFilename,
+    mimeType: attachment.mimeType,
+    sizeBytes: attachment.sizeBytes,
+    createdAt: attachment.createdAt,
+    uploadedBy: attachment.uploadedBy,
+    status: removed ? 'REMOVED' : 'ACTIVE',
+    downloadUrl: removed ? null : absoluteDownloadUrl(req, attachment.id),
+    removal: removed
+      ? { reason: attachment.deletedReason, removedAt: attachment.deletedAt, removedBy: attachment.deletedBy }
+      : null,
+  };
+  // storageKey is never selected into this shape -- see the Prisma `select` below, which omits
+  // it at the query level too, so there is no code path where it could leak.
+}
+
+const ATTACHMENT_SELECT = {
+  id: true, originalFilename: true, mimeType: true, sizeBytes: true, createdAt: true,
+  deletedAt: true, deletedReason: true,
+  uploadedBy: { select: { id: true, displayName: true } },
+  deletedBy: { select: { id: true, displayName: true } },
+} as const;
+
+async function findOwnedTicket(ticketId: string, requesterId: string) {
+  const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+  if (!ticket || ticket.requesterId !== requesterId) {
+    // Identical 404 for "doesn't exist" and "exists but isn't yours" -- D-24, api-spec.md #8.
+    throw new HttpError(404, 'TICKET_NOT_ACCESSIBLE', 'Ticket not found');
+  }
+  return ticket;
+}
+
+ticketAttachmentsRouter.get('/', async (req, res, next) => {
+  try {
+    const ticket = await findOwnedTicket(req.params.id, req.user!.id);
+    const attachments = await prisma.attachment.findMany({
+      where: { ticketId: ticket.id },
+      select: ATTACHMENT_SELECT,
+      orderBy: { createdAt: 'asc' },
+    });
+    res.status(200).json(attachments.map((a) => serializeAttachment(req, a)));
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Review fix: ticket-exists/ownership (404) and the active-count limit (409) must be checked
+// BEFORE multer ever reads the request body -- api-spec.md's #10 order is
+// ticket accessible -> count&lt;5 -> size -> type. Running them as router middleware ahead of
+// `upload.single('file')` means an oversized or malformed body against a nonexistent/foreign
+// ticket still correctly returns 404, not a Multer error the size middleware would throw first.
+async function authorizeAndCheckLimit(req: import('express').Request, _res: import('express').Response, next: import('express').NextFunction) {
+  try {
+    const ticket = await findOwnedTicket(req.params.id, req.user!.id);
+    const activeCount = await prisma.attachment.count({ where: { ticketId: ticket.id, deletedAt: null } });
+    if (activeCount &gt;= 5) {
+      throw new HttpError(409, 'ATTACHMENT_LIMIT_REACHED', 'This ticket already has 5 active attachments');
+    }
+    (req as unknown as { ticket: typeof ticket }).ticket = ticket;
+    next();
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Review fix: multer's own 5 MB limit throws a `MulterError`, which errorEnvelope.ts does NOT
+// special-case (it only handles `HttpError`), so an oversized upload would otherwise fall through
+// to a generic 500 instead of the spec-mandated 413. This middleware runs immediately after
+// `upload.single('file')` and translates that one error code before anything else sees it.
+function mapMulterError(err: unknown, _req: import('express').Request, _res: import('express').Response, next: import('express').NextFunction) {
+  if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+    next(new HttpError(413, 'ATTACHMENT_TOO_LARGE', 'File exceeds the 5 MB limit'));
+    return;
+  }
+  next(err);
+}
+
+ticketAttachmentsRouter.post(
+  '/',
+  authorizeAndCheckLimit,
+  upload.single('file'),
+  mapMulterError,
+  async (req, res, next) => {
+  try {
+    const ticket = (req as unknown as { ticket: { id: string } }).ticket;
+
+    const file = req.file;
+    if (!file) throw new ValidationHttpError([{ field: 'file', message: 'file is required' }]);
+
+    const allowed = await isAllowedAttachment(file.originalname, file.mimetype, file.buffer);
+    if (!allowed) {
+      throw new HttpError(422, 'ATTACHMENT_TYPE_REJECTED', 'File type not allowed');
+    }
+
+    const storageKey = await attachmentStorage.save(file.buffer);
+    try {
+      const created = await prisma.$transaction(async (tx) => {
+        const attachment = await tx.attachment.create({
+          data: {
+            ticketId: ticket.id,
+            uploadedById: req.user!.id,
+            originalFilename: file.originalname,
+            mimeType: file.mimetype,
+            sizeBytes: file.size,
+            storageKey,
+          },
+          select: ATTACHMENT_SELECT,
+        });
+        await tx.ticketEvent.create({
+          data: { ticketId: ticket.id, actorId: req.user!.id, eventType: 'ATTACHMENT_ADDED' },
+        });
+        return attachment;
+      });
+      res.status(201).json(serializeAttachment(req, created));
+    } catch (transactionError) {
+      // Compensating cleanup, per SDS -- the metadata insert failed after the object was
+      // already written to storage, so remove it rather than leaving an orphaned file.
+      await attachmentStorage.remove(storageKey);
+      throw transactionError;
+    }
+  } catch (error) {
+    next(error);
+  }
+});
+
+attachmentContentRouter.get('/:id/content', async (req, res, next) => {
+  try {
+    const attachment = await prisma.attachment.findUnique({
+      where: { id: req.params.id },
+      include: { ticket: true },
+    });
+    if (!attachment || attachment.ticket.requesterId !== req.user!.id) {
+      throw new HttpError(404, 'TICKET_NOT_ACCESSIBLE', 'Ticket not found');
+    }
+    if (attachment.deletedAt) {
+      throw new HttpError(410, 'ATTACHMENT_REMOVED', 'This attachment has been removed');
+    }
+    const bytes = await attachmentStorage.read(attachment.storageKey);
+    const safeName = attachment.originalFilename.replace(/[\r\n"]/g, '');
+    res.setHeader('Content-Type', attachment.mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.status(200).send(bytes);
+  } catch (error) {
+    next(error);
+  }
+});
+
+attachmentContentRouter.delete('/:id', async (req, res, next) => {
+  try {
+    // Review fix: feature-f.md orders removal validation as authorize (uploader-only) -> ticket
+    // not Closed -> reason present (422), reason LAST. Checking reason first would return 422 for
+    // a malformed body against a nonexistent attachment, leaking "this attachment exists" via a
+    // different status code than the 404 a genuinely-missing one gets -- exactly the kind of
+    // existence leak D-24 exists to prevent. Load and authorize first, validate reason last.
+    const attachment = await prisma.attachment.findUnique({
+      where: { id: req.params.id },
+      include: { ticket: true },
+    });
+    if (!attachment || attachment.ticket.requesterId !== req.user!.id) {
+      throw new HttpError(404, 'TICKET_NOT_ACCESSIBLE', 'Ticket not found');
+    }
+    if (attachment.uploadedById !== req.user!.id) {
+      // Different from the 404 above: the caller can already see this ticket/attachment, so
+      // there's nothing left to hide -- 403 correctly signals "yours to view, not yours to remove".
+      throw new HttpError(403, 'ATTACHMENT_NOT_OWNED', 'Only the uploader can remove this attachment');
+    }
+    if (attachment.ticket.status === 'CLOSED') {
+      throw new HttpError(409, 'TICKET_CLOSED', 'Cannot modify attachments on a closed ticket');
+    }
+
+    const { reason } = req.body ?? {};
+    const trimmedReason = typeof reason === 'string' ? reason.trim() : '';
+    if (trimmedReason.length &lt; 1 || trimmedReason.length &gt; 200) {
+      throw new ValidationHttpError([{ field: 'reason', message: 'reason is required, 1-200 characters' }]);
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.attachment.update({
+        where: { id: attachment.id },
+        data: { deletedAt: new Date(), deletedById: req.user!.id, deletedReason: trimmedReason },
+        select: ATTACHMENT_SELECT,
+      });
+      await tx.ticketEvent.create({
+        data: { ticketId: attachment.ticketId, actorId: req.user!.id, eventType: 'ATTACHMENT_REMOVED' },
+      });
+      return result;
+    });
+
+    try {
+      await attachmentStorage.remove(attachment.storageKey);
+    } catch (storageError) {
+      // Never fail the request over a storage cleanup error -- the row is already correctly
+      // marked removed, which is what makes the attachment inaccessible. Log with the
+      // correlation id and leave the orphaned object for a later retry job.
+      console.error(`Failed to delete storage object for attachment ${attachment.id}`, storageError);
+    }
+
+    res.status(200).json(serializeAttachment(req, updated));
+  } catch (error) {
+    next(error);
+  }
+});</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 5: Mount + gitignore</strong></label></div>
+  <p class="pathline">Modify: <code>server/src/routes/v1/tickets.ts</code> (review fix: the mount
+    line for <code>ticketAttachmentsRouter</code> goes here, not in <code>index.ts</code>, because
+    <code>:id</code> must resolve from <code>tickets.ts</code>'s own route params via
+    <code>{ mergeParams: true }</code>) and <code>server/src/routes/v1/index.ts</code>
+    (for the sibling <code>attachmentContentRouter</code>, which has no <code>:id</code>
+    dependency on the tickets router).</p>
+  <pre><code>// server/src/routes/v1/tickets.ts — add near the top and after the existing route handlers
+import { ticketAttachmentsRouter } from './attachments';
+// ...
+ticketsRouter.use('/:id/attachments', ticketAttachmentsRouter);</code></pre>
+  <pre><code>// server/src/routes/v1/index.ts — add alongside the other v1Router.use(...) calls
+import { attachmentContentRouter } from './attachments';
+// ...
+v1Router.use('/attachments', attachmentContentRouter);</code></pre>
+  <p class="pathline">Modify: <code>server/.gitignore</code> — add <code>storage/attachments/</code>.</p>
+
+  <!-- ============================= W4-3 ============================= -->
+  <h3 class="issuebox">W4-3 — Create Ticket UI</h3>
+  <p class="pathline">Branch: <code>feature/11-create-ticket-ui</code> · Depends on: W4-1 (router,
+    context), W4-2 (upload endpoint) · Blocks: nothing.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Tickets + attachments API client</strong></label></div>
+  <p class="pathline">Create: <code>client/src/api/tickets.ts</code> (this issue adds only
+    <code>createTicket</code> and the shared request headers helper; W4-4/W4-5 append more exports
+    to this same file later), <code>client/src/api/attachments.ts</code> (adds
+    <code>uploadAttachment</code>; W4-5 appends <code>fetchAttachments</code>/<code>removeAttachment</code>).</p>
+  <pre><code>// client/src/api/tickets.ts
+import { useRequester } from '../context/RequesterContext'; // header value comes from the caller
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000';
+
+export function authHeaders(requesterId: string): HeadersInit {
+  return { 'x-dev-user-id': requesterId, 'Content-Type': 'application/json' };
+}
+
+export interface CreateTicketPayload {
+  summary: string;
+  description: string;
+  categoryId: number;
+  relatedSystemId: number | null;
+  requestedPriority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+}
+
+export interface TicketDetailDto {
+  id: string; ticketNo: string; summary: string; description: string;
+  category: { id: number; name: string };
+  relatedSystem: { id: number; name: string } | null;
+  status: string; requestedPriority: string; itPriority: string;
+  createdAt: string; updatedAt: string; attachmentCount: number;
+  requester: { id: string; displayName: string };
+  owner: { id: string; displayName: string } | null;
+  resolutionSummary: string | null; version: number;
+}
+
+export async function createTicket(requesterId: string, payload: CreateTicketPayload): Promise&lt;TicketDetailDto&gt; {
+  const response = await fetch(`${API_BASE_URL}/api/v1/tickets`, {
+    method: 'POST', headers: authHeaders(requesterId), body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error?.message ?? 'Failed to create ticket');
+  }
+  return response.json();
+}</code></pre>
+  <pre><code>// client/src/api/attachments.ts
+import { authHeaders } from './tickets';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000';
+
+export interface AttachmentDto {
+  id: string; originalFilename: string; mimeType: string; sizeBytes: number; createdAt: string;
+  uploadedBy: { id: string; displayName: string };
+  status: 'ACTIVE' | 'REMOVED';
+  downloadUrl: string | null;
+  removal: { reason: string; removedAt: string; removedBy: { id: string; displayName: string } } | null;
+}
+
+export async function uploadAttachment(requesterId: string, ticketId: string, file: File): Promise&lt;AttachmentDto&gt; {
+  const form = new FormData();
+  form.append('file', file);
+  const response = await fetch(`${API_BASE_URL}/api/v1/tickets/${ticketId}/attachments`, {
+    method: 'POST', headers: { 'x-dev-user-id': requesterId }, body: form,
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error?.message ?? `Failed to upload ${file.name}`);
+  }
+  return response.json();
+}</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: AttachmentPicker — contract</strong></label></div>
+  <p class="pathline">Create: <code>client/src/components/AttachmentPicker.tsx</code>. Props:
+    <code>{ files: File[]; onChange: (files: File[]) =&gt; void }</code>. Client pre-checks
+    extension (<code>jpg jpeg png webp pdf</code>) and size (≤5 MB) on add — advisory only, shows
+    an inline error next to a staged file that fails and excludes it from <code>onChange</code>,
+    the server re-validates independently either way. Each staged file has a remove-before-submit
+    control. No upload happens here — this component only manages the staged <code>File[]</code>
+    list; the actual <code>uploadAttachment</code> calls happen in
+    <code>CreateTicketPage</code>'s submit handler, per FR-11's create-then-upload sequence.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: CreateTicketPage — contract (ui-spec.md §4)</strong></label></div>
+  <p class="pathline">Create: <code>client/src/pages/CreateTicketPage.tsx</code>, test:
+    <code>client/tests/lab-02/CreateTicket.test.tsx</code>.</p>
+  <p>State: form fields (summary, description, categoryId, relatedSystemId, requestedPriority),
+    staged attachments (<code>File[]</code> from AttachmentPicker), <code>submitting</code>
+    boolean, <code>fieldErrors</code>, <code>globalError</code>. On mount, fetch active categories
+    (<code>GET /categories</code>, already exists) and related systems
+    (<code>GET /related-systems</code>, already exists) — empty categories disables the form with
+    guidance per ui-spec.md §4 "empty" state.</p>
+  <p><strong>Submit sequence (FR-11, exact order):</strong></p>
+  <ol>
+    <li>Disable the submit button (busy state, spinner, <code>aria-busy="true"</code>), prevent
+      double-submit.</li>
+    <li>Call <code>createTicket(requesterId, payload)</code>. On a 422, map
+      <code>fieldErrors</code> onto the form, restore all entered input, move focus to the first
+      invalid field, re-enable the button, stop here — do not attempt any uploads.</li>
+    <li>On success, for each staged file <em>in sequence</em> (not <code>Promise.all</code> — a
+      partial failure must not race with the ticket already existing), call
+      <code>uploadAttachment(requesterId, ticket.id, file)</code>, collecting per-file
+      success/failure.</li>
+    <li>Navigate to <code>/tickets/{ticket.id}</code> regardless of individual upload outcomes. If
+      any upload failed, pass a summary via router state (e.g.
+      <code>navigate(path, { state: { uploadSummary } })</code>) for TicketDetailPage to render as
+      a dismissible alert: <em>"2 of 3 files attached. 1 failed: invoice.exe — file type not
+      allowed. Retry from Attachments below."</em> The ticket itself is never rolled back or
+      hidden because an attachment failed.</li>
+  </ol>
+  <p class="note">Tests to write first: empty-categories disables the form; submitting a form
+    missing required fields never calls <code>createTicket</code> and shows field errors locally
+    (client mirrors server minimums so the common case doesn't round-trip); a 422 response
+    preserves every entered value and focuses the first invalid field; a successful create with no
+    staged files navigates immediately; a successful create with one staged file that fails upload
+    still navigates, with the failure summary present in the navigation state.</p>
+
+  <!-- ============================= W4-4 ============================= -->
+  <h3 class="issuebox">W4-4 — My Tickets</h3>
+  <p class="pathline">Branch: <code>feature/12-my-tickets</code> · Depends on: W4-1 (router) ·
+    Touches <code>server/src/routes/v1/tickets.ts</code> — branch after W4-2 merges to avoid a
+    late rebase, even though W4-4 doesn't use W4-2's endpoints directly.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Query validator (test first)</strong></label></div>
+  <p class="pathline">Create: <code>server/tests/lab-02/listTicketsQuery.test.ts</code>,
+    <code>server/src/validators/listTicketsQuery.ts</code>.</p>
+  <pre><code>import { FieldError } from '../middleware/errorEnvelope';
+
+const SORT_WHITELIST = ['createdAt:desc', 'createdAt:asc', 'updatedAt:desc', 'ticketNo:asc'] as const;
+type Sort = typeof SORT_WHITELIST[number];
+
+export interface ValidatedListTicketsQuery {
+  status: string[];
+  categoryId: number | null;
+  q: string | null;
+  page: number;
+  pageSize: number;
+  sort: Sort;
+}
+
+type Result = { ok: true; value: ValidatedListTicketsQuery } | { ok: false; errors: FieldError[] };
+
+export function validateListTicketsQuery(query: Record&lt;string, unknown&gt;): Result {
+  const errors: FieldError[] = [];
+
+  const status = Array.isArray(query.status) ? query.status.map(String) : query.status ? [String(query.status)] : [];
+
+  let categoryId: number | null = null;
+  if (query.categoryId !== undefined) {
+    const parsed = Number(query.categoryId);
+    if (!Number.isInteger(parsed)) errors.push({ field: 'categoryId', message: 'categoryId must be an integer' });
+    else categoryId = parsed;
+  }
+
+  let q: string | null = null;
+  if (typeof query.q === 'string') {
+    const trimmed = query.q.trim();
+    if (trimmed.length &gt; 100) errors.push({ field: 'q', message: 'q must be 100 characters or fewer' });
+    else if (trimmed.length &gt; 0) q = trimmed; // blank/whitespace-only q behaves as omitted
+  }
+
+  const page = query.page !== undefined ? Number(query.page) : 1;
+  if (!Number.isInteger(page) || page &lt; 1) errors.push({ field: 'page', message: 'page must be a positive integer' });
+
+  // pageSize clamps silently rather than erroring, per api-spec.md #7.
+  const rawPageSize = query.pageSize !== undefined ? Number(query.pageSize) : 10;
+  const pageSize = Number.isInteger(rawPageSize) && rawPageSize &gt; 0 ? Math.min(rawPageSize, 50) : 10;
+
+  const sort = typeof query.sort === 'string' && (SORT_WHITELIST as readonly string[]).includes(query.sort)
+    ? (query.sort as Sort)
+    : query.sort !== undefined
+      ? null
+      : 'createdAt:desc';
+  if (sort === null) errors.push({ field: 'sort', message: 'sort must be one of ' + SORT_WHITELIST.join(', ') });
+
+  if (errors.length &gt; 0) return { ok: false, errors };
+  return { ok: true, value: { status, categoryId, q, page, pageSize, sort: sort as Sort } };
+}</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: GET / list handler (test first)</strong></label></div>
+  <p class="pathline">Modify: <code>server/tests/lab-02/ticketsList.api.test.ts</code> (new file),
+    <code>server/src/routes/v1/tickets.ts</code>. Cases: only the caller's own tickets are ever
+    returned regardless of what other seeded tickets exist; <code>q</code> matches ticketNo or
+    summary case-insensitively; status/categoryId/q combine with AND; invalid <code>sort</code> →
+    422; <code>pageSize=999</code> clamps to 50 silently (200, not 422); zero-tickets-ever vs
+    zero-matches-for-filters are distinguishable (the endpoint doesn't need to say which — the
+    client tells them apart using whether any filter/search is active, per ui-spec.md §5 — but
+    assert <code>meta.total</code> is accurate in both cases so the client can do that).</p>
+  <p class="note">Review fix (coverage pass): the existing <code>POST /</code> handler's response
+    includes a stray <code>commentCount: 0</code> field that isn't part of api-spec.md's
+    <code>TicketDetailDto</code> (there is no <code>CommentDto</code> in Lab 2 at all, per D-15).
+    While touching this file, delete that one field from the existing <code>POST /</code>
+    response object so every ticket-shaped response in the API is consistently DTO-exact — this
+    is a one-line deletion, not a new endpoint.</p>
+  <pre><code>import { validateListTicketsQuery } from '../../validators/listTicketsQuery';
+
+ticketsRouter.get('/', async (req, res, next) => {
+  try {
+    const validated = validateListTicketsQuery(req.query as Record&lt;string, unknown&gt;);
+    if (!validated.ok) throw new ValidationHttpError(validated.errors);
+    const { status, categoryId, q, page, pageSize, sort } = validated.value;
+
+    const [sortField, sortDirection] = sort.split(':') as [string, 'asc' | 'desc'];
+
+    // requesterId is never taken from the query -- always the authenticated caller (BR-13).
+    const where: Prisma.TicketWhereInput = {
+      requesterId: req.user!.id,
+      ...(status.length &gt; 0 ? { status: { in: status as never[] } } : {}),
+      ...(categoryId !== null ? { categoryId } : {}),
+      ...(q !== null
+        ? { OR: [{ ticketNo: { contains: q, mode: 'insensitive' } }, { summary: { contains: q, mode: 'insensitive' } }] }
+        : {}),
+    };
+
+    const [total, tickets] = await Promise.all([
+      prisma.ticket.count({ where }),
+      prisma.ticket.findMany({
+        where,
+        orderBy: { [sortField]: sortDirection },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          category: { select: { id: true, name: true } },
+          _count: { select: { attachments: { where: { deletedAt: null } } } },
+        },
+      }),
+    ]);
+
+    res.status(200).json({
+      data: tickets.map((t) => ({
+        id: t.id, ticketNo: t.ticketNo, summary: t.summary, category: t.category,
+        status: t.status, requestedPriority: t.requestedPriority, itPriority: t.itPriority,
+        createdAt: t.createdAt, updatedAt: t.updatedAt, attachmentCount: t._count.attachments,
+      })),
+      meta: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+    });
+  } catch (error) {
+    next(error);
+  }
+});</code></pre>
+  <p class="note">Note this handler must be registered <em>before</em> the existing
+    <code>POST /</code> handler's neighbors but Express matches by method+path so order between
+    <code>GET /</code> and <code>POST /</code> on the same router doesn't matter here — just don't
+    place it after the <code>/:id</code> route W4-5 adds, or <code>GET /</code> would never
+    be reached (Express matches top-down); keep <code>GET /</code> and <code>POST /</code> above
+    any future <code>/:id</code> route.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: fetchTickets client call</strong></label></div>
+  <p class="pathline">Modify: <code>client/src/api/tickets.ts</code> — add
+    <code>fetchTickets(requesterId, query)</code> building the query string from the same filter
+    shape, returning <code>{ data: TicketListItemDto[]; meta }</code>.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 4: MyTicketsPage — contract (ui-spec.md §5)</strong></label></div>
+  <p class="pathline">Create: <code>client/src/pages/MyTicketsPage.tsx</code>,
+    <code>client/src/components/TicketStatusBadge.tsx</code> (text + icon, never color alone —
+    reused by TicketDetailPage in W4-5), test: <code>client/tests/lab-02/MyTickets.test.tsx</code>.</p>
+  <p>Filter bar state: search (debounced ~300 ms via a <code>useEffect</code> + timeout, not a
+    library), status multi-select, category select, sort. Any filter/sort/search change refetches
+    and resets to page 1. "Clear filters" resets to defaults and is disabled when nothing is
+    active. Desktop (≥768px, use a <code>matchMedia</code> or CSS-only dual-render — CSS-only
+    is simpler and avoids a resize listener: render both the <code>&lt;table&gt;</code> and the
+    card list, toggle visibility with a Bootstrap responsive utility class) vs mobile stacked
+    cards. Two empty states distinguished by whether any filter/search is currently active (not
+    by <code>meta.total</code> alone — a search with zero results and zero tickets ever both have
+    <code>total: 0</code>, the distinguishing signal is client-side: is a filter active).
+    Row/card click navigates to <code>/tickets/{id}</code>.</p>
+  <p class="note">Tests to write first: loading renders skeleton; zero tickets with no filters
+    active renders "you have no tickets yet" + Create Ticket link; zero tickets with a search
+    active renders "no tickets match your filters" + Clear filters; changing the search box
+    debounces before calling <code>fetchTickets</code> (use fake timers); changing a filter resets
+    to page 1; clicking a row navigates.</p>
+
+  <!-- ============================= W4-5 ============================= -->
+  <h3 class="issuebox">W4-5 — Ticket Detail + Attachments UI</h3>
+  <p class="pathline">Branch: <code>feature/13-ticket-detail-attachments-ui</code> · Depends on:
+    W4-2 (attachment endpoints), W4-4 merged (shares <code>tickets.ts</code>).</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: GET /:id handler (test first)</strong></label></div>
+  <p class="pathline">Create: <code>server/tests/lab-02/ticketDetail.api.test.ts</code>. Cases:
+    own ticket → 200 full <code>TicketDetailDto</code>; a ticket belonging to a different
+    requester → 404; a nonexistent id → 404 with the identical body shape as the previous case
+    (assert both responses are byte-identical aside from the id itself, per D-24).</p>
+  <pre><code>ticketsRouter.get('/:id', async (req, res, next) => {
+  try {
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: req.params.id },
+      include: {
+        category: { select: { id: true, name: true } },
+        relatedSystem: { select: { id: true, name: true } },
+        requester: { select: { id: true, displayName: true } },
+        owner: { select: { id: true, displayName: true } },
+        _count: { select: { attachments: { where: { deletedAt: null } } } },
+      },
+    });
+    if (!ticket || ticket.requesterId !== req.user!.id) {
+      // Identical body for "doesn't exist" and "exists but isn't yours" -- a 403 here would
+      // have confirmed the ticket's existence, which defeats the point (D-24).
+      throw new HttpError(404, 'TICKET_NOT_ACCESSIBLE', 'Ticket not found');
+    }
+    res.status(200).json({
+      id: ticket.id, ticketNo: ticket.ticketNo, summary: ticket.summary, description: ticket.description,
+      category: ticket.category, relatedSystem: ticket.relatedSystem,
+      status: ticket.status, requestedPriority: ticket.requestedPriority, itPriority: ticket.itPriority,
+      createdAt: ticket.createdAt, updatedAt: ticket.updatedAt,
+      attachmentCount: ticket._count.attachments,
+      requester: ticket.requester, owner: ticket.owner,
+      resolutionSummary: ticket.resolutionSummary, version: ticket.version,
+    });
+  } catch (error) {
+    next(error);
+  }
+});</code></pre>
+  <p class="note">This route must be registered <em>after</em> <code>GET /</code> and
+    <code>POST /</code> on the same router (W4-4's handlers) — Express matches routes
+    top-down and <code>/:id</code> would otherwise never let a literal path like a future
+    <code>/search</code> route match, though with only <code>GET /</code>/<code>POST /</code>
+    ahead of it here there's no actual collision today; keep the ordering convention anyway for
+    whoever adds the next route.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: fetchTicketDetail, fetchAttachments, removeAttachment</strong></label></div>
+  <p class="pathline">Modify: <code>client/src/api/tickets.ts</code> (add
+    <code>fetchTicketDetail</code>), <code>client/src/api/attachments.ts</code> (add
+    <code>fetchAttachments(requesterId, ticketId)</code>,
+    <code>removeAttachment(requesterId, attachmentId, reason)</code>).</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: RemovalConfirmDialog — focus trap (test first, this is the second highest-risk piece)</strong></label></div>
+  <p class="pathline">Create: <code>client/tests/lab-02/RemovalConfirmDialog.test.tsx</code>,
+    <code>client/src/components/RemovalConfirmDialog.tsx</code>.</p>
+  <pre><code>import { useEffect, useRef, useState } from 'react';
+
+interface Props {
+  filename: string;
+  onCancel: () =&gt; void;
+  onConfirm: (reason: string) =&gt; void;
+  triggerRef: React.RefObject&lt;HTMLElement&gt;;
+}
+
+export function RemovalConfirmDialog({ filename, onCancel, onConfirm, triggerRef }: Props) {
+  const [reason, setReason] = useState('');
+  const dialogRef = useRef&lt;HTMLDivElement&gt;(null);
+
+  useEffect(() =&gt; {
+    const dialog = dialogRef.current;
+    const focusable = dialog?.querySelectorAll&lt;HTMLElement&gt;('button, input, textarea, select, [tabindex]');
+    focusable?.[0]?.focus();
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        onCancel();
+        return;
+      }
+      if (event.key !== 'Tab' || !focusable || focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey &amp;&amp; document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey &amp;&amp; document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () =&gt; {
+      document.removeEventListener('keydown', handleKeyDown);
+      triggerRef.current?.focus(); // return focus to the control that opened the dialog
+    };
+  }, [onCancel, triggerRef]);
+
+  return (
+    &lt;div role="dialog" aria-modal="true" aria-label={`Remove ${filename}`} ref={dialogRef}&gt;
+      &lt;label htmlFor="removal-reason"&gt;Reason for removal&lt;/label&gt;
+      &lt;textarea id="removal-reason" value={reason} maxLength={200}
+        onChange={(e) =&gt; setReason(e.target.value)} /&gt;
+      &lt;button onClick={onCancel}&gt;Cancel&lt;/button&gt;
+      &lt;button disabled={reason.trim().length === 0} onClick={() =&gt; onConfirm(reason.trim())}&gt;
+        Remove
+      &lt;/button&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+  <p class="note">Tests to write first: on open, focus moves into the dialog; Tab from the last
+    focusable element wraps to the first (and Shift+Tab from the first wraps to the last); Escape
+    calls <code>onCancel</code>; Confirm is disabled until the reason is non-empty; on close (both
+    Cancel and Confirm paths), focus returns to <code>triggerRef</code>'s element.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 4: AttachmentSection — contract (ui-spec.md §6 states table)</strong></label></div>
+  <p class="pathline">Create: <code>client/src/components/AttachmentSection.tsx</code>, test:
+    <code>client/tests/lab-02/AttachmentSection.test.tsx</code>.</p>
+  <p>Props: <code>{ ticketId: string; requesterId: string; ticketStatus: string }</code>. Fetches
+    its own attachment list on mount via <code>fetchAttachments</code> (independent of
+    TicketDetailPage's own ticket fetch, so a retry here doesn't refetch the whole ticket). Upload
+    control disabled at 5 active (count shown as "N of 5 used"). Row rendering per the states
+    table in ui-spec.md §6: Active (Download link, Remove button shown only when
+    <code>uploadedBy.id === requesterId</code>), Uploading (staged, busy indicator, no
+    Download/Remove yet), Removed (muted text, "Removed" badge, reason/remover/date shown,
+    Download replaced with a disabled control), Unavailable (list fetch itself failed → inline
+    error + Retry for the whole section, not a partial list). Remove button opens
+    <code>RemovalConfirmDialog</code>; on confirm, call <code>removeAttachment</code> and replace
+    that row's entry with the server's returned (now-removed) DTO rather than refetching the whole
+    list.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 5: TicketDetailPage — contract (ui-spec.md §6 header block)</strong></label></div>
+  <p class="pathline">Create: <code>client/src/pages/TicketDetailPage.tsx</code>, test:
+    <code>client/tests/lab-02/TicketDetail.test.tsx</code>.</p>
+  <p>Reads <code>:id</code> from the route, fetches <code>fetchTicketDetail</code> on mount and on
+    every remount (satisfies the "discard cached data on requester switch" rule from W4-1).
+    Renders the header block (ticket number, date, category, related system or "Not applicable",
+    requester, owner or "Unassigned", both priority badges via <code>TicketStatusBadge</code>,
+    status badge, summary, description, resolution summary or "No resolution yet") then
+    <code>&lt;AttachmentSection /&gt;</code> directly below — no tabs, no Service Actions, no Event
+    Log (D-22). If <code>location.state.uploadSummary</code> is present (passed from
+    CreateTicketPage's navigate call), render it as a dismissible alert. A 404 from
+    <code>fetchTicketDetail</code> renders the generic "Ticket not found" message, never a 403-style
+    "not yours" message that would confirm existence.</p>
+  <p class="note">Tests to write first: loading renders a skeleton; 404 renders the generic
+    not-found message; a successful fetch renders every header field, including the "Not
+    applicable"/"Unassigned"/"No resolution yet" fallbacks when those fields are null; an
+    <code>uploadSummary</code> in navigation state renders the dismissible alert.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 6: E2E addition assertion</strong></label></div>
+  <p class="note">Per W4-1's route-guard note, add one assertion here (or in W4-4's MyTickets
+    test) that switching requester via AppShell's "Change Requester" and selecting a different
+    one, then revisiting <code>/tickets</code>, shows that requester's own tickets only — this is
+    the concrete regression test for the cache-discard behavior, not just a unit test of the
+    context in isolation.</p>
+
+  <!-- ============================= W4-6 ============================= -->
+  <h3 class="issuebox">W4-6 — E2E and visual verification</h3>
+  <p class="pathline">Branch: <code>feature/14-lab2-e2e-visual</code> · Depends on: W4-1 through W4-5 all
+    merged · Mirrors the pattern reviewed this session on <code>ArmmyC/CPE334-TokTickIT-Lab1</code>
+    Issue #19/PR #27: a dedicated test database, a Playwright config with desktop/tablet/mobile
+    projects, one end-to-end spec covering the full requester → create → find → detail →
+    upload → remove → switch-requester → isolation flow, real screenshots under
+    <code>artifacts/lab-02/screenshots/</code>, and <code>tests.md</code>/<code>ai-use.md</code>/
+    <code>reviewer.md</code> updated with genuine evidence (not invented pass/fail rows).</p>
+  <p class="note">Scope this issue's task breakdown from the actual repo state once W4-1-W4-5 exist —
+    the test-database guard, docker-compose service, and Playwright config can largely be adapted
+    from what was reviewed on ArmmyC's Issue #19 (same course, same contract shape), but the E2E
+    spec itself must be written against this repo's real selectors and routes, not copied. Treat
+    this issue as its own follow-up plan once the four feature branches are merged, rather than
+    detailing every Playwright step speculatively here against UI that doesn't exist yet.</p>
+
+</div>
+</body>
+</html>
