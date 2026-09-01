@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../prisma';
 import { validateCreateTicketRequest } from '../../validators/createTicketRequest';
+import { validateListTicketsQuery } from '../../validators/listTicketsQuery';
 import { generateTicketNumber } from '../../services/ticketNumber';
 import { HttpError, ValidationHttpError } from '../../middleware/errorEnvelope';
 import { ticketAttachmentsRouter } from './attachments';
@@ -90,7 +91,6 @@ ticketsRouter.post('/', async (req, res, next) => {
       itPriority: ticket.itPriority,
       createdAt: ticket.createdAt,
       updatedAt: ticket.updatedAt,
-      commentCount: 0,
       attachmentCount: 0,
       requester: ticket.requester,
       owner: ticket.owner,
@@ -119,6 +119,51 @@ ticketsRouter.post('/', async (req, res, next) => {
         return;
       }
     }
+    next(error);
+  }
+});
+
+ticketsRouter.get('/', async (req, res, next) => {
+  try {
+    const validated = validateListTicketsQuery(req.query as Record<string, unknown>);
+    if (!validated.ok) throw new ValidationHttpError(validated.errors);
+    const { status, categoryId, q, page, pageSize, sort } = validated.value;
+
+    const [sortField, sortDirection] = sort.split(':') as [string, 'asc' | 'desc'];
+
+    // requesterId is never taken from the query -- always the authenticated caller (BR-13).
+    const where: Prisma.TicketWhereInput = {
+      requesterId: req.user!.id,
+      ...(status.length > 0 ? { status: { in: status as never[] } } : {}),
+      ...(categoryId !== null ? { categoryId } : {}),
+      ...(q !== null
+        ? { OR: [{ ticketNo: { contains: q, mode: 'insensitive' } }, { summary: { contains: q, mode: 'insensitive' } }] }
+        : {}),
+    };
+
+    const [total, tickets] = await Promise.all([
+      prisma.ticket.count({ where }),
+      prisma.ticket.findMany({
+        where,
+        orderBy: { [sortField]: sortDirection },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          category: { select: { id: true, name: true } },
+          _count: { select: { attachments: { where: { deletedAt: null } } } },
+        },
+      }),
+    ]);
+
+    res.status(200).json({
+      data: tickets.map((t) => ({
+        id: t.id, ticketNo: t.ticketNo, summary: t.summary, category: t.category,
+        status: t.status, requestedPriority: t.requestedPriority, itPriority: t.itPriority,
+        createdAt: t.createdAt, updatedAt: t.updatedAt, attachmentCount: t._count.attachments,
+      })),
+      meta: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+    });
+  } catch (error) {
     next(error);
   }
 });
