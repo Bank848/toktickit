@@ -1,0 +1,14 @@
+{
+  "name": "toktickit-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Root-level orchestration for Lab 2 Playwright E2E tests. Client and server remain separate npm projects; this package only wires up the dedicated E2E database and Playwright.",
+  "scripts": {
+    "test:e2e:prepare": "node scripts/e2e-db-prepare.mjs",
+    "test:e2e": "npm run test:e2e:prepare && playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "dotenv": "^16.4.5"
+  }
+}
