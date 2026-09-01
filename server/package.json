@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "e2e": "dotenv -e .env.e2e -- ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
     "start": "node dist/src/server.js",
     "test": "vitest run",
@@ -30,6 +31,7 @@
     "@types/node": "^22.7.0",
     "@types/supertest": "^6.0.2",
     "@vitest/coverage-v8": "^2.1.9",
+    "dotenv-cli": "^8.0.0",
     "prisma": "^5.20.0",
     "supertest": "^7.0.0",
     "ts-node": "^10.9.2",

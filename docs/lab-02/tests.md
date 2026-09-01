@@ -170,6 +170,21 @@ document and will change once search, the dev selector, soft-removal-with-reason
 code land; it is retained only as a historical checkpoint, not as evidence toward the ≥80% Lab 2
 target, which is measured again at Lab 2 completion.
 
+**Lab 2 W4 measurement (Issues #19–#24, requester-facing UI, recorded 2026-09-02):**
+
+- `client` — `npx vitest run` in `client/`: **47/47 tests passing** across 10 files.
+- E2E — `npx playwright test` against `e2e/lab-02/requester-ticket-flow.spec.ts`: **3/3 passing**
+  (desktop, tablet, mobile projects), covering select requester → create ticket with an initial
+  attachment → find it in My Tickets → open detail → upload a second attachment → remove it with
+  a reason → switch requester → confirm the new requester sees neither the ticket nor the removed
+  attachment's reason, and that direct navigation to another requester's ticket returns the
+  generic "Ticket not found." message (not a 403-style message, per D-24).
+- 24 real screenshots captured to `artifacts/lab-02/screenshots/{select-requester,create-ticket,
+  my-tickets,ticket-detail}/`, one set per viewport per flow step.
+- `server` vitest suite was not re-run for this Issue — no server code changed in W4-6, and the
+  local `toktickit_test` Postgres database this machine's `tests/globalSetup.ts` expects is not
+  currently provisioned (a pre-existing local-environment gap, not a W4 regression).
+
 ## 7. Known Limitations or Deferred Tests
 
 - Load/perf testing beyond the p95 smoke assertion is out of scope for Lab 2.

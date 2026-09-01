@@ -114,3 +114,41 @@ they are not auto-posted.
 
 None yet. PR #14 has received CHANGES_REQUESTED from ArmmyC in both completed rounds; no APPROVED
 review exists as of this document.
+
+## Lab 2 W4 pull requests (Issues #19–#24)
+
+Reviewer identity, PR links, and approvals for the six implementation PRs that shipped the
+requester-facing UI (App Shell, Attachment backend, Create Ticket UI, My Tickets, Ticket Detail
+and Attachments UI, and E2E/visual verification). Compiled from
+`gh pr view <n> --repo Bank848/toktickit --json reviews`, not from memory. All six merged into
+`lab2-staging`.
+
+| PR | Issue | Title | Reviewer | Verdict |
+|---|---|---|---|---|
+| [#18](https://github.com/Bank848/toktickit/pull/18) | #19 | App shell, routing, and Development Requester selection | N0M3KM | APPROVED |
+| [#25](https://github.com/Bank848/toktickit/pull/25) | #20 | Attachment storage and lifecycle backend | N0M3KM | APPROVED |
+| [#26](https://github.com/Bank848/toktickit/pull/26) | #21 | Create Ticket UI | Jinnakan | APPROVED |
+| [#27](https://github.com/Bank848/toktickit/pull/27) | #22 | My Tickets | N0M3KM | APPROVED |
+| [#28](https://github.com/Bank848/toktickit/pull/28) | #23 | Ticket Detail and Attachments UI | N0M3KM | CHANGES_REQUESTED, CHANGES_REQUESTED, APPROVED |
+| (this PR) | #24 | Lab 2 E2E and visual verification | — | pending |
+
+PR #28 is the one substantive review round of Lab 2 W4. N0M3KM's first review found a real bug:
+the attachment-removal dialog's keyboard focus trap captured its list of focusable elements once,
+in a `useEffect` that didn't re-run when the Remove button's disabled state changed, so Remove
+silently dropped out of the Tab cycle even after becoming enabled.
+
+> N0M3KM, CHANGES_REQUESTED (2026-09-01T16:24:47Z, commit `a4a5ced`): "Some issue, I found. Please
+> recheck."
+
+Fixed in commit `8e7fb65` — the focus trap now re-queries focusable elements on every Tab press
+instead of caching a stale snapshot — with a new regression test covering exactly that scenario
+(`client/tests/lab-02/RemovalConfirmDialog.test.tsx`).
+
+> N0M3KM, CHANGES_REQUESTED (2026-09-01T16:29:09Z, commit `a4a5ced`): "Sorry this one"
+
+This second review is a duplicate of the first, pinned to the same pre-fix commit (`a4a5ced`) —
+confirmed by comparing `submitted_at`/`commit_id` across both reviews via the GitHub API, not a
+new finding. Once N0M3KM re-reviewed against the fix commit, it was approved:
+
+> N0M3KM, APPROVED (2026-09-01T16:33:52Z, commit `8e7fb65`): "Ok!! everything seems great now.
+> Ready to merge :)"

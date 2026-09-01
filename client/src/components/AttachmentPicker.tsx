@@ -74,7 +74,7 @@ export function AttachmentPicker({ files, onChange }: Props) {
         <ul>
           {files.map((file, index) => (
             <li key={`${file.name}-${index}`}>
-              {file.name}
+              <span>{file.name}</span>
               <button type="button" onClick={() => handleRemove(index)} aria-label={`Remove ${file.name}`}>
                 Remove
               </button>
