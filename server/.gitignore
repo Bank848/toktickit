@@ -1,3 +1,7 @@
 node_modules
+coverage
+storage/attachments/
 # Keep environment variables out of version control
 .env
+.env.test
+.env.e2e

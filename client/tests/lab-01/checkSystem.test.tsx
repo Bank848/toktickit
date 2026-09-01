@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import App from '../../src/App';
+import { SystemCheckPage as App } from '../../src/pages/SystemCheckPage';
 import * as api from '../../src/api';
 
 describe('Check System button', () => {

@@ -1,0 +1,2171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TokTickIT Lab 2 — W3 Foundation Plan</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: "dark", securityLevel: "loose" });</script>
+<style>
+  :root { --bg:#0d1117; --panel:#161b22; --border:#30363d; --fg:#e6edf3; --muted:#9da7b3;
+          --accent:#58a6ff; --add:#3fb950; --mod:#d29922; --del:#f85149; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:15px/1.6 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+  .wrap { max-width:1100px; margin:0 auto; padding:32px 24px 96px; }
+  h1 { font-size:28px; margin:0 0 4px; }
+  h2 { font-size:21px; margin:40px 0 12px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+  h3 { font-size:17px; margin:24px 0 8px; }
+  h4 { font-size:15px; margin:18px 0 6px; color: var(--accent); }
+  .tag { display:inline-block; font-size:12px; color:var(--muted); border:1px solid var(--border);
+         border-radius:999px; padding:2px 10px; margin-right:6px; }
+  .meta { color:var(--muted); margin:8px 0 0; }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px 18px; margin:14px 0; }
+  .ba { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+  .ba > figure { margin:0; background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:12px; }
+  .ba figcaption { font-weight:600; margin-bottom:8px; color:var(--muted); }
+  .ba .before figcaption::before { content:"◀ BEFORE  "; color:var(--del); }
+  .ba .after  figcaption::before { content:"AFTER ▶  ";  color:var(--add); }
+  @media (max-width:820px){ .ba { grid-template-columns:1fr; } }
+  .mermaid { background:#0b0f14; border-radius:8px; padding:10px; overflow:auto; }
+  .changes li { list-style:none; margin:4px 0; }
+  .changes .add::before { content:"+ "; color:var(--add); font-weight:700; }
+  .changes .mod::before { content:"~ "; color:var(--mod); font-weight:700; }
+  .changes .del::before { content:"− "; color:var(--del); font-weight:700; }
+  code, pre { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
+  pre { background:#0b0f14; border:1px solid var(--border); border-radius:8px; padding:12px 14px; overflow:auto; font-size:13px; }
+  code:not(pre code){ background:#0b0f14; border:1px solid var(--border); border-radius:4px; padding:1px 5px; font-size:13px; }
+  .step { margin:6px 0; }
+  .step input { margin-right:8px; }
+  .pathline { color:var(--muted); font-size:13px; }
+  hr.section { border:0; border-top:2px dashed var(--border); margin:48px 0; }
+  .note { color:var(--muted); font-size:13px; }
+  .warn { border-left:3px solid var(--mod); padding-left:12px; }
+  .task-issue { color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>TokTickIT Lab 2 — W3 Foundation</h1>
+  <p class="meta">
+    <span class="tag">2026-08-18</span>
+    <span class="tag">plan-pro</span>
+    <span class="tag">Node.js</span><span class="tag">Express</span><span class="tag">TypeScript</span>
+    <span class="tag">Prisma</span><span class="tag">PostgreSQL</span><span class="tag">Vitest</span>
+    <span class="tag">Supertest</span><span class="tag">React</span><span class="tag">Vite</span>
+  </p>
+
+  <h2>📖 Read this first</h2>
+
+  <div class="card">
+    <strong>Goal.</strong> Turn the approved, Opus-reviewed
+    <code>TokTickIT-Lab2-Implementation-Plan-v0.1.md</code> into executable tasks for Lab 2's
+    W3 scope only (GitHub Issues 5–8: spec docs, data model increment, API v1 foundation with
+    an identity seam, and the ticket-creation endpoint). By the end, <code>lab2-staging</code>
+    has a working <code>POST /api/v1/tickets</code> backed by a real Postgres schema, protected
+    by a header-based dev identity stub, with Lab 1's health/categories endpoints untouched and
+    passing, plus a dedicated test database so Lab 2's tests never touch the dev database.
+    <br><br>
+    <strong>Key decisions.</strong> This plan does <strong>not</strong> execute Issues 5–8 in
+    that numeric order. <code>resolveCurrentUser</code> (Issue 6's identity seam) needs the
+    <code>User</code> Prisma model, and <code>GET /api/v1/me</code> needs a seeded requester —
+    both are Issue 7 deliverables. The source plan's stated dependency chain
+    "5 → 6 → 7 → 8" doesn't compile as written. This plan sequences the actual work as
+    <strong>5 → 7 → 6 → 8</strong> (docs → data model → API foundation → ticket creation) while
+    keeping every task labelled with its true GitHub issue number, so the board still shows
+    Issues 5–8 with their original content — only the branch <em>merge order</em> changes
+    (Issue 7's branch merges into <code>lab2-staging</code> before Issue 6's). Three real bugs
+    the Opus review caught are folded in here as concrete tasks, not left as notes: explicit
+    <code>onDelete: Restrict</code> on optional FKs, the <code>downloadUrl</code> composition
+    issue (deferred — no download endpoint exists until W4, but the pattern is documented here
+    so Issue 8's DTOs don't repeat the mistake), and <code>Comment.body</code>'s column length.
+  </div>
+
+  <h3>Before → After</h3>
+  <p class="note">Left = what's on <code>lab2-staging</code> right now (9747d4f). Right = after Issues 5–8 land.</p>
+  <div class="ba">
+    <figure class="before"><figcaption>Today: Lab 1 only</figcaption>
+      <div class="mermaid">
+flowchart LR
+  Client["React client<br/>App.tsx"] -->|"GET /api/health"| API["Express app.ts"]
+  Client -->|"GET /api/categories"| API
+  API --> DB[("Postgres<br/>Category only")]
+      </div>
+    </figure>
+    <figure class="after"><figcaption>After Issues 5–8</figcaption>
+      <div class="mermaid">
+flowchart LR
+  Client["React client"] -->|"/api/v1/*"| Router["/api/v1 router"]
+  Client -->|"/api/health, /api/categories<br/>Lab 1 aliases, unchanged"| Legacy["Legacy routes"]
+  Router --> Auth["resolveCurrentUser<br/>header-based dev identity"]
+  Auth --> Routes["/me · /categories · /related-systems · POST /tickets"]
+  Legacy --> DB[("Postgres")]
+  Routes --> DB
+  DB --- Models["User · Ticket · Comment · Attachment<br/>TicketEvent · TicketCounter<br/>RelatedSystem · Category+"]
+      </div>
+    </figure>
+  </div>
+
+  <div class="ba" style="margin-top:20px">
+    <figure class="before"><figcaption>Today: no ticket creation</figcaption>
+      <div class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant A as API
+  Note over C,A: Only /api/health and<br/>/api/categories exist.
+  C->>A: GET /api/categories
+  A-->>C: 200 [4 categories]
+      </div>
+    </figure>
+    <figure class="after"><figcaption>After: identity + transactional create</figcaption>
+      <div class="mermaid">
+sequenceDiagram
+  participant C as Client
+  participant M as resolveCurrentUser
+  participant A as POST /api/v1/tickets
+  participant T as prisma.$transaction
+  participant DB as Postgres
+  C->>M: x-dev-user-email header
+  M->>DB: findUnique(User)
+  DB-->>M: active user
+  M->>A: req.user set
+  A->>A: validate body (422 if invalid)
+  A->>T: begin
+  T->>DB: increment/create TicketCounter
+  T->>DB: insert Ticket (itPriority = requestedPriority)
+  T->>DB: insert TicketEvent(TICKET_CREATED)
+  T-->>A: commit
+  A-->>C: 201 TicketDetailDto
+      </div>
+    </figure>
+  </div>
+
+  <h3>What's changing</h3>
+  <ul class="changes">
+    <li class="add"><code>docs/lab-02/</code> — decision register addendum, corrected SRS, 5 feature specs, API contract, test plan, traceability matrix (Issue 5)</li>
+    <li class="mod"><code>server/prisma/schema.prisma</code> — adds User, RelatedSystem, Ticket, Comment, Attachment, TicketEvent, TicketCounter; extends Category (Issue 7)</li>
+    <li class="add"><code>server/prisma/migrations/&lt;ts&gt;_lab2_ticketing_foundation/</code> — one clean migration (Issue 7)</li>
+    <li class="mod"><code>server/prisma/seed.ts</code> — idempotent category backfill + related systems + 4 users (Issue 7)</li>
+    <li class="mod"><code>client/vite.config.ts</code> — test include pattern fixed to catch `.ts` unit tests (Issue 7)</li>
+    <li class="mod"><code>server/package.json</code> — fixes broken `start` script; adds `@vitest/coverage-v8`, `dotenv` test setup (Issue 6)</li>
+    <li class="mod"><code>server/tests/lab-01/categories.test.ts</code> — strengthened assertions (Issue 6)</li>
+    <li class="add"><code>server/src/middleware/errorEnvelope.ts</code>, <code>server/src/auth/currentUser.ts</code> — cross-cutting API foundation (Issue 6)</li>
+    <li class="add"><code>server/src/routes/v1/</code> — `/api/v1` router, `/me`, Lab 1 aliases preserved (Issue 6)</li>
+    <li class="add"><code>server/tests/globalSetup.ts</code>, <code>server/tests/setupEnv.ts</code>, <code>server/.env.test</code> — dedicated test database harness (Issue 6)</li>
+    <li class="add"><code>server/src/services/ticketNumber.ts</code>, <code>server/src/validators/createTicketRequest.ts</code>, <code>server/src/routes/v1/tickets.ts</code> — ticket creation (Issue 8)</li>
+  </ul>
+
+  <h3>⚡ Parallelization analysis</h3>
+  <div class="card">
+    <p>Batches below assume subagent-per-task execution. The true critical path is
+    <strong>Task 5 (schema) → Task 12 (identity) → Task 13 (router) → Task 17 (ticket creation)</strong> —
+    everything after the schema lands funnels through identity, then the router, before the
+    final ticket-creation task can be written.</p>
+    <ul>
+      <li><strong>Batch 1 (parallel):</strong> Tasks 1, 2, 3, 4 (all docs, disjoint files under <code>docs/lab-02/</code>), Task 9 (Lab 1 bugfixes, touches <code>package.json</code>/an existing test file, no overlap with docs or schema), Task 11 (error envelope, new files under <code>src/middleware/</code>) — none of these touch the same file or depend on each other.</li>
+      <li><strong>Batch 2 (solo):</strong> Task 5 (schema + migration). Every later code task reads this file; running anything schema-dependent concurrently with it would race on `schema.prisma`.</li>
+      <li><strong>Batch 3a (solo):</strong> Task 6 (migration/backfill test) — depends only on Task 5's finished schema.</li>
+      <li><strong>Batch 3b (parallel):</strong> Task 7 (seed script), Task 10 (test DB harness) — Task 7 depends on Task 6 having created <code>server/tests/lab-02/migration.test.ts</code> first (Task 7 Step 2 adds a `code`-field assertion to that same file — the two tasks share a file, so they cannot run in the same batch as each other, but Task 10 touches none of Task 6/7's files and can run alongside Task 7).</li>
+      <li><strong>Batch 4 (parallel):</strong> Task 8 (seed verification + the unrelated `vite.config.ts` client fix, bundled since both are small loose ends) and Task 12 (`resolveCurrentUser`, needs Task 5's `User` model and Task 11's `HttpError`) — disjoint files.</li>
+      <li><strong>Batch 5 (solo):</strong> Task 13 (router mount + `/me`) — needs Task 11 and Task 12 both finished; it's the file every later route gets registered in.</li>
+      <li><strong>Batch 6 (parallel):</strong> Task 14 (ticket number service), Task 15 (create-ticket validator), Task 16 (categories/related-systems v1 routes) — three disjoint new files, all depend on Task 5 (schema) and Task 13 (router + auth in place) but not on each other.</li>
+      <li><strong>Batch 7 (solo):</strong> Task 17 (`POST /api/v1/tickets` + rollback test) — the integration point that uses Tasks 14 and 15 together inside one transaction; kept solo since it's the highest-risk task (concurrency + transaction correctness).</li>
+    </ul>
+    <p class="note">No batch above has two <em>concurrently-run</em> tasks editing the same file. Task 9 and Task 10 both touch <code>server/package.json</code> (Task 9 fixes the `start` script, Task 10 adds `@vitest/coverage-v8`) — they're in different batches (1 and 3b) specifically to avoid that collision. Task 6 and Task 7 both touch <code>server/tests/lab-02/migration.test.ts</code> — that's why Task 6 got its own solo batch (3a) ahead of Task 7 rather than being grouped into the same parallel batch as it.</p>
+  </div>
+
+  <hr class="section" />
+
+  <h2>🛠 Implementation plan</h2>
+  <p class="note">For agentic workers: use <code>superpowers:subagent-driven-development</code> or
+     <code>superpowers:executing-plans</code> (or plan-pro's parallel execution per the batches above).
+     Steps use checkboxes for tracking.</p>
+
+  <div class="card">
+    <strong>Goal:</strong> Implement TokTickIT Lab 2 Issues 5–8: the spec document set, the Prisma
+    data-model increment, an `/api/v1` API foundation with a header-based dev identity seam, and
+    the transactional ticket-creation endpoint.<br>
+    <strong>Architecture:</strong> Express + Prisma stays as Lab 1 left it, additive only — no
+    destructive migrations, Lab 1's `/api/health` and `/api/categories` keep working unchanged.
+    A new `/api/v1` router is mounted alongside them. Identity is resolved per-request from a
+    dev-only header/env fallback (`resolveCurrentUser`), gated at process boot so it can never
+    silently run in production. Ticket numbers are allocated inside the same Prisma
+    `$transaction` as the ticket insert, using an atomic counter-row update (never `count(*)+1`).<br>
+    <strong>Tech Stack:</strong> Node.js/Express/TypeScript (server), Prisma 5/PostgreSQL, Vitest +
+    Supertest (server tests), React/TypeScript/Vite (client, only `vite.config.ts` touched here).<br>
+    <strong>Spec:</strong> <code>D:\CPE334\Lab2\TokTickIT-Lab2-Implementation-Plan-v0.1.md</code>
+    (signed off + Opus-reviewed 2026-08-18) — read alongside this plan; §1 has the full text of
+    D-13…D-20, §2 the full schema, §3 the API contract, §6 the test plan.
+  </div>
+
+  <h4>Global Constraints (copied verbatim from the source spec — apply to every task below)</h4>
+  <div class="card">
+    <ul>
+      <li>REST conventions: root <code>/api/v1</code>, JSON except upload/download, camelCase field names, ISO-8601 UTC timestamps, response bodies are DTOs only (never a raw Prisma model), status codes 201 create / 401 auth / 403 authz / 404 missing / 409 conflict / 422 validation.</li>
+      <li>Error envelope on every non-2xx response: <code>{ "error": { "code", "message", "fieldErrors": [], "correlationId" } }</code>.</li>
+      <li>Every FK relation gets an <strong>explicit</strong> <code>onDelete: Restrict</code> — Prisma's implicit default is `Restrict` only on required relations and silently `SetNull` on optional ones, which would violate "Tickets and Ticket Events are never cascade-deleted."</li>
+      <li>Ticket number generation must be transactional and atomic (increment-and-read on the `TicketCounter` row) — never `count(*) + 1`.</li>
+      <li><code>itPriority</code> is always copied from `requestedPriority` server-side; never accepted from the request body.</li>
+      <li><code>requesterId</code> / <code>authorId</code> / any actor id is always `req.user.id`; never accepted from a request body.</li>
+      <li>Server tests run against a dedicated `toktickit_test` database — never the developer's real dev database.</li>
+      <li>TDD throughout: write the failing test, run it, write minimal code, run again, commit.</li>
+    </ul>
+  </div>
+
+  <h3>File structure</h3>
+  <ul class="changes">
+    <li class="add"><code>docs/lab-02/decision-register-addendum.md</code> — D-13…D-20, full text and downstream-edit checklist</li>
+    <li class="add"><code>docs/lab-02/srs-corrections.md</code> — every FR/BR diff applied to the Lab 2 SRS</li>
+    <li class="add"><code>docs/lab-02/features/feature-b-ticket-creation.md</code> … <code>feature-f-attachments.md</code> — 5 feature specs</li>
+    <li class="add"><code>docs/lab-02/api-contract.md</code>, <code>docs/lab-02/test-plan.md</code>, <code>docs/lab-02/traceability-matrix.md</code></li>
+    <li class="mod"><code>server/prisma/schema.prisma</code> — the Lab 2 data-model increment</li>
+    <li class="add"><code>server/prisma/migrations/&lt;timestamp&gt;_lab2_ticketing_foundation/migration.sql</code></li>
+    <li class="mod"><code>server/prisma/seed.ts</code> — idempotent category/related-system/user seeding</li>
+    <li class="add"><code>server/tests/lab-02/migration.test.ts</code> — Lab 1 categories survive migration</li>
+    <li class="add"><code>server/prisma/verify-seed-lab2.ts</code> — manual seed-verification script</li>
+    <li class="mod"><code>client/vite.config.ts</code></li>
+    <li class="mod"><code>server/package.json</code> — `start` script fix, new devDependencies</li>
+    <li class="mod"><code>server/tests/lab-01/categories.test.ts</code> — stronger assertions</li>
+    <li class="add"><code>server/.env.test</code>, <code>server/tests/setupEnv.ts</code>, <code>server/tests/globalSetup.ts</code>, <code>server/tests/helpers/resetDb.ts</code></li>
+    <li class="mod"><code>server/vitest.config.ts</code> — wire in setup/global-setup, disable file parallelism</li>
+    <li class="add"><code>server/src/middleware/errorEnvelope.ts</code></li>
+    <li class="add"><code>server/src/auth/currentUser.ts</code></li>
+    <li class="add"><code>server/src/routes/v1/index.ts</code>, <code>server/src/routes/v1/me.ts</code></li>
+    <li class="mod"><code>server/src/app.ts</code> — mount `/api/v1`</li>
+    <li class="mod"><code>server/.env.example</code></li>
+    <li class="add"><code>server/src/services/ticketNumber.ts</code></li>
+    <li class="add"><code>server/src/validators/createTicketRequest.ts</code></li>
+    <li class="add"><code>server/src/routes/v1/categories.ts</code>, <code>server/src/routes/v1/relatedSystems.ts</code></li>
+    <li class="add"><code>server/src/routes/v1/tickets.ts</code></li>
+  </ul>
+
+  <!-- ================================================================ -->
+  <!-- ISSUE 5 — SPEC DOCS                                               -->
+  <!-- ================================================================ -->
+
+  <h3>Task 1: SDS Decision Register Addendum <span class="task-issue">(Issue 5, docs)</span></h3>
+  <p class="pathline">Create: <code>docs/lab-02/decision-register-addendum.md</code> · Modify: <code>D:\CPE334\Lab2\TokTickIT-v1.0.md</code></p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write the addendum with the full text of D-13 through D-20</strong></label></div>
+  <p class="note">Copy each decision's Decision/Why/Downstream-edits text verbatim from
+  <code>TokTickIT-Lab2-Implementation-Plan-v0.1.md</code> §1 into this file, formatted as a
+  Decision Register continuation matching the SDS's existing D-01…D-12 style:</p>
+<pre><code># TokTickIT SDS — Decision Register Addendum (Lab 2)
+
+Continues the Decision Register in `TokTickIT-v1.0.md`. D-13…D-20 were signed off 2026-08-18
+after review by an Opus subagent (3 factual bugs fixed, 1 scope risk flagged — see §8 item 0
+of the Lab 2 implementation plan). Status: CONFIRMED, same weight as D-01…D-12.
+
+## D-13 — Requester status authority is corrected to match the Labsheet (supersedes part of D-02)
+
+**Decision.** SDS D-02's clause "any authorized user may cancel or reopen" is withdrawn.
+Replacement text:
+
+> Only IT Staff or Administrator may change a ticket's formal status (including Cancelled and
+> reopening). A Requester may: respond to IT Staff (public comment), confirm or reject a
+> resolution, and request reopening. A requester's confirmation, rejection, or reopen request
+> records a flag plus a TicketEvent and never changes formal status by itself.
+
+**Why.** Labsheet §1.1 role table is the professor's ground truth: Requester's list is
+create / view own / set Requested Priority / respond to IT Staff / confirm or reject a
+resolution / request reopening. "Change ticket status" appears only under "IT Staff and
+Administrator can both". D-02's blanket cancel/reopen right is not derivable from any source
+document and directly contradicts the graded one.
+
+**Status:** CONFIRMED. Downstream edits to apply to this SDS in Step 2 below.
+
+## D-14 — Reopen-request and resolution confirm/reject are modeled but deferred out of Lab 2
+
+**Decision.** Model as TicketEvent types RESOLUTION_CONFIRMED / RESOLUTION_REJECTED /
+REOPEN_REQUESTED plus a nullable `requesterResolutionConfirmedAt` column on Ticket. No Lab 2
+endpoint, no Lab 2 UI control — implemented in Lab 3 alongside IT Staff status changes.
+
+**Why.** These actions are only reachable from Resolved/Closed/Cancelled, and nothing in Lab 2
+can reach those statuses. The Ticket status enum ships complete (all seven values) but the only
+reachable status in Lab 2 is `NEW` — no transition service, no status-change endpoint in Lab 2.
+
+**Status:** CONFIRMED.
+
+## D-15 — Add the Comment entity (Feature-E is in scope)
+
+**Decision.** Add `Comment` as a child of Ticket. Comments are immutable once posted (no edit,
+no delete endpoint in Lab 2). "Internal Notes" is a separate, IT-Staff-only entity, out of
+scope for Lab 2 and never conflated with Comment — recommend a separate `InternalNote` model in
+Lab 3 (poka-yoke: two tables make a visibility leak structurally impossible, one table with a
+`visibility` flag does not).
+
+**Why.** Labsheet §1.2 Final Ticket Model says "No. of Child entities: 5" and names four
+(Public Comments, Internal Notes, Actions Taken, Attachments) — the fifth is `TicketEvent`,
+per the mockup's Event Log tab (state this reasoning explicitly in `data-model.md`, a grader
+will look for it). §1.1 grants "add public comments" to all three roles.
+
+**Grading-risk flag (from the Opus review pass — resurfaced at Lab 2 plan §8 item 0, highest
+priority open question).** §0 of the source plan quotes the Lab 2 lecture's own caption:
+"Later labs will add role-specific IT Staff controls, **communication**, workflow, and Actions
+Taken" — public comments are the natural referent of "communication," and the W4 activity line
+never names comments. The counter-argument ("respond to IT Staff" is a named Requester ability;
+the mockup's default-open tab is Public Comments) keeps this a defensible call, not an error,
+but it is the single largest scope addition in this plan beyond what the lecture explicitly
+assigns to Lab 2. **This decision stays CONFIRMED for Issues 5–8 (W3) since Comments don't
+touch any W3 deliverable** — no comment code ships until Issue 10 (W4). Re-confirm with the TA
+before Issue 10 starts.
+
+**Status:** CONFIRMED for W3 scope; re-confirm before W4 Issue 10.
+
+## D-16 — RelatedSystem becomes reference data
+
+**Decision.** Add a `RelatedSystem` reference table (`id, code, name, isActive`), seeded, with
+`Ticket.relatedSystemId` optional. Rendered as a select on Create Ticket (W4).
+
+**Why.** Labsheet §1.2 lists Related System in the Ticket header; §1.1 gives the Administrator
+"manage Categories and Related Systems" — implying a managed table, not free text.
+
+**Status:** CONFIRMED (student sign-off 2026-08-18: "ตาราง reference data ตามแผน").
+
+## D-17 — Free-text search is out of Lab 2's required scope
+
+**Decision.** My Tickets (W4) filters by status and category only, plus sort and pagination.
+FR-016 stays as filtering; search moves to FR-016b, Feature-O, Lab 3+.
+
+**Why.** Neither the Labsheet nor the lecture mentions search for the Requester MVP.
+
+**Status:** CONFIRMED.
+
+## D-18 — Lab 2 uses a stubbed server-side identity seam, not real login
+
+**Decision.** Lab 2 ships the `User` model and a `resolveCurrentUser` middleware producing the
+same `req.user` context a real session will later produce. It does NOT ship a Login screen,
+First Password Change screen, password verification, the `Session` model, or CSRF — those are
+Lab 3.
+
+**Why.** Lab 1 §4's deferral sentence ("Playwright, authentication, ticket creation, and image
+upload will be introduced in later labs") lists what Lab 1 itself defers, not what Lab 2 must
+contain. The lecture assigns ticket creation, attachments, and E2E to Lab 2 explicitly; it
+never assigns authentication to Lab 2.
+
+**Mechanism:** `resolveCurrentUser` reads `x-dev-user-email` header (or
+`DEV_DEFAULT_USER_EMAIL` env fallback), loads the active `User` by normalized email, and sets
+`req.user`. The dev fallback refuses to load unless `NODE_ENV !== 'production'` or
+`ALLOW_DEV_IDENTITY=true` is explicitly set — startup fails fast otherwise. Every route/service
+takes `req.user`; nothing reads the header directly, so Lab 3 replaces step 2 of the resolution
+chain only.
+
+**One caveat found during the Opus review pass:** `app.ts` currently uses bare `cors()`, which
+doesn't set `credentials`. That's fine for the header-based stub (a custom header still
+triggers a preflight that default `cors()` reflects), but Lab 3's cookie-based session will
+need `cors({ origin, credentials: true })` — so "Lab 3 replaces step 2 only" has one small
+exception: CORS config also changes then.
+
+**Status:** CONFIRMED (student sign-off 2026-08-18: "Identity stub, auth = Lab 3 (ตามแผน)").
+
+## D-19 — The UI theme is KMUTT orange/yellow/blue-grey, not Zen Green
+
+**Decision.** D-09 stands (W4 concern — no code in W3). The lecture's "Zen Green theme UI"
+phrase and Figure 1's green chrome are the template the mockup generator used; Figure 1's own
+caption calls it "Illustrative," and the deck's separate KMUTT Color Theme slide (p.44)
+reproduces the official palette (#FA4616 / #FFC72C / #7B8189) independently. Two independent
+supports in the professor's own deck, not a stretch.
+
+**Status:** CONFIRMED (student sign-off 2026-08-18: "น่าจะข้อแรก เราจะอิงตามใบแลป").
+
+## D-20 — API versioning and storage staging
+
+**D-20a.** `/api/v1` from now on; Lab 1's `/api/health` and `/api/categories` stay mounted,
+unchanged, as aliases — do not rewrite Lab 1 tests.
+
+**D-20b.** Storage adapter interface written against SeaweedFS (D-06), Lab 2 defaults to a
+`LocalDiskStorage` implementation (W4 concern, out of scope for Issues 5-8).
+
+**D-20c.** New entities use `String @id @default(uuid())`. `Category` keeps its Lab 1 `Int`
+autoincrement PK — migrating it would break the Lab 1 migration/seed/tests/submitted evidence
+for no benefit. `RelatedSystem` uses `Int` too, for symmetry with Category.
+
+**Status:** CONFIRMED.
+</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: Apply the D-13/D-15/D-16 downstream edits to the approved SDS</strong></label></div>
+  <p class="note">Open <code>D:\CPE334\Lab2\TokTickIT-v1.0.md</code> and make these edits directly
+  (the SDS is the graded artifact — the addendum above documents the decisions, but the SDS text
+  itself must also change):</p>
+  <ul>
+    <li>Authorization Matrix: rows "Cancel an accessible ticket" and "Reopen an accessible ticket" → Requester = <strong>No</strong> (D-13).</li>
+    <li>Ticket Status Baseline table: Resolved/Cancelled rows updated to reflect IT-Staff/Admin-only transitions (D-13).</li>
+    <li>The existing D-02 callout box: append a note "Superseded in part by D-13 (Lab 2 Decision Register Addendum) — see <code>docs/lab-02/decision-register-addendum.md</code>."</li>
+    <li>Mandatory Ticket Invariants bullets 2 and 4: reword to match D-13's replacement text.</li>
+    <li>Mandatory Business-Rule Tests bullets 4 and 5: rescope to IT Staff/Administrator; note the addition of a reject-resolution test (BR-008b).</li>
+    <li>Domain model table: add a `Comment` row (child of Ticket, per D-15) and a `RelatedSystem` row (reference data, per D-16), each with a one-line pointer to the addendum for full field lists.</li>
+  </ul>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: Commit</strong></label></div>
+<pre><code>git add docs/lab-02/decision-register-addendum.md
+git commit -m "docs: add Lab 2 SDS decision register addendum (D-13...D-20)"</code></pre>
+  <p class="note">The edit to <code>TokTickIT-v1.0.md</code> lives outside this repo (<code>D:\CPE334\Lab2\</code>)
+  — save it there; it is not part of this git commit.</p>
+
+  <h3>Task 2: SRS corrections <span class="task-issue">(Issue 5, docs)</span></h3>
+  <p class="pathline">Create: <code>docs/lab-02/srs-corrections.md</code> · Modify: <code>D:\CPE334\Lab2\TokTickIT-SRS-and-Feature-Inventory-draft-v0.1.md</code></p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write the corrections doc</strong></label></div>
+<pre><code># TokTickIT SRS — Lab 2 Corrections
+
+Applied to `TokTickIT-SRS-and-Feature-Inventory-draft-v0.1.md` on 2026-08-18, per Decision
+Register Addendum D-13/D-15/D-16/D-17.
+
+## FR-023 (rewritten, per D-13)
+
+Was: "An authorized user may cancel or reopen an accessible ticket."
+Now: "A Requester may confirm or reject a proposed resolution, and may request that a
+Resolved/Closed ticket be reopened; only IT Staff or Administrator may execute the actual
+status change (including Cancelled and reopening)."
+
+## BR-006 / BR-007 (rescoped, per D-13)
+
+BR-006 ("Any authorized user may cancel an accessible ticket") → rescoped to: "Only IT Staff
+or Administrator may cancel a ticket."
+BR-007 ("Any authorized user may reopen a Resolved/Closed/Cancelled ticket") → rescoped to:
+"Only IT Staff or Administrator may execute a reopen; a Requester may only request one
+(BR-008b)."
+
+## BR-008b (new, per D-13)
+
+"A Requester may reject a proposed resolution; rejection records a TicketEvent and a
+`requesterResolutionConfirmedAt = null` state, and does not itself change ticket status."
+
+## FR-016 (resolved, per D-17) / FR-016b (new)
+
+FR-016 "[NEW]" marker resolved: stays as ticket-list filtering by status and category only.
+FR-016b (new, Feature-O, Lab 3+): free-text search across a Requester's own tickets.
+
+## FR-008b (new, per D-16)
+
+"A Requester may optionally associate a ticket with a Related System from an
+administrator-managed list at creation time."
+
+## BR-011b (new, per D-16)
+
+"A Related System may be deactivated but never hard-deleted while referenced by any ticket."
+
+## FR-024 / FR-025 (confirmed, per D-15)
+
+Both confirmed as originally drafted — no rewrite needed, only the domain-model gap (missing
+`Comment` entity) that these FRs depend on is now closed by D-15.
+</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: Apply each correction directly to the SRS draft file</strong></label></div>
+  <p class="note">Open <code>D:\CPE334\Lab2\TokTickIT-SRS-and-Feature-Inventory-draft-v0.1.md</code>
+  and replace FR-023's text, rescope BR-006/BR-007, insert BR-008b after BR-007, resolve the
+  FR-016 <code>[NEW]</code> marker and insert FR-016b in the Feature-O row, insert FR-008b in the
+  Feature-B (Ticket Creation) row, and remove the <code>[NEW — gap, needs a decision]</code> flag
+  next to the Comment entity note since D-15 resolves it. Add the Feature-M scope note for
+  RelatedSystem per D-16.</p>
+  <p class="note">Like the SDS edit in Task 1 Step 3: <code>TokTickIT-SRS-and-Feature-Inventory-draft-v0.1.md</code>
+  lives outside this repo (<code>D:\CPE334\Lab2\</code>) — save it there; it is not part of this
+  git commit.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: Commit</strong></label></div>
+<pre><code>git add docs/lab-02/srs-corrections.md
+git commit -m "docs: record Lab 2 SRS corrections (FR-023, BR-006/007/008b, FR-016b, FR-008b)"</code></pre>
+
+  <h3>Task 3: Feature specs B–F <span class="task-issue">(Issue 5, docs)</span></h3>
+  <p class="pathline">Create: <code>docs/lab-02/features/feature-b-ticket-creation.md</code>, <code>feature-c-my-tickets.md</code>, <code>feature-d-ticket-detail.md</code>, <code>feature-e-ticket-comments.md</code>, <code>feature-f-attachments.md</code></p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write each feature spec using the SDS's twelve-section contract</strong></label></div>
+  <p class="note">Base each file on §4 of <code>TokTickIT-Lab2-Implementation-Plan-v0.1.md</code>
+  (Identity, Traceability, Behavior, Permissions, Workflow, Data, API, UI, NFRs, Dependencies,
+  Out of scope, plus the scoping-call callouts already written there for Feature-B's
+  attach-at-creation deferral and Feature-D/F's omitted tabs). Example for Feature-B:</p>
+<pre><code># Feature-B — Ticket Creation
+
+**Identity.** FEAT-B, Ticket Creation, v1.0, Lab 2.
+**Traceability.** FR-008…FR-013, FR-008b · BR-001, BR-002, BR-009, BR-014, BR-015 ·
+NFR-001, NFR-003 · D-03, D-10, D-13, D-16, D-18.
+**Behavior.** Actor: Requester (IT Staff/Admin also permitted per Labsheet, but no IT screen
+exists in Lab 2). Precondition: identity resolved, >=1 active category. Main flow: submit ->
+server validates -> allocates ticket number -> persists -> emits TICKET_CREATED. Acceptance: a
+created ticket has status NEW, ownerId null, itPriority === requestedPriority, a unique
+TKT-YYYY-NNNNN, and exactly one TICKET_CREATED event.
+**Permissions.** Any authenticated user creates; requesterId is always req.user.id.
+**Workflow.** Entry into NEW only.
+**Data.** Ticket, TicketCounter, TicketEvent. Transaction boundary = number + insert + event.
+**API.** POST /api/v1/tickets (+ GET /categories, GET /related-systems for form data).
+**UI.** W4 concern, not part of Issues 5-8.
+**NFRs.** p95 &lt; 500ms; WCAG 2.2 AA form labelling; double-submit disabled while in flight.
+**Dependencies.** Seeded categories, related systems, identity middleware.
+**Out of scope.** Attaching files at creation (deferred — after-creation only, see source plan
+§4 scoping call), draft saving, ticket editing, IT Priority entry, requester selection.
+</code></pre>
+  <p class="note">Repeat the same structure for Feature-C (My Tickets), Feature-D (Ticket
+  Detail), Feature-E (Ticket Comments — carry the D-15 grading-risk flag forward into this
+  file's Traceability section), and Feature-F (Attachments), pulling each section's content
+  from source plan §4 verbatim.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: Commit</strong></label></div>
+<pre><code>git add docs/lab-02/features/
+git commit -m "docs: add Lab 2 feature specs B-F"</code></pre>
+
+  <h3>Task 4: API contract, test plan, traceability matrix <span class="task-issue">(Issue 5, docs)</span></h3>
+  <p class="pathline">Create: <code>docs/lab-02/api-contract.md</code>, <code>docs/lab-02/test-plan.md</code>, <code>docs/lab-02/traceability-matrix.md</code></p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write api-contract.md</strong></label></div>
+  <p class="note">Copy source plan §3 in full — the 14-endpoint table, the error/pagination
+  envelopes, the DTO definitions (including the corrected <code>downloadUrl</code> composition
+  note from the Opus review), and the "endpoint notes a coding agent will otherwise get wrong"
+  subsection (§3.3) verbatim, since Tasks 14-17 below implement endpoints 1-4 of that table
+  directly from this document.</p>
+  <p class="note">Annotate endpoint #14 (<code>GET /api/v1/health</code>) in the copied table
+  with a line this plan's own tasks don't otherwise state anywhere: <strong>not implemented in
+  Issues 5-8</strong>. Per D-20a, Lab 1's existing <code>GET /api/health</code> (no <code>/v1</code>)
+  stays mounted unchanged and is the only health endpoint W3 ships — Task 13 does not add a
+  <code>/api/v1/health</code> alias. Without this annotation the contract describes an endpoint
+  no task ever builds, which reads as a doc/implementation mismatch to anyone auditing the two
+  side by side.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: Write test-plan.md</strong></label></div>
+  <p class="note">Copy source plan §6 in full, including the two harness fixes (vite.config.ts
+  include pattern, dedicated test database) and the mandatory security test list as amended by
+  the Opus review (the `requesterId` query-param IDOR test, the download-header test, the
+  non-uploader-403 test).</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: Write traceability-matrix.md</strong></label></div>
+<pre><code># Requirements -> Feature -> Issue -> Test Traceability (Lab 2, W3 scope)
+
+| Requirement | Feature | Issue | Test(s) |
+|---|---|---|---|
+| FR-008...FR-013, FR-008b | Feature-B | 8 | server/tests/lab-02/ticketCreation.test.ts |
+| BR-001, BR-002, BR-009 | Feature-B | 8 | server/tests/lab-02/ticketCreation.test.ts |
+| BR-014, BR-015 (ticket number uniqueness) | Feature-B | 8 | server/tests/lab-02/ticketNumber.test.ts |
+| D-13 (Requester status authority) | SDS/SRS | 5 | docs/lab-02/decision-register-addendum.md review |
+| D-16 (RelatedSystem reference data) | Feature-B, Feature-M | 7, 8 | server/tests/lab-02/migration.test.ts, relatedSystems.test.ts |
+| D-18 (identity seam) | API foundation | 6 | server/tests/lab-02/currentUser.test.ts |
+| D-20a (/api/v1 + Lab 1 aliases) | API foundation | 6 | server/tests/lab-01/*.test.ts (regression) |
+
+Full matrix (FR-014...FR-031 for W4 features C-F) is deferred to Issue 9-17 planning, which
+waits for the real Lab 2 labsheet per the source plan's issue-creation staging note.
+</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 4: Commit</strong></label></div>
+<pre><code>git add docs/lab-02/api-contract.md docs/lab-02/test-plan.md docs/lab-02/traceability-matrix.md
+git commit -m "docs: add Lab 2 API contract, test plan, and traceability matrix"</code></pre>
+
+  <!-- ================================================================ -->
+  <!-- ISSUE 7 — DATA MODEL (executed before Issue 6 — see Key decisions) -->
+  <!-- ================================================================ -->
+
+  <h3>Task 5: Prisma schema increment and migration <span class="task-issue">(Issue 7, data model)</span></h3>
+  <p class="pathline">Modify: <code>server/prisma/schema.prisma</code> · Create: <code>server/prisma/migrations/&lt;ts&gt;_lab2_ticketing_foundation/</code></p>
+  <p class="warn note">This task has no red/green test cycle of its own — it's the schema every
+  later task's tests depend on. Task 6 is its test.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Replace schema.prisma with the full Lab 2 increment</strong></label></div>
+<pre><code>generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole        { REQUESTER  IT_STAFF  ADMINISTRATOR }
+enum TicketStatus    { NEW  ASSIGNED  IN_PROGRESS  PENDING_REQUESTER  RESOLVED  CLOSED  CANCELLED }
+enum Priority        { LOW  MEDIUM  HIGH  URGENT }
+enum TicketEventType { TICKET_CREATED  COMMENT_ADDED  ATTACHMENT_ADDED  ATTACHMENT_REMOVED }
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  displayName  String
+  role         UserRole @default(REQUESTER)
+  passwordHash String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  requestedTickets   Ticket[]      @relation("TicketRequester")
+  ownedTickets       Ticket[]      @relation("TicketOwner")
+  comments           Comment[]
+  attachments        Attachment[]  @relation("AttachmentUploader")
+  deletedAttachments Attachment[]  @relation("AttachmentDeleter")
+  events             TicketEvent[]
+}
+
+model RelatedSystem {
+  id       Int      @id @default(autoincrement())
+  code     String   @unique
+  name     String
+  isActive Boolean  @default(true)
+  tickets  Ticket[]
+}
+
+model Category {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  code        String?  @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  tickets     Ticket[]
+}
+
+model Ticket {
+  id                              String        @id @default(uuid())
+  ticketNo                        String        @unique
+  summary                         String
+  description                     String
+  status                          TicketStatus  @default(NEW)
+  requestedPriority               Priority
+  itPriority                      Priority
+  resolutionSummary               String?
+  requesterResolutionConfirmedAt  DateTime?
+  version                         Int           @default(0)
+  createdAt                       DateTime      @default(now())
+  updatedAt                       DateTime      @updatedAt
+
+  requesterId     String
+  requester       User           @relation("TicketRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  ownerId         String?
+  owner           User?          @relation("TicketOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  categoryId      Int
+  category        Category       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  relatedSystemId Int?
+  relatedSystem   RelatedSystem? @relation(fields: [relatedSystemId], references: [id], onDelete: Restrict)
+
+  comments    Comment[]
+  attachments Attachment[]
+  events      TicketEvent[]
+
+  @@index([requesterId, createdAt])
+  @@index([status])
+  @@index([categoryId])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  body      String   @db.VarChar(2000)
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+model Attachment {
+  id               String    @id @default(uuid())
+  ticketId         String
+  ticket           Ticket    @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  uploadedById     String
+  uploadedBy       User      @relation("AttachmentUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+  originalFilename String
+  mimeType         String
+  sizeBytes        Int
+  storageKey       String    @unique
+  createdAt        DateTime  @default(now())
+  deletedAt        DateTime?
+  deletedById      String?
+  deletedBy        User?     @relation("AttachmentDeleter", fields: [deletedById], references: [id], onDelete: Restrict)
+  deletedReason    String?
+
+  @@index([ticketId, deletedAt])
+}
+
+model TicketEvent {
+  id        String          @id @default(uuid())
+  ticketId  String
+  ticket    Ticket          @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  actorId   String
+  actor     User            @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  eventType TicketEventType
+  payload   Json?
+  createdAt DateTime        @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+model TicketCounter {
+  year      Int      @id
+  lastValue Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: Generate and apply the migration against the dev database</strong></label></div>
+<pre><code>cd server
+npx prisma migrate dev --name lab2_ticketing_foundation
+npx prisma generate</code></pre>
+  <p class="note">Expected: Prisma reports the migration applied cleanly with no destructive
+  warnings (all changes are additive — new tables, plus new nullable/defaulted columns on
+  `Category`). The four Lab 1 categories must still exist afterward — verified in Task 6.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: Commit</strong></label></div>
+<pre><code>git add server/prisma/schema.prisma server/prisma/migrations/
+git commit -m "feat(db): add Lab 2 ticketing data model (User, Ticket, Comment, Attachment, TicketEvent, TicketCounter, RelatedSystem)"</code></pre>
+
+  <h3>Task 6: Migration/backfill test <span class="task-issue">(Issue 7, data model)</span></h3>
+  <p class="pathline">Create: <code>server/tests/lab-02/migration.test.ts</code></p>
+  <p class="note">This test runs against the dedicated test database once Task 10 wires it up —
+  write and verify it now against the dev DB (it's read-only, safe either way), then it starts
+  running against `toktickit_test` automatically once Task 10 lands.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write the failing test</strong></label></div>
+<pre><code>import { describe, it, expect } from 'vitest';
+import { prisma } from '../../src/prisma';
+
+describe('Lab 2 migration', () => {
+  it('preserves the four Lab 1 categories with code and isActive backfilled', async () => {
+    const categories = await prisma.category.findMany({ orderBy: { id: 'asc' } });
+
+    expect(categories).toHaveLength(4);
+    expect(categories.map((c) => c.name)).toEqual([
+      'Account and Access',
+      'Hardware',
+      'Software',
+      'Network',
+    ]);
+    for (const category of categories) {
+      expect(typeof category.isActive).toBe('boolean');
+      expect(category.isActive).toBe(true);
+    }
+  });
+
+  it('creates the TicketCounter table with no rows yet', async () => {
+    const count = await prisma.ticketCounter.count();
+    expect(count).toBe(0);
+  });
+});</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: Run it</strong></label></div>
+  <p class="note">Run: <code>cd server && npx vitest run tests/lab-02/migration.test.ts</code> —
+  Expected: the categories assertion passes (Task 5's migration already backfilled
+  `isActive: true` via the column's `@default(true)`), but `code` is currently `null` for all
+  four rows since Task 5 only added the column — that's fine, Task 7's seed fills it in. If the
+  test fails because the categories are missing entirely, Task 5's migration did not apply —
+  stop and re-run Task 5 Step 2 before continuing.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: Commit</strong></label></div>
+<pre><code>git add server/tests/lab-02/migration.test.ts
+git commit -m "test: verify Lab 1 categories survive the Lab 2 migration"</code></pre>
+
+  <h3>Task 7: Seed script additions <span class="task-issue">(Issue 7, data model)</span></h3>
+  <p class="pathline">Modify: <code>server/prisma/seed.ts</code></p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Replace seed.ts with the idempotent Lab 2 seed</strong></label></div>
+<pre><code>import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+const CATEGORIES: { name: string; code: string }[] = [
+  { name: 'Account and Access', code: 'ACCESS' },
+  { name: 'Hardware', code: 'HARDWARE' },
+  { name: 'Software', code: 'SOFTWARE' },
+  { name: 'Network', code: 'NETWORK' },
+];
+
+const RELATED_SYSTEMS: { code: string; name: string; isActive: boolean }[] = [
+  { code: 'CORP_LAPTOP', name: 'Corporate Laptop', isActive: true },
+  { code: 'EMAIL', name: 'Email', isActive: true },
+  { code: 'VPN', name: 'VPN', isActive: true },
+  { code: 'PRINTER', name: 'Printer', isActive: true },
+  { code: 'ERP', name: 'ERP', isActive: true },
+  { code: 'LEGACY_FS', name: 'Legacy File Server', isActive: false },
+];
+
+const USERS: {
+  email: string;
+  displayName: string;
+  role: 'REQUESTER' | 'IT_STAFF' | 'ADMINISTRATOR';
+}[] = [
+  { email: 'requester@toktickit.local', displayName: 'Nattapong R.', role: 'REQUESTER' },
+  { email: 'requester2@toktickit.local', displayName: 'Siriporn K.', role: 'REQUESTER' },
+  { email: 'itstaff@toktickit.local', displayName: 'IT Support', role: 'IT_STAFF' },
+  { email: 'admin@toktickit.local', displayName: 'System Admin', role: 'ADMINISTRATOR' },
+];
+
+async function main() {
+  for (const category of CATEGORIES) {
+    await prisma.category.upsert({
+      where: { name: category.name },
+      update: { code: category.code, isActive: true },
+      create: { name: category.name, code: category.code, isActive: true },
+    });
+  }
+
+  for (const system of RELATED_SYSTEMS) {
+    await prisma.relatedSystem.upsert({
+      where: { code: system.code },
+      update: { name: system.name, isActive: system.isActive },
+      create: system,
+    });
+  }
+
+  for (const user of USERS) {
+    await prisma.user.upsert({
+      where: { email: user.email },
+      update: { displayName: user.displayName, role: user.role, isActive: true },
+      create: { ...user, isActive: true },
+    });
+  }
+}
+
+main()
+  .then(async () => {
+    await prisma.$disconnect();
+  })
+  .catch(async (error) => {
+    console.error(error);
+    await prisma.$disconnect();
+    process.exit(1);
+  });</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: Run it and re-run the migration test</strong></label></div>
+<pre><code>cd server
+npx prisma db seed
+npx vitest run tests/lab-02/migration.test.ts</code></pre>
+  <p class="note">Expected: seed completes without error (upserts are idempotent — running it
+  twice in a row must not fail or duplicate rows), and the migration test's `code` field is now
+  populated (extend the test's category assertion to also check
+  <code>categories.map((c) =&gt; c.code)</code> equals
+  <code>['ACCESS', 'HARDWARE', 'SOFTWARE', 'NETWORK']</code> — add this assertion to
+  <code>migration.test.ts</code> now as part of this step).</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: Commit</strong></label></div>
+<pre><code>git add server/prisma/seed.ts server/tests/lab-02/migration.test.ts
+git commit -m "feat(db): idempotent Lab 2 seed data (categories backfill, related systems, users)"</code></pre>
+
+  <h3>Task 8: Seed verification script and client harness fix <span class="task-issue">(Issue 7, data model)</span></h3>
+  <p class="pathline">Create: <code>server/prisma/verify-seed-lab2.ts</code> · Modify: <code>client/vite.config.ts</code></p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write a manual seed-verification script</strong></label></div>
+<pre><code>import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+async function main() {
+  const categories = await prisma.category.count({ where: { isActive: true } });
+  const relatedSystemsActive = await prisma.relatedSystem.count({ where: { isActive: true } });
+  const relatedSystemsInactive = await prisma.relatedSystem.count({ where: { isActive: false } });
+  const users = await prisma.user.count();
+  const requesters = await prisma.user.count({ where: { role: 'REQUESTER' } });
+
+  console.log(`Active categories: ${categories} (expect 4)`);
+  console.log(`Active related systems: ${relatedSystemsActive} (expect 5)`);
+  console.log(`Inactive related systems: ${relatedSystemsInactive} (expect 1)`);
+  console.log(`Total users: ${users} (expect 4)`);
+  console.log(`Requesters: ${requesters} (expect 2 — needed for the FR-007 cross-requester 403 test)`);
+
+  if (categories !== 4 || relatedSystemsActive !== 5 || relatedSystemsInactive !== 1 || users !== 4 || requesters !== 2) {
+    console.error('Seed verification FAILED — counts do not match expectations.');
+    process.exit(1);
+  }
+  console.log('Seed verification passed.');
+}
+
+main()
+  .then(async () => {
+    await prisma.$disconnect();
+  })
+  .catch(async (error) => {
+    console.error(error);
+    await prisma.$disconnect();
+    process.exit(1);
+  });</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: Run it</strong></label></div>
+  <p class="note">Run: <code>cd server && npx ts-node prisma/verify-seed-lab2.ts</code> —
+  Expected: "Seed verification passed."</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: Fix the client's Vitest include pattern</strong></label></div>
+<pre><code>/// &lt;reference types="vitest/config" /&gt;
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./tests/setup.ts'],
+    include: ['tests/**/*.test.{ts,tsx}'],
+  },
+});</code></pre>
+  <p class="note">Only the <code>include</code> line changes (`.test.tsx` → `.test.{ts,tsx}`).
+  Run <code>cd client && npx vitest run</code> afterward — expected: the existing `.tsx` tests
+  still run and pass (no `.ts`-only test files exist yet in Issue 5-8's scope, so there's
+  nothing new to pick up until W4, but the config is fixed before it can silently skip
+  anything).</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 4: Commit</strong></label></div>
+<pre><code>git add server/prisma/verify-seed-lab2.ts client/vite.config.ts
+git commit -m "chore: add seed verification script; fix client vitest include pattern for .ts tests"</code></pre>
+
+  <!-- ================================================================ -->
+  <!-- ISSUE 6 — API v1 FOUNDATION + IDENTITY SEAM                       -->
+  <!-- ================================================================ -->
+
+  <h3>Task 9: Fix Lab 1 carried-over bugs <span class="task-issue">(Issue 6, API foundation)</span></h3>
+  <p class="pathline">Modify: <code>server/package.json</code>, <code>server/tests/lab-01/categories.test.ts</code></p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write the stronger category test (currently failing on the extra assertions)</strong></label></div>
+<pre><code>import { describe, it, expect } from 'vitest';
+import request from 'supertest';
+import { app } from '../../src/app';
+
+describe('GET /api/categories', () => {
+  it('returns the four seeded categories', async () => {
+    const response = await request(app).get('/api/categories');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveLength(4);
+    const names = response.body.map((category: { name: string }) => category.name);
+    expect(names).toEqual(['Account and Access', 'Hardware', 'Software', 'Network']);
+    for (const category of response.body) {
+      expect(typeof category.id).toBe('number');
+    }
+  });
+});</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: Run it to confirm it still passes</strong></label></div>
+  <p class="note">Run: <code>cd server && npx vitest run tests/lab-01/categories.test.ts</code> —
+  Expected: PASS. This isn't a red-green cycle in the strict sense (the route already returns
+  `id`/`name` correctly per Lab 1's `select: { id: true, name: true }`), it's tightening an
+  under-specified test — confirm it passes immediately rather than expecting a failure first.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: Fix the broken start script</strong></label></div>
+<pre><code>{
+  "name": "toktickit-server",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc",
+    "start": "node dist/src/server.js",
+    "test": "vitest run",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "prisma:generate": "prisma generate"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.20.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.7.0",
+    "@types/supertest": "^6.0.2",
+    "prisma": "^5.20.0",
+    "supertest": "^7.0.0",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.1"
+  }
+}</code></pre>
+  <p class="note">Only the `"start"` line changes (`dist/server.js` → `dist/src/server.js`,
+  matching `tsconfig.json`'s `rootDir: "."` with source at `src/server.ts`). Verify:</p>
+<pre><code>cd server
+npm run build
+node dist/src/server.js &
+sleep 1
+curl -s http://localhost:4000/api/health
+kill %1</code></pre>
+  <p class="note">Expected: the curl call returns <code>{"status":"ok","service":"TokTickIT API"}</code>
+  instead of a "Cannot find module" crash.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 4: Commit, then delete the superseded local branch</strong></label></div>
+<pre><code>git add server/package.json server/tests/lab-01/categories.test.ts
+git commit -m "fix: correct server start script path; strengthen categories test"
+git branch -D fix/pr9-review-checklist</code></pre>
+  <p class="note">Per §7's branch-decision note: <code>fix/pr9-review-checklist</code> is
+  superseded now that its two real fixes have landed here — its three doc files were stale
+  duplicates of the already-merged Lab 1 submission (PR#9) and were never going to be used.
+  Confirm the two fixes above are committed before deleting.</p>
+
+  <h3>Task 10: Dedicated test database and coverage tooling <span class="task-issue">(Issue 6, API foundation)</span></h3>
+  <p class="pathline">Create: <code>server/.env.test</code>, <code>server/tests/setupEnv.ts</code>, <code>server/tests/globalSetup.ts</code>, <code>server/tests/helpers/resetDb.ts</code> · Modify: <code>server/vitest.config.ts</code>, <code>server/package.json</code></p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Create the test database and its env file</strong></label></div>
+<pre><code>createdb -h localhost -p 5433 -U postgres toktickit_test</code></pre>
+<pre><code># server/.env.test
+# Same host/credentials as server/.env, different database name — copy the password
+# from your local server/.env, do not commit the real value.
+DATABASE_URL="postgresql://postgres:&lt;your-local-password&gt;@localhost:5433/toktickit_test"
+PORT=4001</code></pre>
+  <p class="note">Add <code>.env.test</code> to <code>server/.gitignore</code> alongside the
+  existing <code>.env</code> entry — it's local, and its exact form (host/port) is inferred
+  from your own <code>server/.env</code>, so it shouldn't be committed as one shared value.</p>
+  <p class="note warn">Nothing downstream checks that <code>toktickit_test</code> actually
+  exists before <code>globalSetup.ts</code> runs <code>prisma migrate deploy</code> against it
+  (Step 3/7 below) — if the <code>createdb</code> command above is skipped, the first
+  <code>npm test</code> run after this task lands fails with an opaque Postgres
+  "database does not exist" connection error, not an actionable one. Run <code>createdb</code>
+  first and confirm it exits 0 before moving on to Step 2.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: Write the env-loading setup file</strong></label></div>
+<pre><code>import { config } from 'dotenv';
+import path from 'path';
+
+config({ path: path.resolve(__dirname, '../.env.test'), override: true });</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: Write the global setup (runs migrate + seed once before all test files)</strong></label></div>
+<pre><code>import { execSync } from 'child_process';
+import { config } from 'dotenv';
+import path from 'path';
+
+export default async function globalSetup() {
+  config({ path: path.resolve(__dirname, '../.env.test'), override: true });
+
+  const cwd = path.resolve(__dirname, '..');
+  execSync('npx prisma migrate deploy', { cwd, env: process.env, stdio: 'inherit' });
+  execSync('npx prisma db seed', { cwd, env: process.env, stdio: 'inherit' });
+}</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 4: Write the per-test truncation helper (for Issue 8's tests that write tickets)</strong></label></div>
+<pre><code>import { prisma } from '../../src/prisma';
+
+export async function truncateTicketTables(): Promise&lt;void&gt; {
+  await prisma.$executeRawUnsafe(
+    'TRUNCATE "TicketEvent", "Comment", "Attachment", "Ticket", "TicketCounter" RESTART IDENTITY CASCADE'
+  );
+}</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 5: Wire it all into vitest.config.ts and disable file parallelism</strong></label></div>
+<pre><code>import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    environment: 'node',
+    include: ['tests/**/*.test.ts'],
+    setupFiles: ['./tests/setupEnv.ts'],
+    globalSetup: ['./tests/globalSetup.ts'],
+    poolOptions: {
+      forks: { singleFork: true },
+    },
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json-summary'],
+    },
+  },
+});</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 6: Install coverage tooling and add a coverage script</strong></label></div>
+<pre><code>cd server
+npm install -D @vitest/coverage-v8</code></pre>
+  <p class="note">Add to <code>server/package.json</code> <code>scripts</code>:
+  <code>"test:coverage": "vitest run --coverage"</code>.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 7: Run the full suite against the new test database</strong></label></div>
+  <p class="note">Run: <code>cd server && npm test</code> — Expected: all Lab 1 tests
+  (<code>app.test.ts</code>, <code>health.test.ts</code>, <code>categories.test.ts</code>) and
+  Task 6's migration test pass, now running against <code>toktickit_test</code> instead of the
+  dev database (confirm by checking <code>server/.env.test</code>'s database name appears in
+  the Prisma migrate/seed log output printed by <code>globalSetup</code>).</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 8: Commit</strong></label></div>
+<pre><code>git add server/tests/setupEnv.ts server/tests/globalSetup.ts server/tests/helpers/resetDb.ts \
+        server/vitest.config.ts server/package.json server/.gitignore
+git commit -m "test: add dedicated test database, global setup, and coverage tooling"</code></pre>
+
+  <h3>Task 11: Error envelope, correlation ID, and validation error type <span class="task-issue">(Issue 6, API foundation)</span></h3>
+  <p class="pathline">Create: <code>server/src/middleware/errorEnvelope.ts</code>, <code>server/tests/lab-02/errorEnvelope.test.ts</code></p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write the failing test</strong></label></div>
+<pre><code>import { describe, it, expect } from 'vitest';
+import express from 'express';
+import request from 'supertest';
+import { correlationId, errorEnvelope, HttpError } from '../../src/middleware/errorEnvelope';
+
+function buildTestApp() {
+  const app = express();
+  app.use(correlationId);
+  app.get('/boom-http', () => {
+    throw new HttpError(404, 'NOT_FOUND', 'Thing not found');
+  });
+  app.get('/boom-validation', () => {
+    throw new HttpError(422, 'VALIDATION_FAILED', 'Bad input', [
+      { field: 'summary', message: 'summary is required' },
+    ]);
+  });
+  app.get('/boom-unknown', () => {
+    throw new Error('unexpected');
+  });
+  app.use(errorEnvelope);
+  return app;
+}
+
+describe('errorEnvelope', () => {
+  it('wraps an HttpError in the standard envelope with a correlation id', async () => {
+    const response = await request(buildTestApp()).get('/boom-http');
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe('NOT_FOUND');
+    expect(response.body.error.message).toBe('Thing not found');
+    expect(response.body.error.fieldErrors).toEqual([]);
+    expect(typeof response.body.error.correlationId).toBe('string');
+    expect(response.body.error.correlationId.length).toBeGreaterThan(0);
+  });
+
+  it('carries fieldErrors through for validation failures', async () => {
+    const response = await request(buildTestApp()).get('/boom-validation');
+    expect(response.status).toBe(422);
+    expect(response.body.error.fieldErrors).toEqual([
+      { field: 'summary', message: 'summary is required' },
+    ]);
+  });
+
+  it('maps an unrecognized error to a 500 without leaking its message', async () => {
+    const response = await request(buildTestApp()).get('/boom-unknown');
+    expect(response.status).toBe(500);
+    expect(response.body.error.code).toBe('INTERNAL_ERROR');
+    expect(response.body.error.message).toBe('An unexpected error occurred');
+  });
+});</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: Run it to verify it fails</strong></label></div>
+  <p class="note">Run: <code>cd server && npx vitest run tests/lab-02/errorEnvelope.test.ts</code>
+  — Expected: FAIL with "Cannot find module '../../src/middleware/errorEnvelope'".</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: Write the implementation</strong></label></div>
+<pre><code>import { Request, Response, NextFunction } from 'express';
+import { randomUUID } from 'crypto';
+
+export interface FieldError {
+  field: string;
+  message: string;
+}
+
+export class HttpError extends Error {
+  status: number;
+  code: string;
+  fieldErrors: FieldError[];
+
+  constructor(status: number, code: string, message: string, fieldErrors: FieldError[] = []) {
+    super(message);
+    this.status = status;
+    this.code = code;
+    this.fieldErrors = fieldErrors;
+  }
+}
+
+export class ValidationHttpError extends HttpError {
+  constructor(fieldErrors: FieldError[]) {
+    super(422, 'VALIDATION_FAILED', 'One or more fields are invalid', fieldErrors);
+  }
+}
+
+export function correlationId(req: Request, _res: Response, next: NextFunction) {
+  (req as Request & { correlationId: string }).correlationId = randomUUID();
+  next();
+}
+
+export function errorEnvelope(
+  err: unknown,
+  req: Request,
+  res: Response,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _next: NextFunction
+) {
+  const id = (req as Request & { correlationId?: string }).correlationId ?? 'unknown';
+
+  if (err instanceof HttpError) {
+    res.status(err.status).json({
+      error: { code: err.code, message: err.message, fieldErrors: err.fieldErrors, correlationId: id },
+    });
+    return;
+  }
+
+  console.error(err);
+  res.status(500).json({
+    error: { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred', fieldErrors: [], correlationId: id },
+  });
+}</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 4: Run the test again</strong></label></div>
+  <p class="note">Run: <code>cd server && npx vitest run tests/lab-02/errorEnvelope.test.ts</code>
+  — Expected: PASS (3/3).</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 5: Commit</strong></label></div>
+<pre><code>git add server/src/middleware/errorEnvelope.ts server/tests/lab-02/errorEnvelope.test.ts
+git commit -m "feat(api): add error envelope, correlation id, and validation error middleware"</code></pre>
+
+  <h3>Task 12: resolveCurrentUser middleware and boot guard <span class="task-issue">(Issue 6, API foundation)</span></h3>
+  <p class="pathline">Create: <code>server/src/auth/currentUser.ts</code>, <code>server/tests/lab-02/currentUser.test.ts</code> · Modify: <code>server/src/server.ts</code></p>
+  <p class="note">Depends on Task 5 (User model) and Task 7 (seeded requester@toktickit.local).</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write the failing test</strong></label></div>
+<pre><code>import { describe, it, expect, afterEach, vi } from 'vitest';
+import express from 'express';
+import request from 'supertest';
+import { resolveCurrentUser, assertIdentitySeamBootGuard } from '../../src/auth/currentUser';
+import { errorEnvelope, correlationId } from '../../src/middleware/errorEnvelope';
+
+function buildTestApp() {
+  const app = express();
+  app.use(correlationId);
+  app.get('/whoami', resolveCurrentUser, (req, res) => {
+    res.status(200).json({ id: req.user!.id, email: req.user!.email, role: req.user!.role });
+  });
+  app.use(errorEnvelope);
+  return app;
+}
+
+describe('resolveCurrentUser', () => {
+  afterEach(() => {
+    delete process.env.ALLOW_DEV_IDENTITY;
+    vi.unstubAllEnvs();
+  });
+
+  it('resolves the seeded requester from the x-dev-user-email header', async () => {
+    const response = await request(buildTestApp())
+      .get('/whoami')
+      .set('x-dev-user-email', 'requester@toktickit.local');
+
+    expect(response.status).toBe(200);
+    expect(response.body.email).toBe('requester@toktickit.local');
+    expect(response.body.role).toBe('REQUESTER');
+  });
+
+  it('returns 401 for an unknown email', async () => {
+    const response = await request(buildTestApp())
+      .get('/whoami')
+      .set('x-dev-user-email', 'nobody@toktickit.local');
+
+    expect(response.status).toBe(401);
+    expect(response.body.error.code).toBe('UNAUTHENTICATED');
+  });
+
+  it('returns 401 when no identity header or env fallback is present', async () => {
+    const response = await request(buildTestApp()).get('/whoami');
+    expect(response.status).toBe(401);
+  });
+});
+
+describe('assertIdentitySeamBootGuard', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('throws in production without ALLOW_DEV_IDENTITY', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('ALLOW_DEV_IDENTITY', '');
+    expect(() => assertIdentitySeamBootGuard()).toThrow(/no production identity provider/i);
+  });
+
+  it('does not throw in production when ALLOW_DEV_IDENTITY=true', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('ALLOW_DEV_IDENTITY', 'true');
+    expect(() => assertIdentitySeamBootGuard()).not.toThrow();
+  });
+
+  it('does not throw outside production', () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    expect(() => assertIdentitySeamBootGuard()).not.toThrow();
+  });
+});</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: Run it to verify it fails</strong></label></div>
+  <p class="note">Run: <code>cd server && npx vitest run tests/lab-02/currentUser.test.ts</code>
+  — Expected: FAIL with "Cannot find module '../../src/auth/currentUser'".</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: Write the implementation</strong></label></div>
+<pre><code>import { Request, Response, NextFunction } from 'express';
+import { prisma } from '../prisma';
+import { HttpError } from '../middleware/errorEnvelope';
+
+export interface CurrentUser {
+  id: string;
+  email: string;
+  displayName: string;
+  role: 'REQUESTER' | 'IT_STAFF' | 'ADMINISTRATOR';
+}
+
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      user?: CurrentUser;
+    }
+  }
+}
+
+function devIdentityAllowed(): boolean {
+  return process.env.NODE_ENV !== 'production' || process.env.ALLOW_DEV_IDENTITY === 'true';
+}
+
+export async function resolveCurrentUser(req: Request, _res: Response, next: NextFunction) {
+  try {
+    if (!devIdentityAllowed()) {
+      throw new HttpError(401, 'UNAUTHENTICATED', 'No identity source is configured');
+    }
+
+    const headerEmail = req.header('x-dev-user-email');
+    const email = (headerEmail ?? process.env.DEV_DEFAULT_USER_EMAIL ?? '').trim().toLowerCase();
+
+    if (!email) {
+      throw new HttpError(401, 'UNAUTHENTICATED', 'No identity source is configured');
+    }
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user || !user.isActive) {
+      throw new HttpError(401, 'UNAUTHENTICATED', 'Identity could not be resolved');
+    }
+
+    req.user = { id: user.id, email: user.email, displayName: user.displayName, role: user.role };
+    next();
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Lab 2 has no production identity provider yet (Lab 3 adds real sessions). Call this once at
+ * boot; it throws (and should crash startup) if NODE_ENV=production without an explicit,
+ * intentional override.
+ */
+export function assertIdentitySeamBootGuard(): void {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_IDENTITY !== 'true') {
+    throw new Error(
+      'Lab 2 has no production identity provider yet (Lab 3 adds real sessions). ' +
+        'Refusing to start with NODE_ENV=production unless ALLOW_DEV_IDENTITY=true is set explicitly.'
+    );
+  }
+}</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 4: Wire the boot guard into server.ts</strong></label></div>
+<pre><code>import { app } from './app';
+import { assertIdentitySeamBootGuard } from './auth/currentUser';
+
+assertIdentitySeamBootGuard();
+
+const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
+
+app.listen(PORT, () => {
+  console.log(`TokTickIT API listening on port ${PORT}`);
+});</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 5: Run the test again</strong></label></div>
+  <p class="note">Run: <code>cd server && npx vitest run tests/lab-02/currentUser.test.ts</code>
+  — Expected: PASS (6/6).</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 6: Commit</strong></label></div>
+<pre><code>git add server/src/auth/currentUser.ts server/src/server.ts server/tests/lab-02/currentUser.test.ts
+git commit -m "feat(auth): add resolveCurrentUser identity seam with production boot guard"</code></pre>
+
+  <h3>Task 13: /api/v1 router, Lab 1 aliases, and GET /me <span class="task-issue">(Issue 6, API foundation)</span></h3>
+  <p class="pathline">Create: <code>server/src/routes/v1/index.ts</code>, <code>server/src/routes/v1/me.ts</code>, <code>server/tests/lab-02/apiV1.test.ts</code> · Modify: <code>server/src/app.ts</code>, <code>server/.env.example</code></p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write the failing test</strong></label></div>
+<pre><code>import { describe, it, expect } from 'vitest';
+import request from 'supertest';
+import { app } from '../../src/app';
+
+describe('/api/v1 foundation', () => {
+  it('GET /api/v1/me returns the identity resolved from the header', async () => {
+    const response = await request(app)
+      .get('/api/v1/me')
+      .set('x-dev-user-email', 'requester@toktickit.local');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      id: expect.any(String),
+      email: 'requester@toktickit.local',
+      displayName: expect.any(String),
+      role: 'REQUESTER',
+    });
+  });
+
+  it('GET /api/v1/me returns 401 without identity', async () => {
+    const response = await request(app).get('/api/v1/me');
+    expect(response.status).toBe(401);
+    expect(response.body.error.code).toBe('UNAUTHENTICATED');
+  });
+
+  it('Lab 1 aliases still respond identically', async () => {
+    const health = await request(app).get('/api/health');
+    expect(health.status).toBe(200);
+    expect(health.body).toEqual({ status: 'ok', service: 'TokTickIT API' });
+
+    const categories = await request(app).get('/api/categories');
+    expect(categories.status).toBe(200);
+    expect(categories.body).toHaveLength(4);
+  });
+});</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: Run it to verify it fails</strong></label></div>
+  <p class="note">Run: <code>cd server && npx vitest run tests/lab-02/apiV1.test.ts</code> —
+  Expected: FAIL, `GET /api/v1/me` returns 404 (no `/api/v1` router mounted yet).</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: Write GET /me</strong></label></div>
+<pre><code>import { Router } from 'express';
+import { resolveCurrentUser } from '../../auth/currentUser';
+
+export const meRouter = Router();
+
+meRouter.get('/', resolveCurrentUser, (req, res) => {
+  const user = req.user!;
+  res.status(200).json({ id: user.id, email: user.email, displayName: user.displayName, role: user.role });
+});</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 4: Wire up the v1 router</strong></label></div>
+<pre><code>import { Router } from 'express';
+import { meRouter } from './me';
+
+export const v1Router = Router();
+
+v1Router.use('/me', meRouter);</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 5: Mount it in app.ts alongside the untouched Lab 1 routes</strong></label></div>
+<pre><code>import express from 'express';
+import cors from 'cors';
+import { healthRouter } from './routes/health';
+import { categoriesRouter } from './routes/categories';
+import { v1Router } from './routes/v1';
+import { correlationId, errorEnvelope } from './middleware/errorEnvelope';
+
+export const app = express();
+
+app.use(cors());
+app.use(express.json());
+app.use(correlationId);
+
+app.use('/api/health', healthRouter);
+app.use('/api/categories', categoriesRouter);
+app.use('/api/v1', v1Router);
+
+app.use(errorEnvelope);</code></pre>
+  <p class="note">The error envelope middleware must be registered <em>after</em> every route
+  (including the Lab 1 ones) since Express error handlers only catch errors from routes
+  registered before them — this is why <code>app.use(errorEnvelope)</code> moves to the bottom
+  of the file.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 6: Update .env.example</strong></label></div>
+<pre><code>DATABASE_URL="postgresql://postgres:password@localhost:5433/toktickit_real"
+PORT=4000
+ALLOW_DEV_IDENTITY=false
+DEV_DEFAULT_USER_EMAIL=requester@toktickit.local</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 7: Run the tests again, then the full suite</strong></label></div>
+  <p class="note">Run: <code>cd server && npm test</code> — Expected: every test in
+  <code>tests/lab-01/</code> and <code>tests/lab-02/</code> passes, including the new
+  <code>apiV1.test.ts</code> (3/3) and the earlier <code>categoriesRouter</code>/
+  <code>healthRouter</code> tests unchanged.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 8: Commit</strong></label></div>
+<pre><code>git add server/src/routes/v1/ server/src/app.ts server/.env.example server/tests/lab-02/apiV1.test.ts
+git commit -m "feat(api): mount /api/v1 router with GET /me, preserve Lab 1 aliases"</code></pre>
+
+  <!-- ================================================================ -->
+  <!-- ISSUE 8 — TICKET CREATION API                                     -->
+  <!-- ================================================================ -->
+
+  <h3>Task 14: Ticket number generation service <span class="task-issue">(Issue 8, ticket creation)</span></h3>
+  <p class="pathline">Create: <code>server/src/services/ticketNumber.ts</code>, <code>server/tests/lab-02/ticketNumber.test.ts</code></p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write the failing unit tests for formatTicketNo</strong></label></div>
+<pre><code>import { describe, it, expect, afterEach } from 'vitest';
+import { formatTicketNo, generateTicketNumber } from '../../src/services/ticketNumber';
+import { prisma } from '../../src/prisma';
+
+describe('formatTicketNo', () => {
+  it('pads single-digit sequence numbers to five digits', () => {
+    expect(formatTicketNo(2026, 1)).toBe('TKT-2026-00001');
+  });
+
+  it('does not truncate a five-digit sequence number', () => {
+    expect(formatTicketNo(2026, 99999)).toBe('TKT-2026-99999');
+  });
+
+  it('formats a mid-range sequence number correctly', () => {
+    expect(formatTicketNo(2027, 42)).toBe('TKT-2027-00042');
+  });
+});
+
+describe('generateTicketNumber', () => {
+  afterEach(async () => {
+    await prisma.$executeRawUnsafe('TRUNCATE "TicketCounter" RESTART IDENTITY CASCADE');
+  });
+
+  it('starts a new year at 1', async () => {
+    const result = await prisma.$transaction((tx) => generateTicketNumber(tx, 2099));
+    expect(result).toBe('TKT-2099-00001');
+  });
+
+  it('increments on the second call for the same year', async () => {
+    await prisma.$transaction((tx) => generateTicketNumber(tx, 2099));
+    const second = await prisma.$transaction((tx) => generateTicketNumber(tx, 2099));
+    expect(second).toBe('TKT-2099-00002');
+  });
+
+  it('produces 10 distinct, gapless numbers under concurrent calls', async () => {
+    const results = await Promise.all(
+      Array.from({ length: 10 }, () => prisma.$transaction((tx) => generateTicketNumber(tx, 2098)))
+    );
+    const sequenceNumbers = results
+      .map((ticketNo) => Number(ticketNo.split('-')[2]))
+      .sort((a, b) => a - b);
+    expect(new Set(sequenceNumbers).size).toBe(10);
+    expect(sequenceNumbers).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  });
+});</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: Run it to verify it fails</strong></label></div>
+  <p class="note">Run: <code>cd server && npx vitest run tests/lab-02/ticketNumber.test.ts</code>
+  — Expected: FAIL, module not found.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: Write the implementation</strong></label></div>
+<pre><code>import { Prisma } from '@prisma/client';
+
+export function formatTicketNo(year: number, sequence: number): string {
+  return `TKT-${year}-${String(sequence).padStart(5, '0')}`;
+}
+
+/**
+ * Atomically allocates the next ticket number for `year` inside the caller's transaction.
+ * Never uses count(*) + 1 — that races under concurrent inserts. `upsert` compiles to a single
+ * native `INSERT ... ON CONFLICT (year) DO UPDATE ... RETURNING` on Postgres, so there is no
+ * error-branching, catch-and-retry logic to get wrong: a genuine unique-constraint race between
+ * two callers creating the same year's row for the first time is resolved server-side by the
+ * ON CONFLICT clause itself, inside the same statement, with no partial-transaction recovery
+ * needed. (An earlier draft of this function used update() -> catch P2025 -> create() -> catch
+ * P2002 -> retry update() -- that's unsound: a real P2002 from create() leaves the surrounding
+ * Postgres transaction aborted, so the retried update() inside the catch block would itself
+ * throw "current transaction is aborted" instead of succeeding. upsert() avoids that failure
+ * mode structurally.)
+ */
+export async function generateTicketNumber(
+  tx: Prisma.TransactionClient,
+  year: number
+): Promise&lt;string&gt; {
+  const counter = await tx.ticketCounter.upsert({
+    where: { year },
+    update: { lastValue: { increment: 1 } },
+    create: { year, lastValue: 1 },
+  });
+
+  return formatTicketNo(year, counter.lastValue);
+}</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 4: Run the tests again</strong></label></div>
+  <p class="note">Run: <code>cd server && npx vitest run tests/lab-02/ticketNumber.test.ts</code>
+  — Expected: PASS (5/5), including the 10-parallel-calls concurrency test.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 5: Commit</strong></label></div>
+<pre><code>git add server/src/services/ticketNumber.ts server/tests/lab-02/ticketNumber.test.ts
+git commit -m "feat(tickets): add atomic, transaction-safe ticket number generation"</code></pre>
+
+  <h3>Task 15: Create-ticket request validator <span class="task-issue">(Issue 8, ticket creation)</span></h3>
+  <p class="pathline">Create: <code>server/src/validators/createTicketRequest.ts</code>, <code>server/tests/lab-02/createTicketRequest.validator.test.ts</code></p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write the failing boundary tests</strong></label></div>
+<pre><code>import { describe, it, expect } from 'vitest';
+import { validateCreateTicketRequest } from '../../src/validators/createTicketRequest';
+
+const validBody = {
+  summary: 'Laptop will not turn on',
+  description: 'Pressed the power button several times, no lights or fan noise at all.',
+  categoryId: 1,
+  requestedPriority: 'MEDIUM',
+};
+
+describe('validateCreateTicketRequest', () => {
+  it('accepts a fully valid body', () => {
+    const result = validateCreateTicketRequest(validBody);
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects a 4-character summary', () => {
+    const result = validateCreateTicketRequest({ ...validBody, summary: 'abcd' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.map((e) => e.field)).toContain('summary');
+  });
+
+  it('accepts a 5-character summary (lower boundary)', () => {
+    const result = validateCreateTicketRequest({ ...validBody, summary: 'abcde' });
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts a 150-character summary (upper boundary)', () => {
+    const result = validateCreateTicketRequest({ ...validBody, summary: 'a'.repeat(150) });
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects a 151-character summary', () => {
+    const result = validateCreateTicketRequest({ ...validBody, summary: 'a'.repeat(151) });
+    expect(result.ok).toBe(false);
+  });
+
+  it('rejects a 9-character description', () => {
+    const result = validateCreateTicketRequest({ ...validBody, description: 'a'.repeat(9) });
+    expect(result.ok).toBe(false);
+  });
+
+  it('accepts a 10-character description (lower boundary)', () => {
+    const result = validateCreateTicketRequest({ ...validBody, description: 'a'.repeat(10) });
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects a 5001-character description', () => {
+    const result = validateCreateTicketRequest({ ...validBody, description: 'a'.repeat(5001) });
+    expect(result.ok).toBe(false);
+  });
+
+  it('rejects a blank-after-trim summary', () => {
+    const result = validateCreateTicketRequest({ ...validBody, summary: '     ' });
+    expect(result.ok).toBe(false);
+  });
+
+  it('rejects a missing categoryId', () => {
+    const { categoryId, ...rest } = validBody;
+    const result = validateCreateTicketRequest(rest);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.map((e) => e.field)).toContain('categoryId');
+  });
+
+  it('accepts an optional relatedSystemId when present and numeric', () => {
+    const result = validateCreateTicketRequest({ ...validBody, relatedSystemId: 3 });
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects a non-numeric relatedSystemId', () => {
+    const result = validateCreateTicketRequest({ ...validBody, relatedSystemId: 'not-a-number' });
+    expect(result.ok).toBe(false);
+  });
+
+  it('rejects an unknown requestedPriority value', () => {
+    const result = validateCreateTicketRequest({ ...validBody, requestedPriority: 'SUPER_URGENT' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.map((e) => e.field)).toContain('requestedPriority');
+  });
+});</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: Run it to verify it fails</strong></label></div>
+  <p class="note">Run: <code>cd server && npx vitest run tests/lab-02/createTicketRequest.validator.test.ts</code>
+  — Expected: FAIL, module not found.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: Write the implementation</strong></label></div>
+<pre><code>export interface FieldError {
+  field: string;
+  message: string;
+}
+
+export interface ValidatedCreateTicketRequest {
+  summary: string;
+  description: string;
+  categoryId: number;
+  relatedSystemId: number | null;
+  requestedPriority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+}
+
+type ValidationResult =
+  | { ok: true; value: ValidatedCreateTicketRequest }
+  | { ok: false; errors: FieldError[] };
+
+const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
+
+export function validateCreateTicketRequest(body: Record&lt;string, unknown&gt;): ValidationResult {
+  const errors: FieldError[] = [];
+
+  const rawSummary = typeof body.summary === 'string' ? body.summary.trim() : '';
+  if (typeof body.summary !== 'string' || rawSummary.length &lt; 5 || rawSummary.length &gt; 150) {
+    errors.push({ field: 'summary', message: 'summary must be 5-150 characters' });
+  }
+
+  const rawDescription = typeof body.description === 'string' ? body.description.trim() : '';
+  if (typeof body.description !== 'string' || rawDescription.length &lt; 10 || rawDescription.length &gt; 5000) {
+    errors.push({ field: 'description', message: 'description must be 10-5000 characters' });
+  }
+
+  const categoryId = body.categoryId;
+  if (typeof categoryId !== 'number' || !Number.isInteger(categoryId)) {
+    errors.push({ field: 'categoryId', message: 'categoryId is required and must be an integer' });
+  }
+
+  let relatedSystemId: number | null = null;
+  if (body.relatedSystemId !== undefined && body.relatedSystemId !== null) {
+    if (typeof body.relatedSystemId !== 'number' || !Number.isInteger(body.relatedSystemId)) {
+      errors.push({ field: 'relatedSystemId', message: 'relatedSystemId must be an integer' });
+    } else {
+      relatedSystemId = body.relatedSystemId;
+    }
+  }
+
+  const requestedPriority = body.requestedPriority;
+  if (typeof requestedPriority !== 'string' || !(PRIORITIES as readonly string[]).includes(requestedPriority)) {
+    errors.push({
+      field: 'requestedPriority',
+      message: `requestedPriority must be one of ${PRIORITIES.join(', ')}`,
+    });
+  }
+
+  if (errors.length &gt; 0) {
+    return { ok: false, errors };
+  }
+
+  return {
+    ok: true,
+    value: {
+      summary: rawSummary,
+      description: rawDescription,
+      categoryId: categoryId as number,
+      relatedSystemId,
+      requestedPriority: requestedPriority as ValidatedCreateTicketRequest['requestedPriority'],
+    },
+  };
+}</code></pre>
+  <p class="note">This validator only checks shape/format. Whether `categoryId`/`relatedSystemId`
+  point at <em>active</em> rows is a database-dependent business rule, checked separately in
+  Task 17's route handler — that split keeps this function pure and fast to unit-test.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 4: Run the tests again</strong></label></div>
+  <p class="note">Run: <code>cd server && npx vitest run tests/lab-02/createTicketRequest.validator.test.ts</code>
+  — Expected: PASS (14/14).</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 5: Commit</strong></label></div>
+<pre><code>git add server/src/validators/createTicketRequest.ts server/tests/lab-02/createTicketRequest.validator.test.ts
+git commit -m "feat(tickets): add create-ticket request validator with boundary tests"</code></pre>
+
+  <h3>Task 16: v1 Categories and Related Systems routes <span class="task-issue">(Issue 8, ticket creation)</span></h3>
+  <p class="pathline">Create: <code>server/src/routes/v1/categories.ts</code>, <code>server/src/routes/v1/relatedSystems.ts</code>, <code>server/tests/lab-02/referenceData.test.ts</code> · Modify: <code>server/src/routes/v1/index.ts</code></p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write the failing test</strong></label></div>
+<pre><code>import { describe, it, expect } from 'vitest';
+import request from 'supertest';
+import { app } from '../../src/app';
+
+describe('reference data endpoints', () => {
+  it('GET /api/v1/categories returns only active categories, requires identity', async () => {
+    const unauth = await request(app).get('/api/v1/categories');
+    expect(unauth.status).toBe(401);
+
+    const response = await request(app)
+      .get('/api/v1/categories')
+      .set('x-dev-user-email', 'requester@toktickit.local');
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveLength(4);
+    for (const category of response.body) {
+      expect(category).toHaveProperty('id');
+      expect(category).toHaveProperty('name');
+      expect(category).not.toHaveProperty('storageKey');
+    }
+  });
+
+  it('GET /api/v1/related-systems returns 401 without identity', async () => {
+    const response = await request(app).get('/api/v1/related-systems');
+    expect(response.status).toBe(401);
+  });
+
+  it('GET /api/v1/related-systems returns only the 5 active rows, not the inactive one', async () => {
+    const response = await request(app)
+      .get('/api/v1/related-systems')
+      .set('x-dev-user-email', 'requester@toktickit.local');
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveLength(5);
+    expect(response.body.map((s: { code: string }) => s.code)).not.toContain('LEGACY_FS');
+  });
+});</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: Run it to verify it fails</strong></label></div>
+  <p class="note">Run: <code>cd server && npx vitest run tests/lab-02/referenceData.test.ts</code>
+  — Expected: FAIL, both routes 404 under `/api/v1`.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: Write both routes</strong></label></div>
+<pre><code>import { Router } from 'express';
+import { prisma } from '../../prisma';
+import { resolveCurrentUser } from '../../auth/currentUser';
+
+export const categoriesV1Router = Router();
+
+categoriesV1Router.get('/', resolveCurrentUser, async (_req, res) => {
+  const categories = await prisma.category.findMany({
+    where: { isActive: true },
+    orderBy: { id: 'asc' },
+    select: { id: true, name: true },
+  });
+  res.status(200).json(categories);
+});</code></pre>
+<pre><code>import { Router } from 'express';
+import { prisma } from '../../prisma';
+import { resolveCurrentUser } from '../../auth/currentUser';
+
+export const relatedSystemsRouter = Router();
+
+relatedSystemsRouter.get('/', resolveCurrentUser, async (_req, res) => {
+  const systems = await prisma.relatedSystem.findMany({
+    where: { isActive: true },
+    orderBy: { id: 'asc' },
+    select: { id: true, code: true, name: true },
+  });
+  res.status(200).json(systems);
+});</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 4: Mount both under the v1 router</strong></label></div>
+<pre><code>import { Router } from 'express';
+import { meRouter } from './me';
+import { categoriesV1Router } from './categories';
+import { relatedSystemsRouter } from './relatedSystems';
+
+export const v1Router = Router();
+
+v1Router.use('/me', meRouter);
+v1Router.use('/categories', categoriesV1Router);
+v1Router.use('/related-systems', relatedSystemsRouter);</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 5: Run the tests again</strong></label></div>
+  <p class="note">Run: <code>cd server && npx vitest run tests/lab-02/referenceData.test.ts</code>
+  — Expected: PASS (3/3).</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 6: Commit</strong></label></div>
+<pre><code>git add server/src/routes/v1/categories.ts server/src/routes/v1/relatedSystems.ts \
+        server/src/routes/v1/index.ts server/tests/lab-02/referenceData.test.ts
+git commit -m "feat(api): add v1 active-only categories and related-systems endpoints"</code></pre>
+
+  <h3>Task 17: POST /api/v1/tickets <span class="task-issue">(Issue 8, ticket creation)</span></h3>
+  <p class="pathline">Create: <code>server/src/routes/v1/tickets.ts</code>, <code>server/tests/lab-02/ticketCreation.test.ts</code> · Modify: <code>server/src/routes/v1/index.ts</code></p>
+  <p class="note">Depends on Task 14 (ticket number service), Task 15 (validator), Task 12
+  (identity), Task 16's router pattern. This is the critical-path task — the highest-risk one
+  in this plan, since it's where the transaction, the validator, and the number service all
+  have to compose correctly together.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write the failing tests</strong></label></div>
+<pre><code>import { describe, it, expect, beforeEach } from 'vitest';
+import request from 'supertest';
+import { app } from '../../src/app';
+import { prisma } from '../../src/prisma';
+import { truncateTicketTables } from '../helpers/resetDb';
+import { generateTicketNumber } from '../../src/services/ticketNumber';
+
+describe('POST /api/v1/tickets', () => {
+  beforeEach(async () => {
+    await truncateTicketTables();
+  });
+
+  it('creates a ticket with itPriority copied server-side and one TICKET_CREATED event', async () => {
+    const category = await prisma.category.findFirstOrThrow({ where: { isActive: true } });
+
+    const response = await request(app)
+      .post('/api/v1/tickets')
+      .set('x-dev-user-email', 'requester@toktickit.local')
+      .send({
+        summary: 'VPN keeps disconnecting',
+        description: 'Drops every few minutes since this morning, on both wifi and ethernet.',
+        categoryId: category.id,
+        requestedPriority: 'HIGH',
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.status).toBe('NEW');
+    expect(response.body.requestedPriority).toBe('HIGH');
+    expect(response.body.itPriority).toBe('HIGH');
+    expect(response.body.ticketNo).toMatch(/^TKT-\d{4}-\d{5}$/);
+
+    const events = await prisma.ticketEvent.findMany({ where: { ticketId: response.body.id } });
+    expect(events).toHaveLength(1);
+    expect(events[0].eventType).toBe('TICKET_CREATED');
+  });
+
+  it('ignores a client-supplied requesterId and always uses the authenticated user', async () => {
+    const category = await prisma.category.findFirstOrThrow({ where: { isActive: true } });
+    const otherUser = await prisma.user.findUniqueOrThrow({ where: { email: 'requester2@toktickit.local' } });
+
+    const response = await request(app)
+      .post('/api/v1/tickets')
+      .set('x-dev-user-email', 'requester@toktickit.local')
+      .send({
+        summary: 'Printer out of toner',
+        description: 'The 3rd floor printer shows a toner-empty light and will not print.',
+        categoryId: category.id,
+        requestedPriority: 'LOW',
+        requesterId: otherUser.id,
+        itPriority: 'URGENT',
+        status: 'RESOLVED',
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.requester.id).not.toBe(otherUser.id);
+    expect(response.body.itPriority).toBe('LOW');
+    expect(response.body.status).toBe('NEW');
+  });
+
+  it('returns 401 without identity', async () => {
+    const response = await request(app).post('/api/v1/tickets').send({});
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 422 with fieldErrors for an invalid body', async () => {
+    const response = await request(app)
+      .post('/api/v1/tickets')
+      .set('x-dev-user-email', 'requester@toktickit.local')
+      .send({ summary: 'ab', description: 'too short', categoryId: 1, requestedPriority: 'HIGH' });
+
+    expect(response.status).toBe(422);
+    expect(response.body.error.fieldErrors.length).toBeGreaterThan(0);
+  });
+
+  it('returns 422 when categoryId points at an inactive category', async () => {
+    const inactiveCategory = await prisma.category.create({
+      data: { name: 'Deprecated Category', code: 'DEPRECATED', isActive: false },
+    });
+
+    const response = await request(app)
+      .post('/api/v1/tickets')
+      .set('x-dev-user-email', 'requester@toktickit.local')
+      .send({
+        summary: 'Testing inactive category rejection',
+        description: 'This request targets a category that has been deactivated on purpose.',
+        categoryId: inactiveCategory.id,
+        requestedPriority: 'MEDIUM',
+      });
+
+    expect(response.status).toBe(422);
+    expect(response.body.error.fieldErrors.some((e: { field: string }) => e.field === 'categoryId')).toBe(true);
+
+    await prisma.category.delete({ where: { id: inactiveCategory.id } });
+  });
+
+  it('produces 10 distinct ticket numbers with no gaps or duplicates under concurrent creation', async () => {
+    const category = await prisma.category.findFirstOrThrow({ where: { isActive: true } });
+
+    const responses = await Promise.all(
+      Array.from({ length: 10 }, (_, i) =>
+        request(app)
+          .post('/api/v1/tickets')
+          .set('x-dev-user-email', 'requester@toktickit.local')
+          .send({
+            summary: `Concurrency test ticket ${i}`,
+            description: 'Body text long enough to pass the 10-character minimum requirement.',
+            categoryId: category.id,
+            requestedPriority: 'LOW',
+          })
+      )
+    );
+
+    for (const response of responses) {
+      expect(response.status).toBe(201);
+    }
+    const ticketNumbers = responses.map((r) => r.body.ticketNo);
+    expect(new Set(ticketNumbers).size).toBe(10);
+  });
+
+  it('returns 422 for a relatedSystemId that does not exist, without touching the transaction at all', async () => {
+    const category = await prisma.category.findFirstOrThrow({ where: { isActive: true } });
+    const before = await prisma.ticket.count();
+
+    // This is caught by the pre-transaction existence check in the route handler, before
+    // prisma.$transaction is even entered -- it proves bad references never reach the
+    // transaction, not transaction rollback itself (see the next test for that).
+    const response = await request(app)
+      .post('/api/v1/tickets')
+      .set('x-dev-user-email', 'requester@toktickit.local')
+      .send({
+        summary: 'Nonexistent related system test',
+        description: 'relatedSystemId below does not exist and must be rejected before insert.',
+        categoryId: category.id,
+        relatedSystemId: 999999,
+        requestedPriority: 'LOW',
+      });
+
+    expect(response.status).toBe(422);
+    const after = await prisma.ticket.count();
+    expect(after).toBe(before);
+  });
+
+  it('rolls back the ticket insert if the event insert fails inside the same transaction', async () => {
+    const category = await prisma.category.findFirstOrThrow({ where: { isActive: true } });
+    const user = await prisma.user.findUniqueOrThrow({ where: { email: 'requester@toktickit.local' } });
+    const before = await prisma.ticket.count();
+
+    await expect(
+      prisma.$transaction(async (tx) => {
+        const ticketNo = await generateTicketNumber(tx, 2097);
+        const created = await tx.ticket.create({
+          data: {
+            ticketNo,
+            summary: 'Rollback probe ticket',
+            description: 'This ticket must not survive because the next insert fails on purpose.',
+            requestedPriority: 'LOW',
+            itPriority: 'LOW',
+            requesterId: user.id,
+            categoryId: category.id,
+          },
+        });
+        // Ticket insert above already succeeded within this transaction. Now force a
+        // foreign-key violation on the event insert (a non-existent actor) to prove the
+        // whole transaction -- including the ticket that already "succeeded" -- rolls back.
+        await tx.ticketEvent.create({
+          data: { ticketId: created.id, actorId: 'nonexistent-actor-id', eventType: 'TICKET_CREATED' },
+        });
+      })
+    ).rejects.toThrow();
+
+    const after = await prisma.ticket.count();
+    expect(after).toBe(before);
+    const orphanEvents = await prisma.ticketEvent.count();
+    expect(orphanEvents).toBe(0);
+  });
+});</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 2: Run it to verify it fails</strong></label></div>
+  <p class="note">Run: <code>cd server && npx vitest run tests/lab-02/ticketCreation.test.ts</code>
+  — Expected: FAIL, `POST /api/v1/tickets` is 404 (no route mounted yet).</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 3: Write the route</strong></label></div>
+<pre><code>import { Router } from 'express';
+import { Prisma } from '@prisma/client';
+import { prisma } from '../../prisma';
+import { resolveCurrentUser } from '../../auth/currentUser';
+import { validateCreateTicketRequest } from '../../validators/createTicketRequest';
+import { generateTicketNumber } from '../../services/ticketNumber';
+import { HttpError, ValidationHttpError } from '../../middleware/errorEnvelope';
+
+export const ticketsRouter = Router();
+
+ticketsRouter.post('/', resolveCurrentUser, async (req, res, next) => {
+  try {
+    const validated = validateCreateTicketRequest(req.body ?? {});
+    if (!validated.ok) {
+      throw new ValidationHttpError(validated.errors);
+    }
+    const { summary, description, categoryId, relatedSystemId, requestedPriority } = validated.value;
+
+    const category = await prisma.category.findUnique({ where: { id: categoryId } });
+    if (!category || !category.isActive) {
+      throw new ValidationHttpError([{ field: 'categoryId', message: 'categoryId must reference an active category' }]);
+    }
+
+    if (relatedSystemId !== null) {
+      const relatedSystem = await prisma.relatedSystem.findUnique({ where: { id: relatedSystemId } });
+      if (!relatedSystem || !relatedSystem.isActive) {
+        throw new ValidationHttpError([
+          { field: 'relatedSystemId', message: 'relatedSystemId must reference an active related system' },
+        ]);
+      }
+    }
+
+    const requesterId = req.user!.id;
+    const year = new Date().getUTCFullYear();
+
+    const ticket = await prisma.$transaction(async (tx) => {
+      const ticketNo = await generateTicketNumber(tx, year);
+
+      const created = await tx.ticket.create({
+        data: {
+          ticketNo,
+          summary,
+          description,
+          requestedPriority,
+          itPriority: requestedPriority,
+          requesterId,
+          categoryId,
+          relatedSystemId,
+        },
+        include: {
+          category: { select: { id: true, name: true } },
+          relatedSystem: { select: { id: true, name: true } },
+          requester: { select: { id: true, displayName: true } },
+          owner: { select: { id: true, displayName: true } },
+        },
+      });
+
+      await tx.ticketEvent.create({
+        data: {
+          ticketId: created.id,
+          actorId: requesterId,
+          eventType: 'TICKET_CREATED',
+        },
+      });
+
+      return created;
+    });
+
+    res.status(201).json({
+      id: ticket.id,
+      ticketNo: ticket.ticketNo,
+      summary: ticket.summary,
+      description: ticket.description,
+      category: ticket.category,
+      relatedSystem: ticket.relatedSystem,
+      status: ticket.status,
+      requestedPriority: ticket.requestedPriority,
+      itPriority: ticket.itPriority,
+      createdAt: ticket.createdAt,
+      updatedAt: ticket.updatedAt,
+      commentCount: 0,
+      attachmentCount: 0,
+      requester: ticket.requester,
+      owner: ticket.owner,
+      resolutionSummary: ticket.resolutionSummary,
+      version: ticket.version,
+    });
+  } catch (error) {
+    if (error instanceof HttpError) {
+      next(error);
+      return;
+    }
+    // Only a specific, expected failure gets rewritten to a 422: a foreign-key violation on
+    // the relatedSystem FK (P2003), meaning the row was deleted between the pre-check above
+    // and the insert -- a genuine race, not a server bug. Everything else (an unrelated Prisma
+    // error, a DB connectivity failure, a bug) must fall through to errorEnvelope's generic
+    // 500/INTERNAL_ERROR path unchanged. Silently relabeling arbitrary failures as "your
+    // relatedSystemId doesn't exist" would hide real errors behind a misleading, specific
+    // client-facing message -- exactly what this repo's "never silently swallow errors" rule
+    // forbids.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2003' &&
+      (error.meta?.field_name as string | undefined)?.includes('relatedSystemId')
+    ) {
+      next(new ValidationHttpError([{ field: 'relatedSystemId', message: 'Referenced record no longer exists' }]));
+      return;
+    }
+    next(error);
+  }
+});</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 4: Mount it under the v1 router</strong></label></div>
+<pre><code>import { Router } from 'express';
+import { meRouter } from './me';
+import { categoriesV1Router } from './categories';
+import { relatedSystemsRouter } from './relatedSystems';
+import { ticketsRouter } from './tickets';
+
+export const v1Router = Router();
+
+v1Router.use('/me', meRouter);
+v1Router.use('/categories', categoriesV1Router);
+v1Router.use('/related-systems', relatedSystemsRouter);
+v1Router.use('/tickets', ticketsRouter);</code></pre>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 5: Run the tests again</strong></label></div>
+  <p class="note">Run: <code>cd server && npx vitest run tests/lab-02/ticketCreation.test.ts</code>
+  — Expected: PASS (7/7), including the 10-parallel-creates concurrency test and the
+  forced-rollback test.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 6: Run the entire server test suite with coverage</strong></label></div>
+  <p class="note">Run: <code>cd server && npm run test:coverage</code> — Expected: every test
+  across <code>tests/lab-01/</code> and <code>tests/lab-02/</code> passes; note the reported
+  coverage percentage in <code>docs/lab-02/test-plan.md</code>'s Definition-of-Done line before
+  the final commit.</p>
+
+  <div class="step"><label><input type="checkbox"> <strong>Step 7: Commit</strong></label></div>
+<pre><code>git add server/src/routes/v1/tickets.ts server/src/routes/v1/index.ts server/tests/lab-02/ticketCreation.test.ts
+git commit -m "feat(tickets): add POST /api/v1/tickets with transactional creation and full test coverage"</code></pre>
+
+  <div class="card">
+    <strong>W3 done when:</strong> all 17 tasks above are committed on <code>lab2-staging</code>,
+    <code>npm run test:coverage</code> is green in <code>server/</code> and
+    <code>npm test</code> is green in <code>client/</code>, and each of Issues 5–8 has its own
+    PR into <code>lab2-staging</code> per the source plan's branch table (<code>feature/5-lab2-specs</code>,
+    <code>feature/6-api-v1-foundation</code>, <code>feature/7-ticket-data-model</code>,
+    <code>feature/8-ticket-creation-api</code> — note PR merge order is 5 → 7 → 6 → 8, not
+    numeric order, per this plan's Key Decisions above). Issues 9–17 (W4) wait for the real
+    Lab 2 labsheet, per the source plan's issue-creation staging note.
+  </div>
+
+</div>
+</body>
+</html>

@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "e2e": "dotenv -e .env.e2e -- ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "node dist/src/server.js",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:generate": "prisma generate"
@@ -18,13 +20,18 @@
     "@prisma/client": "^5.20.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.21.0"
+    "express": "^4.21.0",
+    "file-type": "^16.5.4",
+    "multer": "^2.3.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
+    "@types/multer": "^2.2.0",
     "@types/node": "^22.7.0",
     "@types/supertest": "^6.0.2",
+    "@vitest/coverage-v8": "^2.1.9",
+    "dotenv-cli": "^8.0.0",
     "prisma": "^5.20.0",
     "supertest": "^7.0.0",
     "ts-node": "^10.9.2",

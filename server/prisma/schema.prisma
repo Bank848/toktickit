@@ -7,8 +7,150 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  REQUESTER
+  IT_STAFF
+  ADMINISTRATOR
+}
+
+enum TicketStatus {
+  NEW
+  ASSIGNED
+  IN_PROGRESS
+  PENDING_REQUESTER
+  RESOLVED
+  CLOSED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketEventType {
+  TICKET_CREATED
+  COMMENT_ADDED
+  ATTACHMENT_ADDED
+  ATTACHMENT_REMOVED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  displayName  String
+  role         UserRole @default(REQUESTER)
+  passwordHash String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  requestedTickets   Ticket[]      @relation("TicketRequester")
+  ownedTickets       Ticket[]      @relation("TicketOwner")
+  comments           Comment[]
+  attachments        Attachment[]  @relation("AttachmentUploader")
+  deletedAttachments Attachment[]  @relation("AttachmentDeleter")
+  events             TicketEvent[]
+}
+
+model RelatedSystem {
+  id       Int      @id @default(autoincrement())
+  code     String   @unique
+  name     String
+  isActive Boolean  @default(true)
+  tickets  Ticket[]
+}
+
 model Category {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  code        String?  @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  tickets     Ticket[]
+}
+
+model Ticket {
+  id                              String        @id @default(uuid())
+  ticketNo                        String        @unique
+  summary                         String
+  description                     String
+  status                          TicketStatus  @default(NEW)
+  requestedPriority               Priority
+  itPriority                      Priority
+  resolutionSummary               String?
+  requesterResolutionConfirmedAt  DateTime?
+  version                         Int           @default(0)
+  createdAt                       DateTime      @default(now())
+  updatedAt                       DateTime      @updatedAt
+
+  requesterId     String
+  requester       User           @relation("TicketRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  ownerId         String?
+  owner           User?          @relation("TicketOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  categoryId      Int
+  category        Category       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  relatedSystemId Int?
+  relatedSystem   RelatedSystem? @relation(fields: [relatedSystemId], references: [id], onDelete: Restrict)
+
+  comments    Comment[]
+  attachments Attachment[]
+  events      TicketEvent[]
+
+  @@index([requesterId, createdAt])
+  @@index([status])
+  @@index([categoryId])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  body      String   @db.VarChar(2000)
   createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+model Attachment {
+  id               String    @id @default(uuid())
+  ticketId         String
+  ticket           Ticket    @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  uploadedById     String
+  uploadedBy       User      @relation("AttachmentUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+  originalFilename String
+  mimeType         String
+  sizeBytes        Int
+  storageKey       String    @unique
+  createdAt        DateTime  @default(now())
+  deletedAt        DateTime?
+  deletedById      String?
+  deletedBy        User?     @relation("AttachmentDeleter", fields: [deletedById], references: [id], onDelete: Restrict)
+  deletedReason    String?
+
+  @@index([ticketId, deletedAt])
+}
+
+model TicketEvent {
+  id        String          @id @default(uuid())
+  ticketId  String
+  ticket    Ticket          @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  actorId   String
+  actor     User            @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  eventType TicketEventType
+  payload   Json?
+  createdAt DateTime        @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+model TicketCounter {
+  year      Int      @id
+  lastValue Int      @default(0)
+  updatedAt DateTime @updatedAt
 }
