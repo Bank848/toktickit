@@ -131,3 +131,13 @@ export async function fetchTickets(
   }
   return response.json();
 }
+
+export async function fetchTicketDetail(requesterId: string, ticketId: string): Promise<TicketDetailDto> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/tickets/${ticketId}`, {
+    headers: authHeaders(requesterId),
+  });
+  if (!response.ok) {
+    return throwApiError(response, 'Failed to load ticket');
+  }
+  return response.json();
+}
