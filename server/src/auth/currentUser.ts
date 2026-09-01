@@ -51,7 +51,7 @@ export async function resolveCurrentUser(req: Request, _res: Response, next: Nex
  * intentional override.
  */
 export function assertIdentitySeamBootGuard(): void {
-  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_IDENTITY !== 'true') {
+  if (!devIdentityAllowed()) {
     throw new Error(
       'Lab 2 has no production identity provider yet (Lab 3 adds real sessions). ' +
         'Refusing to start with NODE_ENV=production unless ALLOW_DEV_IDENTITY=true is set explicitly.'
