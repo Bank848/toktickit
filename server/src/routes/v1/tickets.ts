@@ -169,3 +169,46 @@ ticketsRouter.get('/', async (req, res, next) => {
 });
 
 ticketsRouter.use('/:id/attachments', ticketAttachmentsRouter);
+
+// Registered after GET / and POST / on this router (Express matches by method+path, so order
+// between GET / and POST / doesn't matter, but /:id must stay below any future literal-path
+// route, e.g. a hypothetical /search, or that route would never be reached).
+ticketsRouter.get('/:id', async (req, res, next) => {
+  try {
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: req.params.id },
+      include: {
+        category: { select: { id: true, name: true } },
+        relatedSystem: { select: { id: true, name: true } },
+        requester: { select: { id: true, displayName: true } },
+        owner: { select: { id: true, displayName: true } },
+        _count: { select: { attachments: { where: { deletedAt: null } } } },
+      },
+    });
+    if (!ticket || ticket.requesterId !== req.user!.id) {
+      // Identical body for "doesn't exist" and "exists but isn't yours" -- a 403 here would
+      // have confirmed the ticket's existence, which defeats the point (D-24).
+      throw new HttpError(404, 'TICKET_NOT_ACCESSIBLE', 'Ticket not found');
+    }
+    res.status(200).json({
+      id: ticket.id,
+      ticketNo: ticket.ticketNo,
+      summary: ticket.summary,
+      description: ticket.description,
+      category: ticket.category,
+      relatedSystem: ticket.relatedSystem,
+      status: ticket.status,
+      requestedPriority: ticket.requestedPriority,
+      itPriority: ticket.itPriority,
+      createdAt: ticket.createdAt,
+      updatedAt: ticket.updatedAt,
+      attachmentCount: ticket._count.attachments,
+      requester: ticket.requester,
+      owner: ticket.owner,
+      resolutionSummary: ticket.resolutionSummary,
+      version: ticket.version,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
