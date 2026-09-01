@@ -17,85 +17,94 @@ written first (TDD) — this plan is not reconstructed afterward from whatever t
 happened to generate.
 
 **Tooling.** Vitest for both client (jsdom + Testing Library) and server (+ Supertest for API
-tests), continuing Lab 1's setup. Playwright for the single end-to-end journey. Required file
-locations, per the labsheet's §12 minimum repository structure:
+tests), continuing Lab 1's setup. Playwright for the single end-to-end journey.
 
-- `server/tests/lab-02/create-ticket.api.test.ts`
-- `server/tests/lab-02/my-tickets.api.test.ts`
-- `server/tests/lab-02/ticket-detail.api.test.ts`
-- `server/tests/lab-02/attachments.api.test.ts`
-- `client/tests/lab-02/CreateTicket.test.tsx`
-- `client/tests/lab-02/MyTickets.test.tsx`
-- `client/tests/lab-02/RequesterTicketDetail.test.tsx`
-- `client/tests/lab-02/AttachmentSection.test.tsx`
-- `e2e/lab-02/requester-ticket-flow.spec.ts`
+**Status note (2026-09-02):** the file list and the `componentRules.ts` helper originally planned
+here described the intended shape before implementation. The actual repository landed on a
+finer-grained split (one file per concern rather than one file per screen on the server side) and
+never implemented the shared component-rules helper. The list below is the real, current file set,
+confirmed against the repository — not the pre-implementation plan.
 
-These are the only required test files; every scenario in §2 below lives in one of them under a
-nested `describe` block by scenario group (for example, `create-ticket.api.test.ts` has
-`describe('validation')`, `describe('attachment upload')`, `describe('ownership')` inside it),
-rather than spawning additional top-level files beyond this minimum set.
+- `server/tests/lab-02/apiV1.test.ts` — `/api/v1` foundation, Development Requester Selection API
+- `server/tests/lab-02/attachmentStorage.test.ts` — local disk storage adapter (unit)
+- `server/tests/lab-02/attachmentValidation.test.ts` — attachment type/MIME/magic-byte policy (unit)
+- `server/tests/lab-02/attachments.api.test.ts` — attachment upload/download/removal API
+- `server/tests/lab-02/createTicketRequest.validator.test.ts` — create-ticket request validator (unit)
+- `server/tests/lab-02/currentUser.test.ts` — identity resolution and dev-identity boot guard
+- `server/tests/lab-02/errorEnvelope.test.ts` — error envelope middleware
+- `server/tests/lab-02/listTicketsQuery.test.ts` — My Tickets query parser (unit)
+- `server/tests/lab-02/migration.test.ts` — Lab 2 schema migration
+- `server/tests/lab-02/referenceData.test.ts` — categories/related-systems reference endpoints
+- `server/tests/lab-02/ticketCreation.test.ts` — `POST /api/v1/tickets`
+- `server/tests/lab-02/ticketDetail.api.test.ts` — `GET /api/v1/tickets/:id`
+- `server/tests/lab-02/ticketNumber.test.ts` — Ticket Number formatting and generation (unit)
+- `server/tests/lab-02/ticketsList.api.test.ts` — `GET /api/v1/tickets`
+- `client/tests/lab-02/AttachmentSection.test.tsx` — attachment list, upload, removal UI
+- `client/tests/lab-02/CreateTicket.test.tsx` — Create Ticket page
+- `client/tests/lab-02/MyTickets.test.tsx` — My Tickets page
+- `client/tests/lab-02/RemovalConfirmDialog.test.tsx` — removal-confirmation dialog and focus trap
+- `client/tests/lab-02/RequesterContext.test.tsx` — Development Requester context/session storage
+- `client/tests/lab-02/SelectRequesterPage.test.tsx` — Development Requester Selection page
+- `client/tests/lab-02/TicketDetail.test.tsx` — Requester Ticket Detail page
+- `client/tests/lab-02/routeGuard.test.tsx` — requester-selection route guard
+- `e2e/lab-02/requester-ticket-flow.spec.ts` — full responsive requester journey
 
-One non-test helper module sits alongside them, `client/tests/lab-02/componentRules.ts`. The
-`ui-spec.md` §2/§8 component rules (required-field asterisk plus `aria-describedby` wiring,
-read-only versus editable field tokens, button-hierarchy classes) are a single contract that
-applies to all four Lab 2 screens, so the assertions are written once and each screen's test file
-calls them with its own selectors (UI-11 to UI-14 below). This keeps the contract from being
-verified on Create Ticket only, without duplicating the same assertion bodies four times. It is a
-helper module, not an additional test file, and it stays inside `client/tests/lab-02/`; no
-`client/tests/shared/` directory is introduced, since Lab 1 has no such convention and the
-labsheet's §12 structure does not call for one.
+**Harness fixes needed before writing tests (all applied):**
 
-**Harness fixes needed before writing tests:**
-
-1. `client/vite.config.ts` must include `.ts` unit tests, not only `.tsx`.
+1. `client/vite.config.ts` includes `.ts` unit tests, not only `.tsx`.
 2. Server tests run against an isolated `toktickit_test` database, with migration + seed in global
-   setup, per-test truncation of ticket-related tables, and no file parallelism, so concurrent
-   suites cannot interleave on the shared Ticket Number counter row. Never point tests at the
-   developer's own database.
-3. Coverage tooling (`@vitest/coverage-v8`) must be installed on both `client` and `server`
-   `package.json` before the coverage-dependent Definition of Done items can be measured.
+   setup. Requires a local `server/.env.test` (gitignored, not committed) pointing at that
+   database — see `server/.env.example` for the connection-string shape.
+3. Coverage tooling (`@vitest/coverage-v8`) is installed on both `client` and `server`.
+4. The E2E suite additionally requires `server/.env.e2e` and `client/.env.e2e` (both gitignored;
+   `.example` copies are committed) pointing the E2E server and client at a dedicated
+   `toktickit_e2e` database and matching port. **Real bug found and fixed in this pass:**
+   `client/.env.e2e` did not exist and there was no `client/.env.e2e.example` documenting it, so
+   the E2E client silently fell back to its default `VITE_API_BASE_URL` (port 4000) while the E2E
+   server actually listens on port 4001 — every E2E run failed at the very first screen (the
+   Development Requester dropdown never populated) until `client/.env.e2e` was added.
 
 ## 2. Planned Tests
 
 | Test ID | Type | Requirement/AC | What It Tests | Expected Result | Automated Test File | Final |
 |---|---|---|---|---|---|---|
-| UNIT-01 | Unit | BR-01, BR-10 | Ticket Number generator padding/year boundary | Correct `TKT-YYYY-NNNNN` format, annual reset | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
-| UNIT-02 | Unit | FR-06, BR-05 | Create-ticket request validator boundaries (summary/description length, blank-after-trim, unknown enum, inactive category/related system) | 422 with field errors for each boundary case | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
-| UNIT-03 | Unit | FR-15, FR-16, BR-13 | List-query parser (pageSize clamp, negative page, unknown sort, `q` trim/length/blank-as-omitted) | Parser normalizes or rejects each case per BR-13 | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| UNIT-04 | Unit | FR-21, BR-08 | Attachment policy matrix (extension/MIME/magic-byte agreement, 5 MB boundary, 5-active-file limit not counting removed) | Each boundary accepted/rejected correctly | `server/tests/lab-02/attachments.api.test.ts` | Pending |
-| UNIT-05 | Unit | FR-22, BR-09 | Removal-request validator (missing/empty/201-char reason) | 422 for each invalid reason | `server/tests/lab-02/attachments.api.test.ts` | Pending |
-| API-01 | API | AC-05 | Create valid ticket | 201; one saved Ticket; status New; itPriority = requestedPriority; unique number returned | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
-| API-02 | API | AC-06, AC-07 | Create with invalid field / with a failing staged attachment | 422 with field errors and preserved input; ticket retained despite failed attachment | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
-| API-03 | API | AC-05 (concurrency) | 10 parallel `POST /tickets` | 10 distinct Ticket Numbers, no gaps or duplicates | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
-| API-04 | API | AC-08, AC-09 | List, filter, search My Tickets | Only the selected requester's tickets; AND semantics across filters and `q` | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-05 | API | AC-10, AC-11 | Empty My Tickets / no-match My Tickets | Distinct empty-state payload shape for each case (zero total vs. zero after filtering) | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-06 | API | AC-18 | Protected endpoint with missing/unknown/inactive requester identity | 401, and `?requesterId=` on the list endpoint is ignored, never honoured as a scope override | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-07 | API | FR-18, FR-19 | Retrieve owned Ticket Detail | 200 with all specified fields plus attachments (active and removed) | `server/tests/lab-02/ticket-detail.api.test.ts` | Pending |
-| API-08 | API | AC-12 | Retrieve another requester's Ticket Detail | 404, no ticket data present in the response, byte-identical to the response for an unknown ticket id | `server/tests/lab-02/ticket-detail.api.test.ts` | Pending |
-| API-09 | API | AC-19 | Ticket Detail response and route surface | No events/service-actions/comments field or endpoint exists anywhere in the response or router | `server/tests/lab-02/ticket-detail.api.test.ts` | Pending |
-| API-10 | API | AC-16 | Upload wrong type / oversized file | 422 type mismatch or 413 size; nothing written to storage | `server/tests/lab-02/attachments.api.test.ts` | Pending |
-| API-11 | API | AC-15 | 6th active attachment upload, then upload after one removal | 409 on the 6th; success after a removal frees a slot | `server/tests/lab-02/attachments.api.test.ts` | Pending |
-| API-12 | API | AC-13, AC-14 | Remove attachment with reason / with missing reason | 200 removed-state DTO with reason/remover/date visible and 410 on content; 422 when reason missing | `server/tests/lab-02/attachments.api.test.ts` | Pending |
-| API-13 | API | FR-24 | Download headers and removed-attachment access | `Content-Disposition`/`nosniff`/stored mimeType present; `storageKey` never in any response body | `server/tests/lab-02/attachments.api.test.ts` | Pending |
-| UI-01 | UI | AC-01, AC-02, AC-03 | Development Requester Selection renders/selects/excludes inactive | Picker blocks navigation until selection; inactive requester absent | `client/tests/lab-02/CreateTicket.test.tsx` (shared app-shell fixture) | Pending |
-| UI-02 | UI | AC-07 | Submit Create Ticket without Summary | Field message renders next to the input; API not called | `client/tests/lab-02/CreateTicket.test.tsx` | Pending |
-| UI-03 | UI | AC-06 | Post-create per-file upload failure | Failure summary renders without hiding the created ticket | `client/tests/lab-02/CreateTicket.test.tsx` | Pending |
-| UI-04 | UI | AC-09, AC-10, AC-11 | My Tickets filters/search/pagination and both empty states | Refetch resets to page 1; correct empty state per scenario | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
-| UI-05 | UI | AC-17 | My Tickets at a sub-768px viewport | Renders as stacked cards, no horizontal scroll | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
-| UI-06 | UI | FR-18, AC-19 | Ticket Detail header render | All specified fields present; no Event Log/Service Actions/Comments section anywhere in the DOM | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Pending |
-| UI-07 | UI | AC-12 | Ticket Detail for a non-owned ticket | Not Found state rendered (same view as an unknown id), no field data present | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Pending |
-| UI-08 | UI | AC-13 | Attachment removal dialog | Submit disabled until a non-empty reason is entered; confirmed removal shows removed metadata, disabled download | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
-| UI-09 | UI | AC-15, AC-16 | Attachment list at the 5-active limit / with an invalid staged file | Upload control disabled at 5; invalid file rejected client-side with a visible message | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
-| UI-10 | UI | FR-02, FR-03, AC-04 | Header identity display and "Change Requester" reload | Header shows selected Requester's name; activating Change Requester clears the stored selection and discards cached requester-scoped data before the picker renders | `client/tests/lab-02/CreateTicket.test.tsx` (shared app-shell fixture) | Pending |
-| UI-11 | UI | `ui-spec.md` §2, §4, §8 (component rules) | Create Ticket component rules, via the shared `componentRules` helper | Required fields show the asterisk marker and are wired to their validation message via `aria-describedby`; Ticket Number/Ticket Date/Requester carry the read-only token class, distinct from the editable inputs; submit renders the primary class, Cancel the tertiary class, and submit renders the disabled and busy classes in those states | `client/tests/lab-02/CreateTicket.test.tsx` | Pending |
-| UI-12 | UI | `ui-spec.md` §2, §6, §8 (component rules) | Ticket Detail component rules, same helper | Every header field renders with the read-only token class and none renders as an editable input; Remove carries the destructive class; Download on a removed attachment carries the disabled class | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Pending |
-| UI-13 | UI | `ui-spec.md` §2, §6, §8 (component rules) | Attachment removal dialog and upload control component rules, same helper | The reason field shows the asterisk marker and is wired to its message via `aria-describedby`; dialog submit carries the destructive class, the disabled class while the reason is empty, and the busy class while the request is in flight; the upload control carries the disabled class at 5 active files | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
-| UI-14 | UI | `ui-spec.md` §2, §5, §8 (component rules) | My Tickets filter-bar component rules, same helper | "Clear filters" carries the secondary class, plus the disabled class when no filter, sort, or search is active; pagination controls carry the disabled class at the first and last page | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
-| E2E-01 | E2E | AC-01, AC-02, AC-05, AC-09, AC-13, AC-17 | Complete responsive requester journey: select requester, create ticket with one valid attachment, find it via search in My Tickets, open Detail, remove the attachment with a reason, verify at a mobile viewport | Every step succeeds; confirmation shows the official Ticket Number; removed attachment shows blocked content | `e2e/lab-02/requester-ticket-flow.spec.ts` | Pending |
-| API-14 | API | FR-12, BR-11 | `TICKET_CREATED` audit event on ticket creation | Event row exists with correct ticketId, type, and timestamp inside the same transaction as the ticket insert | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
-| API-15 | API | FR-23, BR-15 | `ATTACHMENT_REMOVED` audit event on soft removal | Event row exists recording filename, uploader, remover, reason, timestamp | `server/tests/lab-02/attachments.api.test.ts` | Pending |
-| UNIT-06 | Unit | BR-07 | Related System deactivation path | Deactivating sets `isActive = false`; no code path hard-deletes a Related System referenced by any ticket | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
-| UNIT-07 | Unit | BR-12 | Ticket/TicketEvent hard-delete guard | No route or service function performs a hard delete on `Ticket` or `TicketEvent` — asserted by absence (no such handler reachable) | `server/tests/lab-02/ticket-detail.api.test.ts` | Pending |
+| UNIT-01 | Unit | BR-01, BR-10 | Ticket Number generator padding/year boundary | Correct `TKT-YYYY-NNNNN` format, annual reset | `server/tests/lab-02/ticketNumber.test.ts` | Pass |
+| UNIT-02 | Unit | FR-06, BR-05 | Create-ticket request validator boundaries (summary/description length, blank-after-trim, unknown enum, inactive category/related system) | 422 with field errors for each boundary case | `server/tests/lab-02/createTicketRequest.validator.test.ts` | Pass |
+| UNIT-03 | Unit | FR-15, FR-16, BR-13 | List-query parser (pageSize clamp, negative page, unknown sort, `q` trim/length/blank-as-omitted) | Parser normalizes or rejects each case per BR-13 | `server/tests/lab-02/listTicketsQuery.test.ts` | Pass |
+| UNIT-04 | Unit | FR-21, BR-08 | Attachment policy matrix (extension/MIME/magic-byte agreement, 5-active-file limit not counting removed) | Each boundary accepted/rejected correctly | `server/tests/lab-02/attachmentValidation.test.ts` (type/MIME/magic bytes); `server/tests/lab-02/attachments.api.test.ts` (413 size boundary, 5-file limit at the API layer) | Pass |
+| UNIT-05 | Unit | FR-22, BR-09 | Removal-request reason validation | 422 for a missing/empty reason | `server/tests/lab-02/attachments.api.test.ts` | Pass — narrower than planned; see §7 |
+| API-01 | API | AC-05 | Create valid ticket | 201; one saved Ticket; status New; itPriority = requestedPriority; unique number returned | `server/tests/lab-02/ticketCreation.test.ts` | Pass |
+| API-02 | API | AC-06, AC-07 | Create with invalid field | 422 with field errors and preserved input | `server/tests/lab-02/ticketCreation.test.ts` | Pass — see §7 for the failing-attachment half |
+| API-03 | API | AC-05 (concurrency) | 10 parallel `POST /tickets` | 10 distinct Ticket Numbers, no gaps or duplicates | `server/tests/lab-02/ticketCreation.test.ts` | Pass |
+| API-04 | API | AC-08, AC-09 | List, filter, search My Tickets | Only the selected requester's tickets; AND semantics across filters and `q` | `server/tests/lab-02/ticketsList.api.test.ts` | Pass |
+| API-05 | API | AC-10, AC-11 | Empty My Tickets / no-match My Tickets | Distinct empty-state payload shape for each case (zero total vs. zero after filtering) | `server/tests/lab-02/ticketsList.api.test.ts` | Pass |
+| API-06 | API | AC-18 | Protected endpoint with missing/unknown/inactive requester identity | 401, and `?requesterId=` on the list endpoint is ignored, never honoured as a scope override | `server/tests/lab-02/currentUser.test.ts` (401 cases); `server/tests/lab-02/ticketsList.api.test.ts` (requesterId override ignored) | Pass |
+| API-07 | API | FR-18, FR-19 | Retrieve owned Ticket Detail | 200 with all specified fields plus attachments (active and removed) | `server/tests/lab-02/ticketDetail.api.test.ts` | Pass |
+| API-08 | API | AC-12 | Retrieve another requester's Ticket Detail | 404, no ticket data present in the response, byte-identical to the response for an unknown ticket id | `server/tests/lab-02/ticketDetail.api.test.ts` | Pass |
+| API-09 | API | AC-19 | Ticket Detail response and route surface | No events/service-actions/comments field or endpoint exists anywhere in the response or router | — | Not implemented as a dedicated test; see §7 |
+| API-10 | API | AC-16 | Upload wrong type / oversized file | 422 type mismatch or 413 size; nothing written to storage | `server/tests/lab-02/attachments.api.test.ts` | Pass |
+| API-11 | API | AC-15 | 6th active attachment upload, then upload after one removal | 409 on the 6th; success after a removal frees a slot | `server/tests/lab-02/attachments.api.test.ts` | Pass |
+| API-12 | API | AC-13, AC-14 | Remove attachment with reason / with missing reason | 200 removed-state DTO with reason/remover/date visible and 410 on content; 422 when reason missing | `server/tests/lab-02/attachments.api.test.ts` | Pass |
+| API-13 | API | FR-24 | Download headers and removed-attachment access | `Content-Disposition`/`nosniff`/stored mimeType present; `storageKey` never in any response body | `server/tests/lab-02/attachments.api.test.ts` | Pass |
+| UI-01 | UI | AC-01, AC-02, AC-03 | Development Requester Selection renders/selects/excludes inactive | Picker blocks navigation until selection; inactive requester absent | `client/tests/lab-02/SelectRequesterPage.test.tsx`; `client/tests/lab-02/routeGuard.test.tsx` | Pass |
+| UI-02 | UI | AC-07 | Submit Create Ticket without Summary | Field message renders next to the input; API not called | `client/tests/lab-02/CreateTicket.test.tsx` | Pass |
+| UI-03 | UI | AC-06 | Post-create per-file upload failure | Failure summary renders without hiding the created ticket | `client/tests/lab-02/CreateTicket.test.tsx` | Pass |
+| UI-04 | UI | AC-09, AC-10, AC-11 | My Tickets filters/search/pagination and both empty states | Refetch resets to page 1; correct empty state per scenario | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
+| UI-05 | UI | AC-17 | My Tickets at a sub-768px viewport | Renders as stacked cards, no horizontal scroll | — | Not a dedicated component test; covered by E2E-01's mobile project instead |
+| UI-06 | UI | FR-18, AC-19 | Ticket Detail header render | All specified fields present; no Event Log/Service Actions/Comments section anywhere in the DOM | `client/tests/lab-02/TicketDetail.test.tsx` | Pass |
+| UI-07 | UI | AC-12 | Ticket Detail for a non-owned ticket | Not Found state rendered (same view as an unknown id), no field data present | `client/tests/lab-02/TicketDetail.test.tsx` | Pass |
+| UI-08 | UI | AC-13 | Attachment removal dialog | Submit disabled until a non-empty reason is entered; confirmed removal shows removed metadata, disabled download | `client/tests/lab-02/AttachmentSection.test.tsx`; `client/tests/lab-02/RemovalConfirmDialog.test.tsx` | Pass |
+| UI-09 | UI | AC-15, AC-16 | Attachment list at the 5-active limit / with an invalid staged file | Upload control disabled at 5; invalid file rejected client-side with a visible message | `client/tests/lab-02/AttachmentSection.test.tsx` | Pass |
+| UI-10 | UI | FR-02, FR-03, AC-04 | Header identity display and "Change Requester" reload | Header shows selected Requester's name; activating Change Requester clears the stored selection and discards cached requester-scoped data before the picker renders | `client/tests/lab-02/RequesterContext.test.tsx`; `client/tests/lab-02/TicketDetail.test.tsx` (cache-discard regression cases) | Pass |
+| UI-11 | UI | `ui-spec.md` §2, §4, §8 (component rules) | Create Ticket component rules (asterisk/`aria-describedby`, read-only tokens, button hierarchy) | — | — | Not implemented — the planned shared `componentRules.ts` helper was never built; see §7 |
+| UI-12 | UI | `ui-spec.md` §2, §6, §8 (component rules) | Ticket Detail component rules, same helper | — | — | Not implemented; see §7 |
+| UI-13 | UI | `ui-spec.md` §2, §6, §8 (component rules) | Attachment removal dialog and upload control component rules, same helper | — | — | Not implemented; see §7 |
+| UI-14 | UI | `ui-spec.md` §2, §5, §8 (component rules) | My Tickets filter-bar component rules, same helper | — | — | Not implemented; see §7 |
+| E2E-01 | E2E | AC-01, AC-02, AC-05, AC-09, AC-13, AC-17 | Complete responsive requester journey: select requester, create ticket with one valid attachment, find it via search in My Tickets, open Detail, remove the attachment with a reason, verify at a mobile viewport | Every step succeeds; confirmation shows the official Ticket Number; removed attachment shows blocked content | `e2e/lab-02/requester-ticket-flow.spec.ts` | Pass (desktop, tablet, mobile) |
+| API-14 | API | FR-12, BR-11 | `TICKET_CREATED` audit event on ticket creation | Event row exists with correct ticketId, type, and timestamp inside the same transaction as the ticket insert | `server/tests/lab-02/ticketCreation.test.ts` | Pass |
+| API-15 | API | FR-23, BR-15 | `ATTACHMENT_REMOVED` audit event on soft removal | Event row exists recording the removal | `server/tests/lab-02/attachments.api.test.ts` | Pass — asserted as part of the removal happy-path test, not a standalone case |
+| UNIT-06 | Unit | BR-07 | Related System deactivation path | Deactivating sets `isActive = false`; no code path hard-deletes a Related System referenced by any ticket | `server/tests/lab-02/referenceData.test.ts` | Pass |
+| UNIT-07 | Unit | BR-12 | Ticket/TicketEvent hard-delete guard | No route or service function performs a hard delete on `Ticket` or `TicketEvent` — asserted by absence (no such handler reachable) | — | Not implemented as a dedicated test; true by code-review, not by an automated assertion — see §7 |
 
 ## 3. Acceptance-Criterion Traceability
 
@@ -116,7 +125,7 @@ Every criterion in `specification.md` §9 maps to at least one planned test abov
 | BR-07, BR-08, BR-09, BR-11, BR-12, BR-15 | AC-13, AC-14, AC-15, AC-16 | UNIT-04, UNIT-05, UNIT-06, UNIT-07, API-10, API-11, API-12, API-15 |
 | Responsive (§7 breakpoints) | AC-17 | UI-05, E2E-01 (AC-17 only) |
 | Zen Green tokens (`ui-spec.md` §1) | — (visual, not a numbered AC) | manual checklist, §4 below |
-| Component rules (`ui-spec.md` §2, §8) — asterisk/`aria-describedby`, read-only vs editable, button hierarchy | — (component contract, not a numbered AC) | UI-11 (Create Ticket), UI-12 (Ticket Detail), UI-13 (Attachments), UI-14 (My Tickets) |
+| Component rules (`ui-spec.md` §2, §8) — asterisk/`aria-describedby`, read-only vs editable, button hierarchy | — (component contract, not a numbered AC) | UI-11 (Create Ticket), UI-12 (Ticket Detail), UI-13 (Attachments), UI-14 (My Tickets) — none of the four were implemented, see §7 |
 | Seed baseline (`specification.md` §7) | AC-03, AC-18 | migration/seed check, folded into API-06 setup and UI-01 fixture data |
 
 ## 4. Responsive and Visual Checklist
@@ -141,23 +150,38 @@ mobile (< 768 px) viewports, for Create Ticket, My Tickets, and Ticket Detail:
 ## 5. Test Commands
 
 ```bash
-# server
+# server (requires server/.env.test — see server/.env.example for the connection-string shape)
 cd server && npm test
 cd server && npm run test:coverage
 
 # client
 cd client && npm test
-cd client && npm run test:coverage
 
-# e2e (once implemented)
-npx playwright test e2e/lab-02/requester-ticket-flow.spec.ts
+# e2e (requires server/.env.e2e and client/.env.e2e — see the .env.e2e.example files in each)
+npm run test:e2e
 ```
 
 ## 6. Final Results
 
-Not yet run — this is the pre-implementation spec/test-plan phase of Lab 2 (docs-only PR). The
-table in §2 is marked "Pending" throughout; final pass/fail status is recorded here once the
-corresponding implementation Issues land.
+**Final measurement on `main` at `ef4f08c` (2026-09-02, this reconciliation pass — supersedes every
+measurement below it):**
+
+- `server` — `npm test`: **17/17 test files, 109/109 tests passing**. `npm run test:coverage`:
+  79.55% statements / 87.81% branch / 84.61% functions / 79.55% lines overall; every Lab 2 source
+  file itself is 84.6–100% covered (`ticketNumber.ts`, `errorEnvelope.ts`,
+  `attachmentStorage.ts` at 100%; `tickets.ts` 93.56%; `attachments.ts` 92%; `currentUser.ts`
+  93.33%) — the overall percentage is pulled down by `seed.ts`/`server.ts`/`prisma/*-seed*.ts`,
+  boot and ops scripts with no tests by design, same pattern as the W3 measurement below.
+- `client` — `npm test`: **10/10 test files, 47/47 tests passing**.
+- `e2e` — `npm run test:e2e`: **3/3 passing** (desktop, tablet, mobile projects) against
+  `e2e/lab-02/requester-ticket-flow.spec.ts`, covering the full journey described in E2E-01.
+- Two real environment bugs were found and fixed to get this measurement, not worked around:
+  `server`/`client` had drifted from `package.json` (`multer`, `file-type`, `@playwright/test`,
+  `dotenv` were declared but not installed — `npm install` had never been re-run after they were
+  added), and `client/.env.e2e` never existed, so the E2E client silently pointed at the wrong
+  API port until this pass added it. See `ai-use.md` for the diagnosis.
+- Coverage percentages above are for `server` only — `client/package.json` has no `test:coverage`
+  script, so client coverage is not measured in this Lab.
 
 **W3 interim measurement (Issues 5–8 only, recorded 2026-08-18, historical, pre-dates this
 docs-reconciliation pass):** `server` — 47/47 tests passing, `npm run test:coverage` reports 68.6%
@@ -191,3 +215,25 @@ target, which is measured again at Lab 2 completion.
 - Cross-browser E2E (Playwright currently targets Chromium only) is not required by the labsheet
   for Lab 2 and is deferred.
 - Visual regression is manual-checklist only (§4); no pixel-diff tooling is introduced in Lab 2.
+- **UI-11 to UI-14 were never implemented.** §1 originally planned a shared
+  `client/tests/lab-02/componentRules.ts` helper asserting the `ui-spec.md` component contract
+  (required-field asterisk, `aria-describedby` wiring, read-only vs. editable token classes,
+  button-hierarchy classes) once and reusing it across all four screens. That helper does not
+  exist in the repository, and no equivalent assertions exist elsewhere. The component rules
+  themselves are followed in the implementation (visible in the E2E screenshots and manual
+  checklist, §4/§9), but they are not covered by an automated test. This is the single largest
+  real gap in this test plan.
+- **UNIT-05 is narrower than planned.** Only the missing/empty-reason boundary is tested (inside
+  `attachments.api.test.ts`, at the API layer); there is no dedicated removal-request validator
+  unit test and no 201-character upper-boundary case.
+- **API-02's "ticket retained despite a failed attachment" half is not a server test.** Ticket
+  creation and attachment upload are separate endpoints by design, so a failed upload cannot roll
+  back the ticket at the server layer — this is verified at the UI/E2E layer instead (UI-03,
+  E2E-01), not duplicated as a server API test.
+- **API-09 and UNIT-07 are true by absence, not by an automated assertion.** No route or Prisma
+  model for events/service-actions/comments exists (confirmed by reading `src/routes/v1/`), and no
+  code path performs a hard delete on `Ticket`/`TicketEvent` (confirmed by reading
+  `src/routes/v1/attachments.ts` and `tickets.ts`) — but neither fact is asserted by a test that
+  would fail if a future change reintroduced them.
+- **UI-05's mobile-viewport rendering is covered only by E2E-01's mobile project**, not by a
+  dedicated `MyTickets.test.tsx` viewport test.

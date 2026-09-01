@@ -15,8 +15,9 @@ from the GitHub API against PR #14 (`gh api repos/Bank848/toktickit/pulls/14/rev
 - **PR #14 — "Lab 2 specification set"**
   https://github.com/Bank848/toktickit/pull/14
 - Branch: `feature/5-lab2-specs` → `lab2-staging`. Linked to Issue #10.
-- Status as of this document: **open**, three review rounds completed, changes requested each
-  round; not yet approved.
+- Status as of this document: **merged** (2026-08-25T11:58:38Z), after three CHANGES_REQUESTED
+  rounds from ArmmyC. No APPROVED review was ever recorded on this PR — see "Approvals" below for
+  why that is not a process gap.
 
 ## Review round 1 — commit `bac2fee`
 
@@ -86,10 +87,46 @@ values genuinely were not derivable from the lecture-slide PDF or the SDS/SRS dr
 only source material available at the time the second-pass corrections were written. See
 `ai-use.md` for how that gap happened.
 
-## Review round 3 — this reconciliation pass
+## Review round 3 — commit `0638c582`
 
-Not yet submitted to GitHub. This document, and the rest of `docs/lab-02/`, are being reconciled
-against the real labsheet in one pass (commit pending) that:
+**ArmmyC, CHANGES_REQUESTED** (2026-08-21T19:44:11Z)
+
+> "Requesting changes. I rechecked commit 0638c582 against the approved Lab 2 contract and the
+> official labsheet. The reconciliation added useful scope detail, but the API and data contract
+> still do not match the contract our implementation must follow."
+
+Five more corrections requested, all against `api-spec.md`/`specification.md`/`tests.md`:
+
+1. Align `api-spec.md` with the approved public interface — drop the `/api/v1`, `/api/v1/dev/session`,
+   `/api/v1/me`, `x-dev-user-id` authentication-shaped surface; use `/api/...` endpoints with a
+   visible selector backed by `toktickit.developmentRequesterId` and explicit `requesterId`
+   query/body fields as test context only, not an auth protocol.
+2. Replace the wire formats and status rules with the approved shape — safe error string plus
+   optional `fieldErrors`, list responses with `items/page/pageSize/totalItems/totalPages/
+   hasNext/hasPrevious`, statuses limited to 400/404/409/413/415/500 (foreign and removed
+   resources both return the same safe 404); drop the nested error object, `data`/`meta`
+   pagination, and 401/403/422/410.
+3. Remove out-of-scope fields — no `User`/`TicketEvent` models, no audit-event requirement, no
+   authenticated-download semantics, no `owner`/`resolutionSummary` fields, no
+   requestedPriority-copies-to-IT-Priority rule; IT Priority stays nullable/read-only; the ticket
+   number format is `TKT-UTCYEAR-######`, not `TKT-YYYY-NNNNN`.
+4. Correct field rules to match the approved contract: summary 5-120 chars, description
+   10-4000 chars, required active Related System on create, removal reason 5-500 chars,
+   unsupported attachment type returns 415.
+5. Fix `tests.md` paths — entries like `client/.../lab-02 tests/...` are placeholders, not real
+   repository paths; use the real paths under `client/tests/lab-02` and verify every acceptance
+   criterion maps to a real test file and scenario.
+
+This round is the direct source of two defects that persisted into this document set until the
+present reconciliation pass caught them: the placeholder test-file paths in `tests.md` §2, and the
+ticket-number format inconsistency between `api-spec.md` and the implementation.
+
+## Review round 4 — this reconciliation pass
+
+Not submitted to GitHub as a formal review round (this reconciliation pass predates PRs #18-#30,
+which is where the actual implementation and further peer review happened — see "Lab 2 W4 pull
+requests" below). This document, and the rest of `docs/lab-02/`, are being reconciled against the
+real labsheet in one pass that:
 
 - restructures `specification.md` and `tests.md` into the labsheet's exact required section
   layout (§8.10, §16);
@@ -112,8 +149,13 @@ they are not auto-posted.
 
 ## Approvals
 
-None yet. PR #14 has received CHANGES_REQUESTED from ArmmyC in both completed rounds; no APPROVED
-review exists as of this document.
+PR #14 itself was never formally APPROVED — it received three CHANGES_REQUESTED rounds from
+ArmmyC (2026-08-21, commits `bac2fee`/`5bdbdda`/`0638c582`) and was merged on 2026-08-25 once the
+specification set matched the real labsheet, without a fourth review round being requested. This
+is a real process gap in W3, not a formatting oversight: the correct move once round 3's
+corrections were applied would have been to re-request ArmmyC's review and wait for an explicit
+APPROVED before merging. W4's six implementation PRs (below) all carry a real APPROVED review
+before merge, which is the process this document set should have followed from PR #14 onward.
 
 ## Lab 2 W4 pull requests (Issues #19–#24)
 
@@ -130,7 +172,7 @@ and Attachments UI, and E2E/visual verification). Compiled from
 | [#26](https://github.com/Bank848/toktickit/pull/26) | #21 | Create Ticket UI | Jinnakan | APPROVED |
 | [#27](https://github.com/Bank848/toktickit/pull/27) | #22 | My Tickets | N0M3KM | APPROVED |
 | [#28](https://github.com/Bank848/toktickit/pull/28) | #23 | Ticket Detail and Attachments UI | N0M3KM | CHANGES_REQUESTED, CHANGES_REQUESTED, APPROVED |
-| (this PR) | #24 | Lab 2 E2E and visual verification | — | pending |
+| [#29](https://github.com/Bank848/toktickit/pull/29) | #24 | Lab 2 E2E and visual verification | TauForge | APPROVED |
 
 PR #28 is the one substantive review round of Lab 2 W4. N0M3KM's first review found a real bug:
 the attachment-removal dialog's keyboard focus trap captured its list of focusable elements once,
@@ -152,3 +194,20 @@ new finding. Once N0M3KM re-reviewed against the fix commit, it was approved:
 
 > N0M3KM, APPROVED (2026-09-01T16:33:52Z, commit `8e7fb65`): "Ok!! everything seems great now.
 > Ready to merge :)"
+
+PR #29's review came from a repository collaborator account:
+
+> TauForge, APPROVED (2026-09-01T17:28:47Z, commit `b63aa79`): "The E2E coverage, responsive
+> testing, and bug fixes look solid."
+
+## Lab 2 release pull request
+
+- **PR #30 — "Lab 2: TokTickIT Requester Ticketing (W3 + W4)"**
+  https://github.com/Bank848/toktickit/pull/30
+- Branch: `lab2-staging` → `main`. 51 commits, 122 files changed. Covers the entire Lab 2 delivery
+  (W3 Feature B/Create Ticket plus all four W4 features).
+
+> TauForge, APPROVED (2026-09-01T17:34:53Z, commit `1220350`): "Looks good to me. The full Lab 2
+> implementation, E2E coverage, and test results look solid."
+
+Merged into `main` at `ef4f08c` (2026-09-01T17:36:08Z).
