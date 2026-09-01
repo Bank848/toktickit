@@ -4,6 +4,7 @@ import { prisma } from '../../prisma';
 import { validateCreateTicketRequest } from '../../validators/createTicketRequest';
 import { generateTicketNumber } from '../../services/ticketNumber';
 import { HttpError, ValidationHttpError } from '../../middleware/errorEnvelope';
+import { ticketAttachmentsRouter } from './attachments';
 
 export const ticketsRouter = Router();
 
@@ -121,3 +122,5 @@ ticketsRouter.post('/', async (req, res, next) => {
     next(error);
   }
 });
+
+ticketsRouter.use('/:id/attachments', ticketAttachmentsRouter);
