@@ -13,21 +13,29 @@ export function RemovalConfirmDialog({ filename, onCancel, onConfirm, triggerRef
 
   useEffect(() => {
     const dialog = dialogRef.current;
-    // Excludes disabled elements (the plan's literal selector didn't) -- a disabled Remove
-    // button can never actually receive focus in a real browser, so leaving it in the tab-order
-    // list would make the trap "wrap" onto an element focus() silently no-ops on, breaking the
-    // cycle. Cancel is genuinely the last focusable element while the reason field is empty.
-    const focusable = dialog?.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([disabled])',
-    );
-    focusable?.[0]?.focus();
+    // Query fresh on every keypress rather than once at mount -- a querySelectorAll result is a
+    // static snapshot, not a live list, so a mount-time query would keep excluding Remove from the
+    // tab order even after it becomes enabled (reason goes from empty to non-empty without this
+    // effect re-running, since reason isn't a dependency). Excluding [disabled] still matters: a
+    // disabled element can't actually receive focus in a real browser.
+    function getFocusable(): HTMLElement[] {
+      return Array.from(
+        dialog?.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([disabled])',
+        ) ?? [],
+      );
+    }
+
+    getFocusable()[0]?.focus();
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         onCancel();
         return;
       }
-      if (event.key !== 'Tab' || !focusable || focusable.length === 0) return;
+      if (event.key !== 'Tab') return;
+      const focusable = getFocusable();
+      if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       if (event.shiftKey && document.activeElement === first) {

@@ -38,7 +38,7 @@ describe('RemovalConfirmDialog', () => {
     renderDialog();
     const dialog = screen.getByRole('dialog');
     // Remove starts disabled (empty reason), so Cancel -- not Remove -- is the last element the
-    // trap can actually focus; the trap's focusable list is a mount-time snapshot per the plan.
+    // trap can actually focus at this point.
     const focusable = dialog.querySelectorAll<HTMLElement>('button:not([disabled]), textarea:not([disabled])');
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
@@ -50,6 +50,27 @@ describe('RemovalConfirmDialog', () => {
     first.focus();
     fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
     expect(document.activeElement).toBe(last);
+  });
+
+  it('re-evaluates the tab order once Remove becomes enabled, instead of using a stale mount-time snapshot (review fix)', () => {
+    renderDialog();
+    const dialog = screen.getByRole('dialog');
+
+    fireEvent.change(screen.getByLabelText(/reason for removal/i), { target: { value: 'Wrong file' } });
+    const removeButton = within(dialog).getByRole('button', { name: /^remove$/i });
+    const cancelButton = within(dialog).getByRole('button', { name: /^cancel$/i });
+    expect(removeButton).toBeEnabled();
+
+    // Remove is now the true last focusable element -- Tab from it must wrap to the textarea
+    // (first), and Shift+Tab from the textarea must wrap to Remove, not stop at the stale Cancel.
+    removeButton.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(document.activeElement).toBe(screen.getByLabelText(/reason for removal/i));
+
+    screen.getByLabelText(/reason for removal/i).focus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(removeButton);
+    expect(document.activeElement).not.toBe(cancelButton);
   });
 
   it('calls onCancel when Escape is pressed', () => {
