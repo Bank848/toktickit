@@ -216,9 +216,9 @@ Merged into `main` at `ef4f08c` (2026-09-01T17:36:08Z).
 
 Post-submission follow-up: the merged W3+W4 delivery implemented all required functionality but
 did not apply `ui-spec.md`'s Zen Green theme anywhere (no Bootstrap classes on any input, button,
-or label, despite `bootstrap.min.css` being imported). This PR closes that gap. Same staging-branch
-pattern as `lab2-staging`: `ui-redesign-staging` was branched off `main`, and this PR merges the
-restyle work into it; `ui-redesign-staging` → `main` is a separate release PR, not yet opened.
+or label, despite `bootstrap.min.css` being imported). Same staging-branch pattern as
+`lab2-staging`: `ui-redesign-staging` was branched off `main`, took two PRs, then released into
+`main` with its own PR, same as PR #30 did for `lab2-staging`.
 
 - **PR #31 — "Apply Zen Green design system across the client"**
   https://github.com/Bank848/toktickit/pull/31
@@ -229,3 +229,26 @@ restyle work into it; `ui-redesign-staging` → `main` is a separate release PR,
 > follow-up fixes look good, and the test/TypeScript checks are clean."
 
 Merged into `ui-redesign-staging` at `517343a` (2026-09-02T10:56:29Z).
+
+- **PR #32 — "docs: record PR #31 in the reviewer log"**
+  https://github.com/Bank848/toktickit/pull/32
+- Branch: `docs/lab2-reviewer-pr31` → `ui-redesign-staging`. Documentation only, no code changed.
+
+> TauForge, APPROVED (2026-09-02T12:13:34Z, commit `d51da87`): "The documentation update follows
+> the existing reviewer log format and correctly records the PR #31 review information. Since
+> this is a documentation-only change with no code impact, everything looks good to me."
+
+Merged into `ui-redesign-staging` at `287c9fd` (2026-09-02T12:26:07Z).
+
+- **PR #33 — "Lab 2 UI redesign: Zen Green theme (ui-redesign-staging → main)"**
+  https://github.com/Bank848/toktickit/pull/33
+- Branch: `ui-redesign-staging` → `main`. The release PR for the whole UI redesign, same role as
+  PR #30 played for `lab2-staging`.
+
+> TauForge, APPROVED (2026-09-02T12:26:59Z, commit `287c9fd`): "The Zen Green design system has
+> been applied consistently across the Lab 2 screens, and the follow-up fixes address the
+> identified UI, responsive, accessibility, and E2E issues. The reported tests are also passing,
+> including client tests, TypeScript checks, and E2E tests across desktop, tablet, and mobile.
+> Everything looks good to me."
+
+Merged into `main` at `fe8f8b7` (2026-09-02T12:28:22Z).
