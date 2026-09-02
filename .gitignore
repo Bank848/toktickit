@@ -8,3 +8,4 @@ build/
 .DS_Store
 playwright-report/
 test-results/
+docs/lab-02/submission/
