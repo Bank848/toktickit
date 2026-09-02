@@ -5,6 +5,7 @@ import { createTicket, ApiError, type CreateTicketPayload } from '../api/tickets
 import { uploadAttachment } from '../api/attachments';
 import { fetchCategories, fetchRelatedSystems, type CategoryDto, type RelatedSystemDto } from '../api/lookups';
 import { AttachmentPicker } from '../components/AttachmentPicker';
+import { Icon } from '../components/Icon';
 
 type LookupState = 'loading' | 'loaded' | 'empty' | 'error';
 type Priority = CreateTicketPayload['requestedPriority'];
@@ -172,170 +173,229 @@ export function CreateTicketPage() {
   }
 
   return (
-    <div>
+    <div className="mx-auto" style={{ maxWidth: '48rem' }}>
       <h1>Create Ticket</h1>
 
-      {lookupState === 'loading' && <p>Loading form…</p>}
-      {lookupState === 'empty' && (
-        <p role="alert">
-          No active categories are available. A ticket cannot be created until at least one
-          active category exists.
+      {lookupState === 'loading' && (
+        <p className="text-body-secondary d-flex align-items-center gap-2">
+          <span className="spinner-border spinner-border-sm" aria-hidden="true" /> Loading form…
         </p>
       )}
+      {lookupState === 'empty' && (
+        <div role="alert" className="alert alert-warning">
+          <Icon name="exclamation-triangle-fill" />
+          <p>
+            No active categories are available. A ticket cannot be created until at least one
+            active category exists.
+          </p>
+        </div>
+      )}
       {lookupState === 'error' && (
-        <div role="alert">
-          <p>Failed to load form data.</p>
-          <button type="button" onClick={loadLookups}>
-            Retry
-          </button>
+        <div role="alert" className="alert alert-danger">
+          <Icon name="exclamation-triangle-fill" />
+          <div>
+            <p>Failed to load form data.</p>
+            <button type="button" className="btn btn-outline-danger btn-sm" onClick={loadLookups}>
+              <Icon name="arrow-repeat" className="me-1" />
+              Retry
+            </button>
+          </div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} noValidate>
-        <div>
-          <span>Ticket Number: Assigned on save</span>
-        </div>
-        <div>
-          <span>Ticket Date: Today</span>
-        </div>
-        <div>
-          <span>Requester: {requester.displayName}</span>
-        </div>
+      <div className="card">
+        <div className="card-body">
+          <form onSubmit={handleSubmit} noValidate>
+            <div className="row g-3 mb-4">
+              <div className="col-12 col-md-4">
+                <span className="field-label d-block">Ticket Number</span>
+                <span className="field-readonly">Assigned on save</span>
+              </div>
+              <div className="col-12 col-md-4">
+                <span className="field-label d-block">Ticket Date</span>
+                <span className="field-readonly">Today</span>
+              </div>
+              <div className="col-12 col-md-4">
+                <span className="field-label d-block">Requester</span>
+                <span className="field-readonly">{requester.displayName}</span>
+              </div>
+            </div>
 
-        <div>
-          <label htmlFor="ticket-summary">Summary</label>
-          <input
-            id="ticket-summary"
-            ref={summaryRef}
-            type="text"
-            required
-            maxLength={SUMMARY_MAX}
-            value={summary}
-            disabled={formDisabled}
-            aria-describedby={fieldErrors.summary ? 'ticket-summary-error' : undefined}
-            aria-invalid={Boolean(fieldErrors.summary)}
-            onChange={(event) => setSummary(event.target.value)}
-          />
-          <span>
-            {summary.length}/{SUMMARY_MAX}
-          </span>
-          {fieldErrors.summary && (
-            <p id="ticket-summary-error" role="alert">
-              {fieldErrors.summary}
-            </p>
-          )}
+            <div className="mb-3">
+              <label htmlFor="ticket-summary" className="form-label is-required">
+                Summary
+              </label>
+              <input
+                id="ticket-summary"
+                ref={summaryRef}
+                type="text"
+                className={`form-control${fieldErrors.summary ? ' is-invalid' : ''}`}
+                required
+                maxLength={SUMMARY_MAX}
+                value={summary}
+                disabled={formDisabled}
+                aria-describedby={fieldErrors.summary ? 'ticket-summary-error' : undefined}
+                aria-invalid={Boolean(fieldErrors.summary)}
+                onChange={(event) => setSummary(event.target.value)}
+              />
+              <div className="d-flex justify-content-between">
+                {fieldErrors.summary ? (
+                  <p id="ticket-summary-error" role="alert" className="invalid-feedback d-block mb-0">
+                    {fieldErrors.summary}
+                  </p>
+                ) : (
+                  <span />
+                )}
+                <span className="form-text ms-auto" aria-live="polite">
+                  {summary.length}/{SUMMARY_MAX}
+                </span>
+              </div>
+            </div>
+
+            <div className="row g-3">
+              <div className="col-12 col-md-6 mb-3">
+                <label htmlFor="ticket-category" className="form-label is-required">
+                  Category
+                </label>
+                <select
+                  id="ticket-category"
+                  ref={categoryRef}
+                  className={`form-select${fieldErrors.categoryId ? ' is-invalid' : ''}`}
+                  required
+                  value={categoryId}
+                  disabled={formDisabled}
+                  aria-describedby={fieldErrors.categoryId ? 'ticket-category-error' : undefined}
+                  aria-invalid={Boolean(fieldErrors.categoryId)}
+                  onChange={(event) => setCategoryId(event.target.value)}
+                >
+                  <option value="">Select a category</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+                {fieldErrors.categoryId && (
+                  <p id="ticket-category-error" role="alert" className="invalid-feedback d-block">
+                    {fieldErrors.categoryId}
+                  </p>
+                )}
+              </div>
+
+              <div className="col-12 col-md-6 mb-3">
+                <label htmlFor="ticket-related-system" className="form-label">
+                  Related System
+                </label>
+                <select
+                  id="ticket-related-system"
+                  ref={relatedSystemRef}
+                  className={`form-select${fieldErrors.relatedSystemId ? ' is-invalid' : ''}`}
+                  value={relatedSystemId}
+                  disabled={formDisabled}
+                  aria-describedby={fieldErrors.relatedSystemId ? 'ticket-related-system-error' : undefined}
+                  aria-invalid={Boolean(fieldErrors.relatedSystemId)}
+                  onChange={(event) => setRelatedSystemId(event.target.value)}
+                >
+                  <option value="">Not applicable</option>
+                  {relatedSystems.map((system) => (
+                    <option key={system.id} value={system.id}>
+                      {system.name}
+                    </option>
+                  ))}
+                </select>
+                {fieldErrors.relatedSystemId && (
+                  <p id="ticket-related-system-error" role="alert" className="invalid-feedback d-block">
+                    {fieldErrors.relatedSystemId}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="mb-3" style={{ maxWidth: '16rem' }}>
+              <label htmlFor="ticket-priority" className="form-label is-required">
+                Requested Priority
+              </label>
+              <select
+                id="ticket-priority"
+                ref={priorityRef}
+                className={`form-select${fieldErrors.requestedPriority ? ' is-invalid' : ''}`}
+                required
+                value={requestedPriority}
+                disabled={formDisabled}
+                aria-describedby={fieldErrors.requestedPriority ? 'ticket-priority-error' : undefined}
+                aria-invalid={Boolean(fieldErrors.requestedPriority)}
+                onChange={(event) => setRequestedPriority(event.target.value as Priority)}
+              >
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+                <option value="URGENT">Urgent</option>
+              </select>
+              {fieldErrors.requestedPriority && (
+                <p id="ticket-priority-error" role="alert" className="invalid-feedback d-block">
+                  {fieldErrors.requestedPriority}
+                </p>
+              )}
+            </div>
+
+            <div className="mb-3">
+              <label htmlFor="ticket-description" className="form-label is-required">
+                Description
+              </label>
+              <textarea
+                id="ticket-description"
+                ref={descriptionRef}
+                className={`form-control${fieldErrors.description ? ' is-invalid' : ''}`}
+                rows={6}
+                required
+                maxLength={DESCRIPTION_MAX}
+                value={description}
+                disabled={formDisabled}
+                aria-describedby={fieldErrors.description ? 'ticket-description-error' : undefined}
+                aria-invalid={Boolean(fieldErrors.description)}
+                onChange={(event) => setDescription(event.target.value)}
+              />
+              <div className="d-flex justify-content-between">
+                {fieldErrors.description ? (
+                  <p id="ticket-description-error" role="alert" className="invalid-feedback d-block mb-0">
+                    {fieldErrors.description}
+                  </p>
+                ) : (
+                  <span />
+                )}
+                <span className="form-text ms-auto" aria-live="polite">
+                  {description.length}/{DESCRIPTION_MAX}
+                </span>
+              </div>
+            </div>
+
+            <AttachmentPicker files={attachments} onChange={setAttachments} />
+
+            {globalError && (
+              <div role="alert" className="alert alert-danger mt-3">
+                <Icon name="exclamation-triangle-fill" />
+                <p>{globalError}</p>
+              </div>
+            )}
+
+            <div className="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+              <Link to="/tickets" className="btn btn-tertiary">
+                Cancel
+              </Link>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={formDisabled}
+                aria-disabled={formDisabled}
+                aria-busy={submitting}
+              >
+                {submitting && <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />}
+                Create Ticket
+              </button>
+            </div>
+          </form>
         </div>
-
-        <div>
-          <label htmlFor="ticket-category">Category</label>
-          <select
-            id="ticket-category"
-            ref={categoryRef}
-            required
-            value={categoryId}
-            disabled={formDisabled}
-            aria-describedby={fieldErrors.categoryId ? 'ticket-category-error' : undefined}
-            aria-invalid={Boolean(fieldErrors.categoryId)}
-            onChange={(event) => setCategoryId(event.target.value)}
-          >
-            <option value="">Select a category</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-          {fieldErrors.categoryId && (
-            <p id="ticket-category-error" role="alert">
-              {fieldErrors.categoryId}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label htmlFor="ticket-related-system">Related System</label>
-          <select
-            id="ticket-related-system"
-            ref={relatedSystemRef}
-            value={relatedSystemId}
-            disabled={formDisabled}
-            aria-describedby={fieldErrors.relatedSystemId ? 'ticket-related-system-error' : undefined}
-            aria-invalid={Boolean(fieldErrors.relatedSystemId)}
-            onChange={(event) => setRelatedSystemId(event.target.value)}
-          >
-            <option value="">Not applicable</option>
-            {relatedSystems.map((system) => (
-              <option key={system.id} value={system.id}>
-                {system.name}
-              </option>
-            ))}
-          </select>
-          {fieldErrors.relatedSystemId && (
-            <p id="ticket-related-system-error" role="alert">
-              {fieldErrors.relatedSystemId}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label htmlFor="ticket-priority">Requested Priority</label>
-          <select
-            id="ticket-priority"
-            ref={priorityRef}
-            required
-            value={requestedPriority}
-            disabled={formDisabled}
-            aria-describedby={fieldErrors.requestedPriority ? 'ticket-priority-error' : undefined}
-            aria-invalid={Boolean(fieldErrors.requestedPriority)}
-            onChange={(event) => setRequestedPriority(event.target.value as Priority)}
-          >
-            <option value="LOW">Low</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="HIGH">High</option>
-            <option value="URGENT">Urgent</option>
-          </select>
-          {fieldErrors.requestedPriority && (
-            <p id="ticket-priority-error" role="alert">
-              {fieldErrors.requestedPriority}
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label htmlFor="ticket-description">Description</label>
-          <textarea
-            id="ticket-description"
-            ref={descriptionRef}
-            rows={6}
-            required
-            maxLength={DESCRIPTION_MAX}
-            value={description}
-            disabled={formDisabled}
-            aria-describedby={fieldErrors.description ? 'ticket-description-error' : undefined}
-            aria-invalid={Boolean(fieldErrors.description)}
-            onChange={(event) => setDescription(event.target.value)}
-          />
-          <span>
-            {description.length}/{DESCRIPTION_MAX}
-          </span>
-          {fieldErrors.description && (
-            <p id="ticket-description-error" role="alert">
-              {fieldErrors.description}
-            </p>
-          )}
-        </div>
-
-        <AttachmentPicker files={attachments} onChange={setAttachments} />
-
-        {globalError && <p role="alert">{globalError}</p>}
-
-        <div>
-          <Link to="/tickets">Cancel</Link>
-          <button type="submit" disabled={formDisabled} aria-busy={submitting}>
-            {submitting ? 'Creating…' : 'Create Ticket'}
-          </button>
-        </div>
-      </form>
+      </div>
     </div>
   );
 }

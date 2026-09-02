@@ -1,0 +1,437 @@
+/* Zen Green theme (docs/lab-02/ui-spec.md §1) -- Bootstrap 5.3 CSS-variable overrides + a small
+   set of custom classes for states Bootstrap has no native concept of (read-only fields, the
+   tertiary button variant, tone-based badge/alert surfaces, the mobile app header). Loaded after
+   bootstrap.min.css in main.tsx. */
+
+:root,
+[data-bs-theme='light'] {
+  color-scheme: light;
+
+  --bs-primary: #006b3c;
+  --bs-primary-rgb: 0, 107, 60;
+  --bs-primary-text-emphasis: #006b3c;
+  --bs-primary-bg-subtle: #eaf6ef;
+  --bs-primary-border-subtle: #0b7a46;
+
+  --bs-info: #0b7a46;
+  --bs-info-rgb: 11, 122, 70;
+  --bs-info-text-emphasis: #1f2937;
+  --bs-info-bg-subtle: #eaf6ef;
+  --bs-info-border-subtle: #0b7a46;
+
+  --bs-secondary: #5b6573;
+  --bs-secondary-rgb: 91, 101, 115;
+  --bs-secondary-text-emphasis: #1f2937;
+  --bs-secondary-bg-subtle: #f0f3f1;
+  --bs-secondary-border-subtle: #7a8b80;
+
+  --bs-success: #1e7d34;
+  --bs-success-rgb: 30, 125, 52;
+  --bs-success-text-emphasis: #1e7d34;
+  --bs-success-bg-subtle: #eaf6ef;
+  --bs-success-border-subtle: #1e7d34;
+
+  --bs-warning: #8a6d1b;
+  --bs-warning-rgb: 138, 109, 27;
+  --bs-warning-text-emphasis: #8a6d1b;
+  --bs-warning-bg-subtle: #fff6da;
+  --bs-warning-border-subtle: #8a6d1b;
+
+  --bs-danger: #b3261e;
+  --bs-danger-rgb: 179, 38, 30;
+  --bs-danger-text-emphasis: #b3261e;
+  --bs-danger-bg-subtle: rgba(179, 38, 30, 0.08);
+  --bs-danger-border-subtle: #b3261e;
+
+  --bs-body-bg: #f5f7f6;
+  --bs-body-bg-rgb: 245, 247, 246;
+  --bs-body-color: #1f2937;
+  --bs-body-color-rgb: 31, 41, 55;
+  --bs-heading-color: #1f2937;
+  --bs-emphasis-color: #1f2937;
+  --bs-secondary-color: #5b6573;
+  --bs-secondary-color-rgb: 91, 101, 115;
+  --bs-secondary-bg: #f0f3f1;
+  --bs-tertiary-bg: #f5f7f6;
+  --bs-tertiary-color: #7a8b80;
+
+  --bs-border-color: #7a8b80;
+  --bs-border-color-translucent: rgba(122, 139, 128, 0.35);
+
+  --bs-link-color: #0b7a46;
+  --bs-link-color-rgb: 11, 122, 70;
+  --bs-link-hover-color: #006b3c;
+  --bs-link-hover-color-rgb: 0, 107, 60;
+
+  --bs-focus-ring-color: rgba(11, 122, 70, 0.35);
+  --bs-form-invalid-color: #b3261e;
+  --bs-form-invalid-border-color: #b3261e;
+  --bs-form-valid-color: #1e7d34;
+  --bs-form-valid-border-color: #1e7d34;
+
+  --bs-body-font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --bs-body-font-size: 1rem;
+}
+
+body {
+  background-color: var(--bs-body-bg);
+  color: var(--bs-body-color);
+}
+
+/* Typography scale (ui-spec.md §2) */
+h1, .h1, h2, .h2, h3, .h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+.form-label,
+.table > thead > tr > th,
+.field-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.form-text {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--bs-secondary-color);
+}
+
+/* Required-field asterisk as generated content: keeps the label's accessible name/textContent
+   exactly the field name (tests match on it), while still showing the red asterisk visually. */
+.form-label.is-required::after {
+  content: ' *';
+  color: #b3261e;
+}
+
+/* Focus ring: Secondary green, never suppressed (ui-spec.md §8) */
+:focus-visible {
+  outline: 2px solid #0b7a46;
+  outline-offset: 2px;
+}
+.btn:focus-visible {
+  outline: 2px solid #0b7a46;
+  outline-offset: 2px;
+  box-shadow: none;
+}
+.form-control:focus,
+.form-select:focus,
+.form-check-input:focus {
+  border-color: #0b7a46;
+  box-shadow: 0 0 0 0.25rem rgba(11, 122, 70, 0.25);
+  outline: 0;
+}
+.form-check-input:checked {
+  background-color: #006b3c;
+  border-color: #006b3c;
+}
+
+/* Surfaces */
+.card {
+  --bs-card-bg: #ffffff;
+  --bs-card-border-color: var(--bs-border-color-translucent);
+  --bs-card-spacer-y: 1rem;
+  --bs-card-spacer-x: 1rem;
+  box-shadow: 0 1px 2px rgba(31, 41, 55, 0.06);
+}
+@media (min-width: 768px) {
+  .card {
+    --bs-card-spacer-y: 1.5rem;
+    --bs-card-spacer-x: 1.5rem;
+  }
+}
+.list-group {
+  --bs-list-group-bg: #ffffff;
+  --bs-list-group-border-color: var(--bs-border-color-translucent);
+}
+
+/* Editable fields (ui-spec.md §1) */
+.form-control,
+.form-select {
+  background-color: #ffffff;
+  border-color: #7a8b80;
+}
+.form-control:disabled,
+.form-select:disabled {
+  background-color: #f0f3f1;
+  color: #5b6573;
+}
+.invalid-feedback {
+  color: #b3261e;
+  font-size: 0.8125rem;
+}
+
+/* Read-only display field: never the same fill as an editable input */
+.field-readonly {
+  display: block;
+  width: 100%;
+  min-height: calc(1.5em + 0.75rem + 2px);
+  padding: 0.375rem 0.75rem;
+  background-color: #f0f3f1;
+  border: 1px solid var(--bs-border-color-translucent);
+  border-radius: var(--bs-border-radius);
+  color: #1f2937;
+}
+
+.attachment-picker {
+  border: 1px dashed #7a8b80;
+  border-radius: var(--bs-border-radius);
+  background: #f5f7f6;
+  padding: 1rem;
+}
+
+/* Buttons (ui-spec.md §2 button hierarchy) */
+.btn-primary {
+  --bs-btn-bg: #006b3c;
+  --bs-btn-border-color: #006b3c;
+  --bs-btn-color: #fff;
+  --bs-btn-hover-bg: #0b7a46;
+  --bs-btn-hover-border-color: #0b7a46;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-active-bg: #005a32;
+  --bs-btn-active-border-color: #005a32;
+  --bs-btn-active-color: #fff;
+  --bs-btn-focus-shadow-rgb: 11, 122, 70;
+}
+.btn-outline-primary {
+  --bs-btn-color: #0b7a46;
+  --bs-btn-border-color: #0b7a46;
+  --bs-btn-bg: #ffffff;
+  --bs-btn-hover-bg: #eaf6ef;
+  --bs-btn-hover-color: #006b3c;
+  --bs-btn-hover-border-color: #0b7a46;
+  --bs-btn-active-bg: #eaf6ef;
+  --bs-btn-active-color: #006b3c;
+  --bs-btn-active-border-color: #006b3c;
+  --bs-btn-focus-shadow-rgb: 11, 122, 70;
+}
+.btn-outline-secondary {
+  --bs-btn-color: #0b7a46;
+  --bs-btn-border-color: #0b7a46;
+  --bs-btn-bg: #ffffff;
+  --bs-btn-hover-bg: #eaf6ef;
+  --bs-btn-hover-color: #006b3c;
+  --bs-btn-hover-border-color: #0b7a46;
+  --bs-btn-active-bg: #eaf6ef;
+  --bs-btn-active-color: #006b3c;
+  --bs-btn-active-border-color: #006b3c;
+  --bs-btn-focus-shadow-rgb: 11, 122, 70;
+}
+.btn-tertiary {
+  --bs-btn-color: #0b7a46;
+  --bs-btn-bg: transparent;
+  --bs-btn-border-color: transparent;
+  --bs-btn-hover-color: #006b3c;
+  --bs-btn-hover-bg: transparent;
+  --bs-btn-hover-border-color: transparent;
+  --bs-btn-active-color: #006b3c;
+  --bs-btn-active-bg: #eaf6ef;
+  --bs-btn-active-border-color: transparent;
+  --bs-btn-focus-shadow-rgb: 11, 122, 70;
+  --bs-btn-disabled-bg: transparent;
+  --bs-btn-disabled-border-color: transparent;
+}
+.btn-tertiary:hover,
+.btn-tertiary:focus-visible {
+  text-decoration: underline;
+}
+.btn-outline-danger {
+  --bs-btn-color: #b3261e;
+  --bs-btn-border-color: #b3261e;
+  --bs-btn-bg: #ffffff;
+  --bs-btn-hover-bg: rgba(179, 38, 30, 0.08);
+  --bs-btn-hover-color: #b3261e;
+  --bs-btn-hover-border-color: #b3261e;
+  --bs-btn-active-bg: #b3261e;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-border-color: #b3261e;
+  --bs-btn-focus-shadow-rgb: 179, 38, 30;
+}
+.btn-danger {
+  --bs-btn-bg: #b3261e;
+  --bs-btn-border-color: #b3261e;
+  --bs-btn-color: #fff;
+  --bs-btn-hover-bg: #961f18;
+  --bs-btn-hover-border-color: #961f18;
+  --bs-btn-active-bg: #961f18;
+  --bs-btn-active-border-color: #961f18;
+  --bs-btn-focus-shadow-rgb: 179, 38, 30;
+}
+/* Disabled: muted gray, cursor not-allowed, all variants (ui-spec.md §2) */
+.btn:disabled,
+.btn.disabled,
+fieldset:disabled .btn {
+  --bs-btn-disabled-color: #5b6573;
+  --bs-btn-disabled-bg: #f0f3f1;
+  --bs-btn-disabled-border-color: #7a8b80;
+  opacity: 1;
+  pointer-events: auto;
+  cursor: not-allowed;
+}
+.btn-tertiary:disabled,
+.btn-tertiary.disabled {
+  --bs-btn-disabled-bg: transparent;
+  --bs-btn-disabled-border-color: transparent;
+}
+a.btn.disabled {
+  pointer-events: none; /* anchors can't be natively disabled */
+}
+.btn[aria-busy='true'] {
+  pointer-events: none;
+}
+@media (max-width: 767.98px) {
+  .btn {
+    min-height: 44px;
+  }
+}
+
+/* Badges: text + icon on soft surfaces, never raw Primary/Secondary chrome (ui-spec.md §1) */
+.badge {
+  font-weight: 600;
+  font-size: 0.8125rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid transparent;
+}
+.badge-tone-neutral { background: #f0f3f1; color: #1f2937; border-color: #7a8b80; }
+.badge-tone-info    { background: #eaf6ef; color: #1f2937; border-color: #0b7a46; }
+.badge-tone-success { background: #eaf6ef; color: #1e7d34; border-color: #1e7d34; }
+.badge-tone-warning { background: #fff6da; color: #8a6d1b; border-color: #8a6d1b; }
+.badge-tone-danger  { background: rgba(179, 38, 30, 0.08); color: #b3261e; border-color: #b3261e; }
+.badge-tone-dark    { background: #1f2937; color: #ffffff; }
+
+/* App header / navbar */
+.app-navbar {
+  /* No data-bs-theme="dark" on the element: that attribute selector out-specifies a single
+     class and silently overrides --bs-navbar-color back to a translucent white, which is how
+     the inactive "Create Ticket" link fell to ~3.1:1 on the green header. Setting every var
+     directly here, unconditionally, is the one source of truth for this navbar's colors. */
+  --bs-navbar-color: #ffffff;
+  --bs-navbar-hover-color: #eaf6ef;
+  --bs-navbar-active-color: #ffffff;
+  --bs-navbar-brand-color: #ffffff;
+  --bs-navbar-brand-hover-color: #eaf6ef;
+  --bs-navbar-toggler-border-color: rgba(255, 255, 255, 0.5);
+  --bs-navbar-toggler-focus-width: 0;
+  --bs-navbar-toggler-icon-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.9%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+  background-color: #006b3c;
+}
+.app-navbar .nav-link {
+  border-bottom: 3px solid transparent;
+  min-height: 44px; /* §7 touch target */
+  display: flex;
+  align-items: center;
+}
+.app-navbar .nav-link.active {
+  font-weight: 600;
+  border-bottom-color: #eaf6ef;
+}
+.app-navbar .navbar-toggler {
+  min-height: 44px;
+  min-width: 44px;
+}
+.app-navbar .navbar-toggler:focus-visible {
+  outline: 2px solid #eaf6ef;
+  outline-offset: 2px;
+}
+@media (max-width: 767.98px) {
+  .app-navbar .nav-link {
+    border-bottom: 0;
+    border-left: 3px solid transparent;
+    padding-left: 0.75rem;
+  }
+  .app-navbar .nav-link.active {
+    border-left-color: #eaf6ef;
+    background: rgba(255, 255, 255, 0.12);
+  }
+}
+.app-navbar .navbar-text {
+  color: #eaf6ef;
+}
+.btn-header {
+  --bs-btn-color: #ffffff;
+  --bs-btn-border-color: rgba(255, 255, 255, 0.7);
+  --bs-btn-bg: transparent;
+  --bs-btn-hover-bg: #0b7a46;
+  --bs-btn-hover-color: #ffffff;
+  --bs-btn-hover-border-color: #ffffff;
+  --bs-btn-active-bg: #0b7a46;
+  --bs-btn-active-color: #ffffff;
+  --bs-btn-active-border-color: #ffffff;
+}
+
+/* Tables */
+.table {
+  --bs-table-bg: transparent;
+  --bs-table-color: #1f2937;
+  --bs-table-border-color: var(--bs-border-color-translucent);
+  --bs-table-hover-bg: #eaf6ef;
+  --bs-table-hover-color: #1f2937;
+  --bs-table-active-bg: #eaf6ef;
+}
+.table > thead > tr > th {
+  color: #5b6573;
+  border-bottom: 2px solid #7a8b80;
+}
+tr[role='button'] {
+  cursor: pointer;
+}
+.card[role='button'] {
+  cursor: pointer;
+}
+
+/* Pagination */
+.pagination {
+  --bs-pagination-color: #0b7a46;
+  --bs-pagination-hover-color: #006b3c;
+  --bs-pagination-hover-bg: #eaf6ef;
+  --bs-pagination-hover-border-color: #7a8b80;
+  --bs-pagination-focus-color: #006b3c;
+  --bs-pagination-focus-bg: #eaf6ef;
+  --bs-pagination-focus-box-shadow: 0 0 0 0.25rem rgba(11, 122, 70, 0.25);
+  --bs-pagination-active-bg: #006b3c;
+  --bs-pagination-active-border-color: #006b3c;
+  --bs-pagination-active-color: #fff;
+  --bs-pagination-disabled-color: #5b6573;
+  --bs-pagination-disabled-bg: #f0f3f1;
+  --bs-pagination-disabled-border-color: #7a8b80;
+  --bs-pagination-border-color: #7a8b80;
+}
+
+/* Alerts: icon + text layout, never color alone */
+div.alert,
+li.alert {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+ul.alert {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.alert > svg {
+  flex: 0 0 auto;
+  margin-top: 0.125rem;
+}
+.alert p:last-child {
+  margin-bottom: 0;
+}
+.alert-note {
+  background: #eaf6ef;
+  border: 1px solid #0b7a46;
+  color: #1f2937;
+}
+.alert-note-neutral {
+  background: #f0f3f1;
+  border: 1px solid #7a8b80;
+  color: #1f2937;
+}
+
+/* Removed-attachment row */
+.attachment-removed {
+  color: #5b6573;
+}
+.attachment-removed .attachment-name {
+  text-decoration: line-through;
+}
