@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Icon } from './Icon';
 
 interface Props {
   filename: string;
@@ -55,20 +56,57 @@ export function RemovalConfirmDialog({ filename, onCancel, onConfirm, triggerRef
   }, [onCancel, triggerRef]);
 
   return (
-    <div role="dialog" aria-modal="true" aria-label={`Remove ${filename}`} ref={dialogRef}>
-      <label htmlFor="removal-reason">Reason for removal</label>
-      <textarea
-        id="removal-reason"
-        value={reason}
-        maxLength={200}
-        onChange={(e) => setReason(e.target.value)}
-      />
-      <button type="button" onClick={onCancel}>
-        Cancel
-      </button>
-      <button type="button" disabled={reason.trim().length === 0} onClick={() => onConfirm(reason.trim())}>
-        Remove
-      </button>
-    </div>
+    <>
+      <div className="modal-backdrop show" />
+      <div className="modal d-block" tabIndex={-1}>
+        <div className="modal-dialog modal-dialog-centered">
+          <div
+            className="modal-content"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Remove ${filename}`}
+            ref={dialogRef}
+          >
+            <div className="modal-header border-0 pb-0">
+              <h2 className="modal-title h5 mb-0 d-flex align-items-center gap-2">
+                <Icon name="exclamation-triangle-fill" className="text-danger" />
+                Remove attachment
+              </h2>
+            </div>
+            <div className="modal-body">
+              <p className="mb-3">
+                Remove <strong>{filename}</strong>? This cannot be undone.
+              </p>
+              <label htmlFor="removal-reason" className="form-label is-required">
+                Reason for removal
+              </label>
+              <textarea
+                id="removal-reason"
+                className="form-control"
+                rows={3}
+                maxLength={200}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
+              <div className="form-text text-end">{reason.length}/200</div>
+            </div>
+            <div className="modal-footer border-0 pt-0">
+              <button type="button" className="btn btn-tertiary" onClick={onCancel}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                disabled={reason.trim().length === 0}
+                aria-disabled={reason.trim().length === 0}
+                onClick={() => onConfirm(reason.trim())}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
