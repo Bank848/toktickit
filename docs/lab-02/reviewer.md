@@ -211,3 +211,21 @@ PR #29's review came from a repository collaborator account:
 > implementation, E2E coverage, and test results look solid."
 
 Merged into `main` at `ef4f08c` (2026-09-01T17:36:08Z).
+
+## Lab 2 UI redesign pull request
+
+Post-submission follow-up: the merged W3+W4 delivery implemented all required functionality but
+did not apply `ui-spec.md`'s Zen Green theme anywhere (no Bootstrap classes on any input, button,
+or label, despite `bootstrap.min.css` being imported). This PR closes that gap. Same staging-branch
+pattern as `lab2-staging`: `ui-redesign-staging` was branched off `main`, and this PR merges the
+restyle work into it; `ui-redesign-staging` → `main` is a separate release PR, not yet opened.
+
+- **PR #31 — "Apply Zen Green design system across the client"**
+  https://github.com/Bank848/toktickit/pull/31
+- Branch: `feature/ui-redesign-zen-green` → `ui-redesign-staging`. 4 commits, 15 files changed
+  (+1212/-677).
+
+> TauForge, APPROVED (2026-09-02T10:16:41Z, commit `869ab11`): "the Zen Green restyle and the
+> follow-up fixes look good, and the test/TypeScript checks are clean."
+
+Merged into `ui-redesign-staging` at `517343a` (2026-09-02T10:56:29Z).
