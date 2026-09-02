@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { Icon } from './Icon';
 
 const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
 const MAX_SIZE_BYTES = 5 * 1024 * 1024;
@@ -54,28 +55,42 @@ export function AttachmentPicker({ files, onChange }: Props) {
   };
 
   return (
-    <div>
-      <label htmlFor={inputId}>Attachments</label>
-      <input
-        id={inputId}
-        type="file"
-        multiple
-        accept=".jpg,.jpeg,.png,.webp,.pdf"
-        onChange={handleInputChange}
-      />
+    <div className="mb-3">
+      <label htmlFor={inputId} className="form-label">
+        Attachments
+      </label>
+      <div className="attachment-picker">
+        <input
+          id={inputId}
+          type="file"
+          className="form-control"
+          multiple
+          accept=".jpg,.jpeg,.png,.webp,.pdf"
+          onChange={handleInputChange}
+        />
+        <div className="form-text mb-0">JPG, PNG, WEBP or PDF, up to 5 MB each.</div>
+      </div>
       {rejections.length > 0 && (
-        <ul role="alert">
+        <ul role="alert" className="alert alert-danger mt-2 mb-0 ps-4">
           {rejections.map((message) => (
             <li key={message}>{message}</li>
           ))}
         </ul>
       )}
       {files.length > 0 && (
-        <ul>
+        <ul className="list-group mt-2">
           {files.map((file, index) => (
-            <li key={`${file.name}-${index}`}>
-              <span>{file.name}</span>
-              <button type="button" onClick={() => handleRemove(index)} aria-label={`Remove ${file.name}`}>
+            <li key={`${file.name}-${index}`} className="list-group-item d-flex justify-content-between align-items-center gap-2">
+              <span className="text-truncate">
+                <Icon name="paperclip" className="me-1" />
+                {file.name}
+              </span>
+              <button
+                type="button"
+                className="btn btn-outline-danger btn-sm"
+                onClick={() => handleRemove(index)}
+                aria-label={`Remove ${file.name}`}
+              >
                 Remove
               </button>
             </li>

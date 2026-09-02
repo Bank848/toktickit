@@ -63,6 +63,18 @@ async function saveEvidenceScreenshot(page: Page, group: string, projectName: st
   await page.screenshot({ path: path.join(directory, `${projectName}-${name}.png`), fullPage: true });
 }
 
+// The primary nav (My Tickets, Create Ticket) collapses behind a navbar-toggler below the md
+// (768px) breakpoint (ui-spec.md §2 mobile navigation rule) -- on the mobile project the link is
+// in the DOM but not visible until the toggler is opened first.
+async function clickNavLink(page: Page, name: string): Promise<void> {
+  const link = page.getByLabel('Main navigation', { exact: true }).getByRole('link', { name, exact: true });
+  if (!(await link.isVisible())) {
+    await page.getByRole('button', { name: 'Toggle navigation', exact: true }).click();
+    await expect(link).toBeVisible();
+  }
+  await link.click();
+}
+
 async function selectRequester(page: Page, requester: string): Promise<void> {
   const selector = page.getByLabel('Development Requester', { exact: true });
   await expect(selector).toBeVisible();
@@ -93,10 +105,7 @@ test('requester can create, find, inspect, upload, remove, and isolate a Ticket'
   await assertNoHorizontalOverflow(page, 'My Tickets (initial)');
 
   // --- Create a Ticket, with an attachment --------------------------------------------------
-  await page
-    .getByLabel('Main navigation', { exact: true })
-    .getByRole('link', { name: 'Create Ticket', exact: true })
-    .click();
+  await clickNavLink(page, 'Create Ticket');
   await expect(page.getByRole('heading', { name: 'Create Ticket', level: 1 })).toBeVisible();
   await expect(page.getByLabel('Category')).toBeEnabled({ timeout: 30_000 });
 
@@ -129,7 +138,7 @@ test('requester can create, find, inspect, upload, remove, and isolate a Ticket'
   await assertNoHorizontalOverflow(page, 'Ticket Detail (initial)');
 
   // --- Find it in My Tickets ------------------------------------------------------------------
-  await page.getByRole('link', { name: 'My Tickets', exact: true }).click();
+  await clickNavLink(page, 'My Tickets');
   await expect(page.getByRole('heading', { name: 'My Tickets', level: 1 })).toBeVisible();
   await page.getByLabel('Search', { exact: true }).fill(summary);
   await expectVisible(
@@ -157,7 +166,7 @@ test('requester can create, find, inspect, upload, remove, and isolate a Ticket'
   await removalDialog.getByLabel('Reason for removal', { exact: true }).fill('Duplicate follow-up evidence');
   await removalDialog.getByRole('button', { name: 'Remove', exact: true }).click();
   await expect(removalDialog).toBeHidden();
-  await expect(followUpRow.locator('.badge.text-bg-secondary')).toBeVisible();
+  await expect(followUpRow.locator('.badge.badge-tone-neutral')).toBeVisible();
   await expect(followUpRow.getByText('Duplicate follow-up evidence', { exact: false })).toBeVisible();
   await expect(followUpRow.getByRole('link', { name: 'Download', exact: true })).toHaveCount(0);
   await saveEvidenceScreenshot(page, 'ticket-detail', projectName, 'removed-attachment');

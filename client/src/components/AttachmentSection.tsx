@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchAttachments, removeAttachment, uploadAttachment, type AttachmentDto } from '../api/attachments';
 import { RemovalConfirmDialog } from './RemovalConfirmDialog';
+import { Icon } from './Icon';
 
 const MAX_ACTIVE_ATTACHMENTS = 5;
 
@@ -96,38 +97,58 @@ export function AttachmentSection({ ticketId, requesterId, ticketStatus }: Props
     <section aria-labelledby="attachments-heading">
       <h2 id="attachments-heading">Attachments</h2>
 
-      <div>
-        <label htmlFor="attachment-upload-input">Add attachment</label>
-        <input
-          id="attachment-upload-input"
-          type="file"
-          multiple
-          accept=".jpg,.jpeg,.png,.webp,.pdf"
-          disabled={uploadDisabled}
-          onChange={handleFileInput}
-        />
-        <p>
-          JPG, PNG, WEBP or PDF, up to 5 MB, maximum {MAX_ACTIVE_ATTACHMENTS} files ({count} of{' '}
-          {MAX_ACTIVE_ATTACHMENTS} used)
-        </p>
-        {uploadError && <p role="alert">{uploadError}</p>}
+      <div className="mb-3">
+        <label htmlFor="attachment-upload-input" className="form-label">
+          Add attachment
+        </label>
+        <div className="attachment-picker">
+          <input
+            id="attachment-upload-input"
+            type="file"
+            className="form-control"
+            multiple
+            accept=".jpg,.jpeg,.png,.webp,.pdf"
+            disabled={uploadDisabled}
+            onChange={handleFileInput}
+          />
+          <p className="form-text mb-0">
+            JPG, PNG, WEBP or PDF, up to 5 MB, maximum {MAX_ACTIVE_ATTACHMENTS} files ({count} of{' '}
+            {MAX_ACTIVE_ATTACHMENTS} used)
+          </p>
+        </div>
+        {uploadError && (
+          <div role="alert" className="alert alert-danger mt-2">
+            <Icon name="exclamation-triangle-fill" />
+            <p>{uploadError}</p>
+          </div>
+        )}
       </div>
 
-      {listState === 'loading' && <p>Loading attachments…</p>}
+      {listState === 'loading' && (
+        <p className="text-body-secondary d-flex align-items-center gap-2">
+          <span className="spinner-border spinner-border-sm" aria-hidden="true" /> Loading attachments…
+        </p>
+      )}
 
       {listState === 'error' && (
-        <div role="alert">
-          <p>Failed to load attachments.</p>
-          <button type="button" onClick={loadAttachments}>
-            Retry
-          </button>
+        <div role="alert" className="alert alert-danger">
+          <Icon name="exclamation-triangle-fill" />
+          <div>
+            <p>Failed to load attachments.</p>
+            <button type="button" className="btn btn-outline-danger btn-sm" onClick={loadAttachments}>
+              <Icon name="arrow-repeat" className="me-1" />
+              Retry
+            </button>
+          </div>
         </div>
       )}
 
-      {listState === 'loaded' && attachments.length === 0 && uploading.length === 0 && <p>No attachments yet.</p>}
+      {listState === 'loaded' && attachments.length === 0 && uploading.length === 0 && (
+        <p className="text-body-secondary">No attachments yet.</p>
+      )}
 
       {listState === 'loaded' && (attachments.length > 0 || uploading.length > 0) && (
-        <ul>
+        <ul className="list-group">
           {attachments.map((attachment) => {
             const isRemoved = attachment.status === 'REMOVED';
             const isOwnUpload = attachment.uploadedBy.id === requesterId;
@@ -135,48 +156,62 @@ export function AttachmentSection({ ticketId, requesterId, ticketStatus }: Props
               <li
                 key={attachment.id}
                 data-testid="attachment-row"
-                style={isRemoved ? { color: '#6c757d' } : undefined}
+                className={`list-group-item d-flex flex-wrap align-items-center gap-2${isRemoved ? ' attachment-removed' : ''}`}
               >
-                <span>{attachment.originalFilename}</span>{' '}
-                <span>{formatSize(attachment.sizeBytes)}</span>{' '}
-                <span>{attachment.uploadedBy.displayName}</span>{' '}
-                <span>{new Date(attachment.createdAt).toLocaleString()}</span>{' '}
+                <span className="attachment-name">
+                  <Icon name="paperclip" className="me-1" />
+                  {attachment.originalFilename}
+                </span>
+                <span className="text-body-secondary small">{formatSize(attachment.sizeBytes)}</span>
+                <span className="text-body-secondary small">{attachment.uploadedBy.displayName}</span>
+                <span className="text-body-secondary small">{new Date(attachment.createdAt).toLocaleString()}</span>
                 {isRemoved && (
-                  <span className="badge text-bg-secondary">
-                    <span aria-hidden="true">■ </span>Removed
+                  <span className="badge badge-tone-neutral">
+                    <Icon name="dash-circle-fill" />
+                    Removed
                   </span>
                 )}
                 {isRemoved && attachment.removal && (
-                  <span>
-                    {' '}
+                  <span className="text-body-secondary small w-100">
                     Reason: {attachment.removal.reason} — removed by {attachment.removal.removedBy.displayName} on{' '}
                     {new Date(attachment.removal.removedAt).toLocaleString()}
                   </span>
                 )}
-                {!isRemoved && attachment.downloadUrl && (
-                  <a href={attachment.downloadUrl}>Download</a>
-                )}
-                {isRemoved && (
-                  <button type="button" disabled>
-                    Download
-                  </button>
-                )}
-                {!isRemoved && isOwnUpload && ticketStatus !== 'CLOSED' && (
-                  <button
-                    type="button"
-                    ref={(el) => {
-                      triggerRefs.current[attachment.id] = el;
-                    }}
-                    onClick={() => openRemovalDialog(attachment)}
-                  >
-                    Remove
-                  </button>
-                )}
+                <span className="ms-md-auto d-flex gap-2">
+                  {!isRemoved && attachment.downloadUrl && (
+                    <a className="btn btn-outline-primary btn-sm" href={attachment.downloadUrl}>
+                      Download
+                    </a>
+                  )}
+                  {isRemoved && (
+                    <button type="button" className="btn btn-outline-secondary btn-sm" disabled aria-disabled="true">
+                      Download
+                    </button>
+                  )}
+                  {!isRemoved && isOwnUpload && ticketStatus !== 'CLOSED' && (
+                    <button
+                      type="button"
+                      className="btn btn-outline-danger btn-sm"
+                      ref={(el) => {
+                        triggerRefs.current[attachment.id] = el;
+                      }}
+                      onClick={() => openRemovalDialog(attachment)}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </span>
               </li>
             );
           })}
           {uploading.map((filename) => (
-            <li key={`uploading-${filename}`} data-testid="attachment-row-uploading" aria-busy="true">
+            <li
+              key={`uploading-${filename}`}
+              data-testid="attachment-row-uploading"
+              aria-busy="true"
+              className="list-group-item d-flex align-items-center gap-2 text-body-secondary"
+            >
+              <span className="spinner-border spinner-border-sm" aria-hidden="true" />
               <span>{filename}</span> <span>Uploading…</span>
             </li>
           ))}

@@ -4,6 +4,7 @@ import { useRequester } from '../context/RequesterContext';
 import { fetchTickets, type TicketListItemDto, type ListTicketsMeta } from '../api/tickets';
 import { fetchCategories, type CategoryDto } from '../api/lookups';
 import { TicketStatusBadge, STATUS_OPTIONS } from '../components/TicketStatusBadge';
+import { Icon } from '../components/Icon';
 
 const SORT_OPTIONS = [
   { value: 'createdAt:desc', label: 'Newest first' },
@@ -118,8 +119,8 @@ export function MyTicketsPage() {
     <div>
       <h1>My Tickets</h1>
 
-      <div className="row g-2 mb-3 align-items-end">
-        <div className="col-12 col-md-4">
+      <div className="row g-2 mb-3 align-items-start">
+        <div className="col-12 col-md-3">
           <label htmlFor="my-tickets-search" className="form-label">
             Search
           </label>
@@ -141,6 +142,7 @@ export function MyTicketsPage() {
             id="my-tickets-status"
             className="form-select"
             multiple
+            size={4}
             value={query.status}
             onChange={handleStatusChange}
           >
@@ -189,8 +191,16 @@ export function MyTicketsPage() {
           </select>
         </div>
 
-        <div className="col-6 col-md-1">
-          <button type="button" className="btn btn-outline-secondary w-100" onClick={handleClearFilters} disabled={!filtersActive}>
+        <div className="col-6 col-md-2">
+          <label className="form-label d-none d-md-block" aria-hidden="true">
+            &nbsp;
+          </label>
+          <button
+            type="button"
+            className="btn btn-outline-primary w-100"
+            onClick={handleClearFilters}
+            disabled={!filtersActive}
+          >
             Clear filters
           </button>
         </div>
@@ -198,7 +208,9 @@ export function MyTicketsPage() {
 
       {loadState === 'loading' && (
         <div data-testid="my-tickets-skeleton" aria-busy="true" aria-live="polite">
-          <p>Loading tickets…</p>
+          <p className="text-body-secondary d-flex align-items-center gap-2">
+            <span className="spinner-border spinner-border-sm" aria-hidden="true" /> Loading tickets…
+          </p>
           {[0, 1, 2].map((i) => (
             <div key={i} className="placeholder-glow mb-2">
               <span className="placeholder col-12" style={{ height: '2rem', display: 'block' }} />
@@ -208,65 +220,79 @@ export function MyTicketsPage() {
       )}
 
       {loadState === 'error' && (
-        <div role="alert">
-          <p>Failed to load tickets.</p>
-          <button type="button" onClick={loadTickets}>
-            Retry
-          </button>
+        <div role="alert" className="alert alert-danger">
+          <Icon name="exclamation-triangle-fill" />
+          <div>
+            <p>Failed to load tickets.</p>
+            <button type="button" className="btn btn-outline-danger btn-sm" onClick={loadTickets}>
+              <Icon name="arrow-repeat" className="me-1" />
+              Retry
+            </button>
+          </div>
         </div>
       )}
 
       {loadState === 'loaded' && rows.length === 0 && !filtersActive && (
-        <div>
-          <p>You haven&apos;t created any tickets yet.</p>
-          <Link to="/tickets/new">Create Ticket</Link>
+        <div className="alert alert-note-neutral">
+          <Icon name="inbox" />
+          <div>
+            <p>You haven&apos;t created any tickets yet.</p>
+            <Link to="/tickets/new" className="btn btn-primary btn-sm mt-2">
+              Create Ticket
+            </Link>
+          </div>
         </div>
       )}
 
       {loadState === 'loaded' && rows.length === 0 && filtersActive && (
-        <div>
-          <p>No tickets match your filters.</p>
-          <button type="button" onClick={handleClearFilters}>
-            Clear filters
-          </button>
+        <div className="alert alert-note">
+          <Icon name="info-circle" />
+          <div>
+            <p>No tickets match your filters.</p>
+            <button type="button" className="btn btn-outline-primary btn-sm mt-2" onClick={handleClearFilters}>
+              Clear filters
+            </button>
+          </div>
         </div>
       )}
 
       {loadState === 'loaded' && rows.length > 0 && (
         <>
           {/* Desktop table -- CSS-only responsive toggle (no resize listener), per the plan. */}
-          <table className="table d-none d-md-table">
-            <thead>
-              <tr>
-                <th scope="col">Ticket No.</th>
-                <th scope="col">Summary</th>
-                <th scope="col">Category</th>
-                <th scope="col">Status</th>
-                <th scope="col">Last Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((ticket) => (
-                <tr
-                  key={ticket.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => goToTicket(ticket.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') goToTicket(ticket.id);
-                  }}
-                >
-                  <td>{ticket.ticketNo}</td>
-                  <td>{ticket.summary}</td>
-                  <td>{ticket.category.name}</td>
-                  <td>
-                    <TicketStatusBadge status={ticket.status} />
-                  </td>
-                  <td>{new Date(ticket.updatedAt).toLocaleString()}</td>
+          <div className="card d-none d-md-block">
+            <table className="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th scope="col">Ticket No.</th>
+                  <th scope="col">Summary</th>
+                  <th scope="col">Category</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Last Updated</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.map((ticket) => (
+                  <tr
+                    key={ticket.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => goToTicket(ticket.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') goToTicket(ticket.id);
+                    }}
+                  >
+                    <td>{ticket.ticketNo}</td>
+                    <td>{ticket.summary}</td>
+                    <td>{ticket.category.name}</td>
+                    <td>
+                      <TicketStatusBadge status={ticket.status} />
+                    </td>
+                    <td className="text-body-secondary small">{new Date(ticket.updatedAt).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           {/* Mobile stacked cards -- same rows, CSS-only toggle. */}
           <div className="d-md-none">
@@ -282,19 +308,19 @@ export function MyTicketsPage() {
                 }}
               >
                 <div className="card-body">
-                  <p>
+                  <p className="mb-1">
                     <strong>Ticket No.:</strong> {ticket.ticketNo}
                   </p>
-                  <p>
+                  <p className="mb-1">
                     <strong>Summary:</strong> {ticket.summary}
                   </p>
-                  <p>
+                  <p className="mb-1">
                     <strong>Category:</strong> {ticket.category.name}
                   </p>
-                  <p>
+                  <p className="mb-1">
                     <strong>Status:</strong> <TicketStatusBadge status={ticket.status} />
                   </p>
-                  <p>
+                  <p className="mb-0 text-body-secondary small">
                     <strong>Last Updated:</strong> {new Date(ticket.updatedAt).toLocaleString()}
                   </p>
                 </div>
@@ -302,13 +328,14 @@ export function MyTicketsPage() {
             ))}
           </div>
 
-          <nav aria-label="Ticket list pagination">
-            <ul className="pagination">
+          <nav aria-label="Ticket list pagination" className="mt-3">
+            <ul className="pagination justify-content-end mb-0">
               {Array.from({ length: meta.totalPages }, (_, index) => index + 1).map((pageNumber) => (
                 <li key={pageNumber} className={`page-item ${pageNumber === meta.page ? 'active' : ''}`}>
                   <button
                     type="button"
                     className="page-link"
+                    aria-current={pageNumber === meta.page ? 'page' : undefined}
                     onClick={() => setQuery((prev) => ({ ...prev, page: pageNumber }))}
                   >
                     {pageNumber}
