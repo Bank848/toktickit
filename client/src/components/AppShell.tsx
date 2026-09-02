@@ -19,7 +19,7 @@ export function AppShell() {
   return (
     <>
       <header>
-        <nav className="navbar navbar-expand-md app-navbar" data-bs-theme="dark" aria-label="Main navigation">
+        <nav className="navbar navbar-expand-md app-navbar" aria-label="Main navigation">
           <div className="container">
             <span className="navbar-brand fw-semibold mb-0">TokTickIT</span>
 

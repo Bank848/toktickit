@@ -94,7 +94,7 @@ export function AttachmentSection({ ticketId, requesterId, ticketStatus }: Props
   }
 
   return (
-    <section aria-labelledby="attachments-heading" className="mt-4">
+    <section aria-labelledby="attachments-heading">
       <h2 id="attachments-heading">Attachments</h2>
 
       <div className="mb-3">

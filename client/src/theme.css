@@ -302,6 +302,10 @@ a.btn.disabled {
 
 /* App header / navbar */
 .app-navbar {
+  /* No data-bs-theme="dark" on the element: that attribute selector out-specifies a single
+     class and silently overrides --bs-navbar-color back to a translucent white, which is how
+     the inactive "Create Ticket" link fell to ~3.1:1 on the green header. Setting every var
+     directly here, unconditionally, is the one source of truth for this navbar's colors. */
   --bs-navbar-color: #ffffff;
   --bs-navbar-hover-color: #eaf6ef;
   --bs-navbar-active-color: #ffffff;
@@ -309,14 +313,22 @@ a.btn.disabled {
   --bs-navbar-brand-hover-color: #eaf6ef;
   --bs-navbar-toggler-border-color: rgba(255, 255, 255, 0.5);
   --bs-navbar-toggler-focus-width: 0;
+  --bs-navbar-toggler-icon-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.9%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
   background-color: #006b3c;
 }
 .app-navbar .nav-link {
   border-bottom: 3px solid transparent;
+  min-height: 44px; /* §7 touch target */
+  display: flex;
+  align-items: center;
 }
 .app-navbar .nav-link.active {
   font-weight: 600;
   border-bottom-color: #eaf6ef;
+}
+.app-navbar .navbar-toggler {
+  min-height: 44px;
+  min-width: 44px;
 }
 .app-navbar .navbar-toggler:focus-visible {
   outline: 2px solid #eaf6ef;

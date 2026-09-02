@@ -3,7 +3,7 @@ import { useParams, useLocation } from 'react-router-dom';
 import { useRequester } from '../context/RequesterContext';
 import { fetchTicketDetail, ApiError, type TicketDetailDto } from '../api/tickets';
 import { AttachmentSection } from '../components/AttachmentSection';
-import { TicketStatusBadge } from '../components/TicketStatusBadge';
+import { TicketStatusBadge, PriorityBadge } from '../components/TicketStatusBadge';
 import { Icon } from '../components/Icon';
 
 interface UploadFailure {
@@ -126,26 +126,26 @@ export function TicketDetailPage() {
               </div>
 
               <dl className="row mb-4">
-                <dt className="col-6 col-md-3 field-label">Date</dt>
-                <dd className="col-6 col-md-3">{new Date(ticket.createdAt).toLocaleString()}</dd>
-                <dt className="col-6 col-md-3 field-label">Category</dt>
-                <dd className="col-6 col-md-3">{ticket.category.name}</dd>
+                <dt className="col-6 col-md-2 field-label">Date</dt>
+                <dd className="col-6 col-md-4">{new Date(ticket.createdAt).toLocaleString()}</dd>
+                <dt className="col-6 col-md-2 field-label">Category</dt>
+                <dd className="col-6 col-md-4">{ticket.category.name}</dd>
 
-                <dt className="col-6 col-md-3 field-label">Related System</dt>
-                <dd className="col-6 col-md-3">{ticket.relatedSystem?.name ?? 'Not applicable'}</dd>
-                <dt className="col-6 col-md-3 field-label">Requester</dt>
-                <dd className="col-6 col-md-3">{ticket.requester.displayName}</dd>
+                <dt className="col-6 col-md-2 field-label">Related System</dt>
+                <dd className="col-6 col-md-4">{ticket.relatedSystem?.name ?? 'Not applicable'}</dd>
+                <dt className="col-6 col-md-2 field-label">Requester</dt>
+                <dd className="col-6 col-md-4">{ticket.requester.displayName}</dd>
 
-                <dt className="col-6 col-md-3 field-label">Owner</dt>
-                <dd className="col-6 col-md-3 text-body-secondary">{ticket.owner?.displayName ?? 'Unassigned'}</dd>
-                <dt className="col-6 col-md-3 field-label">Requested Priority</dt>
-                <dd className="col-6 col-md-3">
-                  <TicketStatusBadge status={ticket.requestedPriority} />
+                <dt className="col-6 col-md-2 field-label">Owner</dt>
+                <dd className="col-6 col-md-4 text-body-secondary">{ticket.owner?.displayName ?? 'Unassigned'}</dd>
+                <dt className="col-6 col-md-2 field-label">Requested Priority</dt>
+                <dd className="col-6 col-md-4">
+                  <PriorityBadge priority={ticket.requestedPriority} />
                 </dd>
 
-                <dt className="col-6 col-md-3 field-label">IT Priority</dt>
-                <dd className="col-6 col-md-3">
-                  <TicketStatusBadge status={ticket.itPriority} />
+                <dt className="col-6 col-md-2 field-label">IT Priority</dt>
+                <dd className="col-6 col-md-4">
+                  <PriorityBadge priority={ticket.itPriority} />
                 </dd>
               </dl>
 

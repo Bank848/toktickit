@@ -119,8 +119,8 @@ export function MyTicketsPage() {
     <div>
       <h1>My Tickets</h1>
 
-      <div className="row g-2 mb-3 align-items-end">
-        <div className="col-12 col-md-4">
+      <div className="row g-2 mb-3 align-items-start">
+        <div className="col-12 col-md-3">
           <label htmlFor="my-tickets-search" className="form-label">
             Search
           </label>
@@ -142,6 +142,7 @@ export function MyTicketsPage() {
             id="my-tickets-status"
             className="form-select"
             multiple
+            size={4}
             value={query.status}
             onChange={handleStatusChange}
           >
@@ -190,8 +191,16 @@ export function MyTicketsPage() {
           </select>
         </div>
 
-        <div className="col-6 col-md-1">
-          <button type="button" className="btn btn-outline-primary w-100" onClick={handleClearFilters} disabled={!filtersActive}>
+        <div className="col-6 col-md-2">
+          <label className="form-label d-none d-md-block" aria-hidden="true">
+            &nbsp;
+          </label>
+          <button
+            type="button"
+            className="btn btn-outline-primary w-100"
+            onClick={handleClearFilters}
+            disabled={!filtersActive}
+          >
             Clear filters
           </button>
         </div>

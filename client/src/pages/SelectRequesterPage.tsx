@@ -59,7 +59,13 @@ export function SelectRequesterPage() {
   };
 
   return (
-    <div className="container py-4">
+    <div>
+      <header className="app-navbar py-3 mb-4">
+        <div className="container">
+          <span className="navbar-brand fw-semibold mb-0 text-white">TokTickIT</span>
+        </div>
+      </header>
+      <div className="container pb-4">
       <nav aria-label="breadcrumb">
         <ol className="breadcrumb small">
           <li className="breadcrumb-item">Home</li>
@@ -166,6 +172,7 @@ export function SelectRequesterPage() {
             </button>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
