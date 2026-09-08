@@ -2,18 +2,49 @@ import { expect, test } from '@playwright/test';
 import { saveEvidenceScreenshot, assertNoHorizontalOverflow } from '../support/evidence';
 
 // Fixture emails/password confirmed against Task 3's real server/prisma/seed.ts (Issue #35).
+// onboarding@ is the seeded must-change-password user (specification.md §6.2) -- it is used ONLY
+// by the non-mutating "wrong current password" test below. The test that actually changes a
+// password mints its own disposable fixture instead (see that test), so the seeded row is never
+// mutated and this file stays safely re-runnable against the same DB without a reseed.
 const MUST_CHANGE_USER = { email: 'onboarding@toktickit.local', password: 'DevPass123!' };
 const NEW_PASSWORD = 'Sw1tched!Pass';
 const DEACTIVATED_USER = { email: 'itstaff4-inactive@toktickit.local', password: 'DevPass123!' };
 const WRONG_PASSWORD = 'DefinitelyWrong!1';
+const ADMIN = { email: 'admin@toktickit.local', password: 'DevPass123!' };
 
 test('mandatory first-login password change, then logout invalidates the session', async ({ page }, testInfo) => {
   const projectName = testInfo.project.name;
+  const fixtureEmail = `e2e.mustchange.${Date.now()}@toktickit.local`;
+  const tempPassword = 'Fixture!Temp1';
 
+  // Mint a disposable must-change-password user via the Admin UI instead of mutating the shared
+  // seeded onboarding@ fixture -- adminUsers.ts's POST handler always forces
+  // mustChangePassword=true on create (BR-25, no client-supplied override), so any freshly
+  // created user exercises this flow just as well, and the Date.now()-suffixed email makes this
+  // test safely re-runnable without a reseed (same disposable-fixture pattern as
+  // user-administration.spec.ts).
   await page.goto('/login');
+  await page.getByLabel('Email address', { exact: true }).fill(ADMIN.email);
+  await page.getByLabel('Password', { exact: true }).fill(ADMIN.password);
+  await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+  await expect(page).not.toHaveURL(/\/login$/, { timeout: 30_000 });
+
+  await page.goto('/admin/users');
+  await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
+  await page.getByRole('button', { name: 'Create User', exact: true }).click();
+  await page.getByLabel('Full Name', { exact: true }).fill('E2E Must-Change Fixture');
+  await page.getByLabel('Email Address', { exact: true }).fill(fixtureEmail);
+  await page.getByLabel('Role', { exact: true }).selectOption({ label: 'IT Staff' });
+  await page.getByLabel('Initial Password', { exact: true }).fill(tempPassword);
+  await page.getByRole('button', { name: 'Save User', exact: true }).click();
+  await expect(page.getByText('User created', { exact: false })).toBeVisible({ timeout: 30_000 });
+
+  await page.getByRole('button', { name: 'Logout', exact: true }).click();
+  await expect(page).toHaveURL(/\/login$/, { timeout: 30_000 });
+
   await expect(page.getByRole('heading', { name: 'Sign in to your account.' })).toBeVisible();
-  await page.getByLabel('Email address', { exact: true }).fill(MUST_CHANGE_USER.email);
-  await page.getByLabel('Password', { exact: true }).fill(MUST_CHANGE_USER.password);
+  await page.getByLabel('Email address', { exact: true }).fill(fixtureEmail);
+  await page.getByLabel('Password', { exact: true }).fill(tempPassword);
   await saveEvidenceScreenshot(page, 'lab-03', 'authentication', projectName, 'login-filled');
   await assertNoHorizontalOverflow(page, 'Login (filled)');
   await page.getByRole('button', { name: 'Sign In', exact: true }).click();
@@ -22,7 +53,7 @@ test('mandatory first-login password change, then logout invalidates the session
   await expect(page.getByRole('heading', { name: 'Change Your Password.' })).toBeVisible();
   await saveEvidenceScreenshot(page, 'lab-03', 'authentication', projectName, 'change-password-initial');
 
-  await page.getByLabel('Current (temporary) password', { exact: true }).fill(MUST_CHANGE_USER.password);
+  await page.getByLabel('Current (temporary) password', { exact: true }).fill(tempPassword);
   await page.getByLabel('New password', { exact: true }).fill(NEW_PASSWORD);
   await page.getByLabel('Confirm new password', { exact: true }).fill(NEW_PASSWORD);
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
@@ -96,8 +127,15 @@ test('a Lab-2-seeded Requester logs in after the Lab 3 migration and sees their 
   await expect(page).toHaveURL(/\/tickets$/, { timeout: 30_000 });
   await expect(page.getByRole('heading', { name: 'My Tickets' })).toBeVisible();
 
-  // The seed baseline (specification.md §6.2) guarantees this Requester has at least one
-  // pre-existing ticket carried over from Lab 2 -- the list must not come back empty.
+  // The seed script (server/prisma/seed.ts) creates a pre-existing ticket for this Requester --
+  // the list must not come back empty.
   await expect(page.getByText('No tickets found', { exact: false })).toHaveCount(0);
-  await expect(page.getByRole('table').or(page.getByTestId('ticket-card'))).toBeVisible();
+  // Desktop renders a <table>, mobile a stacked "Ticket No.: ..." card -- both are CSS-only
+  // toggled (MyTicketsPage.tsx keeps both in the DOM and hides one with a d-none/d-md-* class),
+  // so a role query is required on both branches: role locators exclude CSS-hidden elements from
+  // the accessibility tree, whereas getByTestId matches the DOM directly and would still resolve
+  // the hidden branch too, tripping Playwright's strict-mode "multiple elements" check.
+  await expect(
+    page.getByRole('table').or(page.getByRole('button', { name: /Ticket No\.:/ })),
+  ).toBeVisible();
 });
