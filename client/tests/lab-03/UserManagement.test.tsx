@@ -48,13 +48,16 @@ describe('AdminUserManagementPage', () => {
 
   it('renders every user returned by the list endpoint', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getByText('Alice Admin')).toBeInTheDocument());
-    expect(screen.getByText('Bob Staff')).toBeInTheDocument();
+    // The list renders once as a desktop table row and once as a mobile card (same dual-DOM,
+    // CSS-only-hidden pattern as StaffTicketQueuePage) -- both are always in the DOM in jsdom,
+    // which has no stylesheet to apply the d-none/d-md-table breakpoint classes.
+    await waitFor(() => expect(screen.getAllByText('Alice Admin').length).toBeGreaterThan(0));
+    expect(screen.getAllByText('Bob Staff').length).toBeGreaterThan(0);
   });
 
   it('re-fetches with the typed search term', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getByText('Alice Admin')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('Alice Admin').length).toBeGreaterThan(0));
 
     fireEvent.change(screen.getByPlaceholderText('Search users…'), { target: { value: 'bob' } });
 
@@ -75,7 +78,7 @@ describe('AdminUserManagementPage', () => {
     });
 
     renderPage();
-    await waitFor(() => expect(screen.getByText('Alice Admin')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('Alice Admin').length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getByRole('button', { name: 'Create User' }));
     fireEvent.change(screen.getByLabelText('Full Name'), { target: { value: 'New Person' } });
@@ -95,7 +98,7 @@ describe('AdminUserManagementPage', () => {
     );
 
     renderPage();
-    await waitFor(() => expect(screen.getByText('Alice Admin')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('Alice Admin').length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getByRole('button', { name: 'Create User' }));
     fireEvent.change(screen.getByLabelText('Full Name'), { target: { value: 'Dup' } });
@@ -109,9 +112,9 @@ describe('AdminUserManagementPage', () => {
 
   it('disables the Deactivate action on the signed-in Administrator\'s own row', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getByText('Alice Admin')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('Alice Admin').length).toBeGreaterThan(0));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Alice Admin' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit Alice Admin' })[0]);
 
     expect(screen.getByRole('button', { name: 'Deactivate User' })).toBeDisabled();
   });
@@ -123,9 +126,9 @@ describe('AdminUserManagementPage', () => {
     });
 
     renderPage();
-    await waitFor(() => expect(screen.getByText('Bob Staff')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('Bob Staff').length).toBeGreaterThan(0));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Bob Staff' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit Bob Staff' })[0]);
     expect(screen.getByLabelText('Full Name')).toHaveValue('Bob Staff');
 
     fireEvent.click(screen.getByRole('button', { name: 'Set New Password' }));
