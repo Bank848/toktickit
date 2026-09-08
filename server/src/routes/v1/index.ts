@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { resolveCurrentUser } from '../../auth/currentUser';
+import { assertPasswordCurrent } from '../../middleware/assertPasswordCurrent';
 import { authLoginRouter, authRouter } from './auth';
 import { meRouter } from './me';
 import { devRouter } from './dev';
@@ -21,6 +22,7 @@ v1Router.use('/dev', devRouter);
 // Every other /api/v1/* route requires identity. Mounted once here so a future route can never
 // forget it (the risk with the old per-route `router.get('/', resolveCurrentUser, ...)` pattern).
 v1Router.use(resolveCurrentUser);
+v1Router.use(assertPasswordCurrent);
 
 v1Router.use('/auth', authRouter);
 v1Router.use('/me', meRouter);
