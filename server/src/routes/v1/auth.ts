@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../../prisma';
 import { HttpError, ValidationHttpError } from '../../middleware/errorEnvelope';
 import { verifyPassword } from '../../auth/password';
-import { createSession, TTK_SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from '../../auth/session';
+import { createSession, TTK_SESSION_COOKIE, SESSION_COOKIE_OPTIONS, revokeSessionByToken } from '../../auth/session';
 
 // Mounted at /auth/login, ahead of resolveCurrentUser — the one endpoint reachable with no
 // session yet (api-spec.md §3).
@@ -47,6 +47,22 @@ authLoginRouter.post('/', async (req, res, next) => {
       role: user.role,
       mustChangePassword: user.mustChangePassword,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Mounted at /auth, after resolveCurrentUser — every route here requires a valid session.
+export const authRouter = Router();
+
+authRouter.post('/logout', async (req, res, next) => {
+  try {
+    const token = req.cookies?.[TTK_SESSION_COOKIE];
+    if (typeof token === 'string' && token.length > 0) {
+      await revokeSessionByToken(token);
+    }
+    res.clearCookie(TTK_SESSION_COOKIE, { path: '/' });
+    res.status(200).json({});
   } catch (error) {
     next(error);
   }
