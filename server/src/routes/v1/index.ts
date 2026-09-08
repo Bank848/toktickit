@@ -3,7 +3,6 @@ import { resolveCurrentUser } from '../../auth/currentUser';
 import { assertPasswordCurrent } from '../../middleware/assertPasswordCurrent';
 import { authLoginRouter, authRouter } from './auth';
 import { meRouter } from './me';
-import { devRouter } from './dev';
 import { categoriesV1Router } from './categories';
 import { relatedSystemsRouter } from './relatedSystems';
 import { ticketsRouter } from './tickets';
@@ -11,16 +10,8 @@ import { attachmentContentRouter } from './attachments';
 
 export const v1Router = Router();
 
-// POST /auth/login is the only route reachable with no session yet — mounted before
-// resolveCurrentUser so it never gets rejected for lacking a cookie that can't exist yet.
 v1Router.use('/auth/login', authLoginRouter);
 
-// /dev/* is how a caller gets identity in the first place (D-18) — it must stay reachable with
-// no identity yet, so it's mounted ahead of the blanket resolveCurrentUser below.
-v1Router.use('/dev', devRouter);
-
-// Every other /api/v1/* route requires identity. Mounted once here so a future route can never
-// forget it (the risk with the old per-route `router.get('/', resolveCurrentUser, ...)` pattern).
 v1Router.use(resolveCurrentUser);
 v1Router.use(assertPasswordCurrent);
 
