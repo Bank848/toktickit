@@ -9,6 +9,7 @@ import { MyTicketsPage } from './pages/MyTicketsPage';
 import { TicketDetailPage } from './pages/TicketDetailPage';
 import { StaffTicketQueuePage } from './pages/StaffTicketQueuePage';
 import { StaffTicketDetailPage } from './pages/StaffTicketDetailPage';
+import { AdminUserManagementPage } from './pages/AdminUserManagementPage';
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
           <Route path="/tickets/:id" element={<TicketDetailPage />} />
           <Route path="/staff/tickets" element={<StaffTicketQueuePage />} />
           <Route path="/staff/tickets/:id" element={<StaffTicketDetailPage />} />
+          <Route path="/admin/users" element={<AdminUserManagementPage />} />
         </Route>
         <Route path="/" element={<Navigate to="/tickets" replace />} />
       </Routes>
