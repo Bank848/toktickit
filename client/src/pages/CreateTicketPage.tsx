@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useRequester } from '../context/RequesterContext';
+import { useAuth } from '../context/AuthContext';
 import { createTicket, ApiError, type CreateTicketPayload } from '../api/tickets';
 import { uploadAttachment } from '../api/attachments';
 import { fetchCategories, fetchRelatedSystems, type CategoryDto, type RelatedSystemDto } from '../api/lookups';
@@ -25,7 +25,7 @@ interface UploadFailure {
 }
 
 export function CreateTicketPage() {
-  const { requester } = useRequester();
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
 
   const [lookupState, setLookupState] = useState<LookupState>('loading');
@@ -70,9 +70,8 @@ export function CreateTicketPage() {
   }, [fieldErrors]);
 
   const loadLookups = useCallback(() => {
-    if (!requester) return;
     setLookupState('loading');
-    Promise.all([fetchCategories(requester.id), fetchRelatedSystems(requester.id)])
+    Promise.all([fetchCategories(), fetchRelatedSystems()])
       .then(([cats, systems]) => {
         setCategories(cats);
         setRelatedSystems(systems);
@@ -81,13 +80,13 @@ export function CreateTicketPage() {
       .catch(() => {
         setLookupState('error');
       });
-  }, [requester]);
+  }, []);
 
   useEffect(() => {
     loadLookups();
   }, [loadLookups]);
 
-  if (!requester) return null;
+  if (!currentUser) return null;
 
   const formDisabled = lookupState !== 'loaded' || submitting;
 
@@ -110,7 +109,7 @@ export function CreateTicketPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submitting || !requester) return;
+    if (submitting || !currentUser) return;
 
     const clientErrors = validateClientSide();
     if (Object.keys(clientErrors).length > 0) {
@@ -132,7 +131,7 @@ export function CreateTicketPage() {
 
     let ticket;
     try {
-      ticket = await createTicket(requester.id, payload);
+      ticket = await createTicket(payload);
     } catch (error) {
       setSubmitting(false);
       if (error instanceof ApiError && error.status === 422) {
@@ -155,7 +154,7 @@ export function CreateTicketPage() {
     let succeeded = 0;
     for (const file of attachments) {
       try {
-        await uploadAttachment(requester.id, ticket.id, file);
+        await uploadAttachment(ticket.id, file);
         succeeded += 1;
       } catch (error) {
         failures.push({
@@ -217,7 +216,7 @@ export function CreateTicketPage() {
               </div>
               <div className="col-12 col-md-4">
                 <span className="field-label d-block">Requester</span>
-                <span className="field-readonly">{requester.displayName}</span>
+                <span className="field-readonly">{currentUser.displayName}</span>
               </div>
             </div>
 

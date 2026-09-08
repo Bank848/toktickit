@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useRequester } from '../context/RequesterContext';
 import { fetchTickets, type TicketListItemDto, type ListTicketsMeta } from '../api/tickets';
 import { fetchCategories, type CategoryDto } from '../api/lookups';
 import { TicketStatusBadge, STATUS_OPTIONS } from '../components/TicketStatusBadge';
@@ -34,7 +33,6 @@ function isFilterActive(query: QueryState): boolean {
 }
 
 export function MyTicketsPage() {
-  const { requester } = useRequester();
   const navigate = useNavigate();
 
   const [categories, setCategories] = useState<CategoryDto[]>([]);
@@ -47,11 +45,10 @@ export function MyTicketsPage() {
   const [loadState, setLoadState] = useState<LoadState>('loading');
 
   useEffect(() => {
-    if (!requester) return;
-    fetchCategories(requester.id)
+    fetchCategories()
       .then(setCategories)
       .catch(() => setCategories([]));
-  }, [requester]);
+  }, []);
 
   // Debounce the raw search box into `query.q` -- a plain useEffect + timeout, not a debounce
   // library, per the plan. Every other filter (status/category/sort) updates `query` immediately
@@ -66,9 +63,8 @@ export function MyTicketsPage() {
   }, [searchInput]);
 
   const loadTickets = useCallback(() => {
-    if (!requester) return;
     setLoadState('loading');
-    fetchTickets(requester.id, {
+    fetchTickets({
       status: query.status,
       categoryId: query.categoryId === '' ? null : Number(query.categoryId),
       q: query.q === '' ? null : query.q,
@@ -84,13 +80,11 @@ export function MyTicketsPage() {
       .catch(() => {
         setLoadState('error');
       });
-  }, [requester, query]);
+  }, [query]);
 
   useEffect(() => {
     loadTickets();
   }, [loadTickets]);
-
-  if (!requester) return null;
 
   // Any filter/sort change resets to page 1 (search does the same, inside the debounce effect
   // above) -- per ui-spec.md §5.

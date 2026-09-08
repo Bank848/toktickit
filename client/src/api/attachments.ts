@@ -14,16 +14,12 @@ export interface AttachmentDto {
   removal: { reason: string; removedAt: string; removedBy: { id: string; displayName: string } } | null;
 }
 
-export async function uploadAttachment(
-  requesterId: string,
-  ticketId: string,
-  file: File,
-): Promise<AttachmentDto> {
+export async function uploadAttachment(ticketId: string, file: File): Promise<AttachmentDto> {
   const form = new FormData();
   form.append('file', file);
   const response = await fetch(`${API_BASE_URL}/api/v1/tickets/${ticketId}/attachments`, {
     method: 'POST',
-    headers: { 'x-dev-user-id': requesterId },
+    credentials: 'include',
     body: form,
   });
   if (!response.ok) {
@@ -42,9 +38,9 @@ async function throwAttachmentError(response: Response, fallbackMessage: string)
   throw new ApiError(body?.error?.message ?? fallbackMessage, response.status, body?.error?.fieldErrors ?? []);
 }
 
-export async function fetchAttachments(requesterId: string, ticketId: string): Promise<AttachmentDto[]> {
+export async function fetchAttachments(ticketId: string): Promise<AttachmentDto[]> {
   const response = await fetch(`${API_BASE_URL}/api/v1/tickets/${ticketId}/attachments`, {
-    headers: { 'x-dev-user-id': requesterId },
+    credentials: 'include',
   });
   if (!response.ok) {
     return throwAttachmentError(response, 'Failed to load attachments');
@@ -52,14 +48,11 @@ export async function fetchAttachments(requesterId: string, ticketId: string): P
   return response.json();
 }
 
-export async function removeAttachment(
-  requesterId: string,
-  attachmentId: string,
-  reason: string,
-): Promise<AttachmentDto> {
+export async function removeAttachment(attachmentId: string, reason: string): Promise<AttachmentDto> {
   const response = await fetch(`${API_BASE_URL}/api/v1/attachments/${attachmentId}`, {
     method: 'DELETE',
-    headers: { 'x-dev-user-id': requesterId, 'Content-Type': 'application/json' },
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ reason }),
   });
   if (!response.ok) {
