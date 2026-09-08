@@ -6,7 +6,9 @@ import { HttpError, ValidationHttpError } from '../../middleware/errorEnvelope';
 import { toUserAdminDto } from '../../dto/userAdminDto';
 import { validateCreateUserRequest } from '../../validators/createUserRequest';
 import { validateUpdateUserRequest } from '../../validators/updateUserRequest';
+import { validateSetInitialPasswordRequest } from '../../validators/setInitialPasswordRequest';
 import { hashPassword } from '../../auth/password';
+import { revokeAllSessionsForUser } from '../../auth/session';
 
 export const adminUsersRouter = Router();
 
@@ -103,6 +105,38 @@ adminUsersRouter.patch('/:id', async (req, res, next) => {
       }
 
       return tx.user.update({ where: { id: target.id }, data: { displayName, email, role, isActive } });
+    });
+
+    res.status(200).json(toUserAdminDto(updated));
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminUsersRouter.patch('/:id/password', async (req, res, next) => {
+  try {
+    const validated = validateSetInitialPasswordRequest(req.body ?? {});
+    if (!validated.ok) throw new ValidationHttpError(validated.errors);
+    const { newInitialPassword } = validated.value;
+
+    const target = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!target) {
+      throw new HttpError(404, 'USER_NOT_FOUND', 'User not found');
+    }
+
+    const passwordHash = await hashPassword(newInitialPassword);
+
+    // BR-26/AC-30: the password-hash update and the session revocation must be atomic (a
+    // crash between the two writes must never leave the old password's sessions alive), so
+    // both run inside a single prisma.$transaction, with revokeAllSessionsForUser taking the
+    // transaction client instead of hitting the pool directly.
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.user.update({
+        where: { id: target.id },
+        data: { passwordHash, mustChangePassword: true },
+      });
+      await revokeAllSessionsForUser(target.id, tx);
+      return result;
     });
 
     res.status(200).json(toUserAdminDto(updated));

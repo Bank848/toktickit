@@ -296,3 +296,61 @@ describe('PATCH /api/v1/admin/users/:id', () => {
     expect(response.status).toBe(404);
   });
 });
+
+describe('PATCH /api/v1/admin/users/:id/password', () => {
+  let adminCookie: string;
+  let targetId: string;
+  let targetSessionCookie: string;
+
+  beforeAll(async () => {
+    const admin = await prisma.user.findUniqueOrThrow({ where: { email: 'admin@toktickit.local' } });
+    adminCookie = await createSessionCookieFor(admin.id);
+  });
+
+  beforeEach(async () => {
+    await prisma.user.deleteMany({ where: { email: 'password-target@toktickit.local' } });
+    const target = await prisma.user.create({
+      data: {
+        email: 'password-target@toktickit.local',
+        displayName: 'Password Target',
+        role: 'REQUESTER',
+        isActive: true,
+        mustChangePassword: false,
+      },
+    });
+    targetId = target.id;
+    targetSessionCookie = await createSessionCookieFor(targetId);
+  });
+
+  it('sets mustChangePassword true and revokes every existing session for that user', async () => {
+    const response = await request(app)
+      .patch(`/api/v1/admin/users/${targetId}/password`)
+      .set('Cookie', adminCookie)
+      .send({ newInitialPassword: 'An0ther!Secure' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.mustChangePassword).toBe(true);
+
+    // BR-26: the session created in beforeEach must now be dead.
+    const meResponse = await request(app).get('/api/v1/me').set('Cookie', targetSessionCookie);
+    expect(meResponse.status).toBe(401);
+  });
+
+  it('rejects a policy-invalid password with 422', async () => {
+    const response = await request(app)
+      .patch(`/api/v1/admin/users/${targetId}/password`)
+      .set('Cookie', adminCookie)
+      .send({ newInitialPassword: 'short' });
+
+    expect(response.status).toBe(422);
+  });
+
+  it('returns 404 for a nonexistent user id', async () => {
+    const response = await request(app)
+      .patch('/api/v1/admin/users/00000000-0000-0000-0000-000000000000/password')
+      .set('Cookie', adminCookie)
+      .send({ newInitialPassword: 'An0ther!Secure' });
+
+    expect(response.status).toBe(404);
+  });
+});
