@@ -166,5 +166,57 @@ npm run test:e2e
   is asserted.
 - Rate limiting / account lockout has no test because it is explicitly out of scope (BR-06,
   Assumption A-14) — its absence is intentional, not an oversight.
+
+**Status note (2026-09-08):** the consolidated file names listed in §1 and the "Automated Test
+File" column above for the #36 (Authentication Foundation) and #38+#39 (IT Staff Ticket Queue and
+Ticket Detail) rows described the intended shape before implementation. The actual repository
+landed on a finer-grained split (one file per concern rather than one file per issue) for both
+areas, confirmed against the merged Lab 3 implementation plan. The mappings below are the real,
+current file names — not the pre-implementation plan.
+
+Issue #36 (Authentication Foundation):
+
+- `server/tests/lab-03/auth.api.test.ts` (planned) → split into: `password.test.ts` (hashing
+  helper, UNIT-01), `session.test.ts` (session helper), `login.api.test.ts` (`POST
+  /api/v1/auth/login`), `logout.api.test.ts` (`POST /api/v1/auth/logout`), `passwordPolicy.test.ts`
+  (policy validator, UNIT-02), `meAndChangePassword.api.test.ts` (`GET /api/v1/me` + `POST
+  /api/v1/auth/change-password`), `assertPasswordCurrent.test.ts` and `passwordGate.api.test.ts`
+  (mandatory password-change gate)
+- `server/tests/lab-03/authorization.api.test.ts` (planned) → session-resolution coverage landed
+  in `resolveCurrentUser.test.ts` instead; the `mustChangePassword` gate landed in
+  `passwordGate.api.test.ts` above; role-gate and Requester-ownership 404-vs-403 coverage is not a
+  separate file at all — it is asserted inline in each protected route's own test file (e.g.
+  `requesterRegression.api.test.ts` for #37, `staffTicketsQueue.api.test.ts` for #38) rather than
+  centralized
+- `client/tests/lab-03/Login.test.tsx` (planned) → `client/tests/lab-03/LoginPage.test.tsx`
+- `client/tests/lab-03/ChangePassword.test.tsx` (planned) →
+  `client/tests/lab-03/ChangePasswordPage.test.tsx`; the role-nav-render assertions this file was
+  also planned to carry (UI-03) landed in a separate `client/tests/lab-03/AppShell.test.tsx`
+  instead
+
+Issue #38+#39 (IT Staff Ticket Queue and Ticket Detail):
+
+- `server/tests/lab-03/staff-queue.api.test.ts` (planned, kebab-case) → split into (camelCase):
+  `staffTicketsQueue.api.test.ts` (`GET /api/v1/staff/tickets`), `assignableOwners.api.test.ts`
+  (`GET /api/v1/staff/assignable-owners`), `staffListTicketsQuery.validator.test.ts` (query
+  validator, unit-style)
+- `server/tests/lab-03/staff-ticket-detail.api.test.ts` (planned, kebab-case) → split into
+  (camelCase): `staffTicketDetail.api.test.ts` (`GET .../tickets/:id`),
+  `staffTicketOwner.api.test.ts` (owner claim/reassign), `staffTicketPriority.api.test.ts` (IT
+  Priority), `staffTicketStatus.api.test.ts` (status transitions, table-driven) plus a dedicated
+  `ticketStatusTransitions.test.ts` for UNIT-03's direct `isValidTransition()` matrix coverage
+  (not folded into the API test file as originally planned), and `staffAttachments.api.test.ts`
+  (read-only staff attachments list, API-28)
+- `server/tests/lab-03/comments-notes.api.test.ts` — the Requester-facing half (#37) kept this
+  planned name; the Staff-facing half (API-27) split into `staffComments.api.test.ts` and
+  `staffNotes.api.test.ts` instead of sharing the one file
+- `client/tests/lab-03/StaffTicketQueue.test.tsx` (planned) →
+  `client/src/pages/StaffTicketQueuePage.test.tsx` — co-located next to the page component it
+  tests, not under `client/tests/lab-03/`
+- `client/tests/lab-03/StaffTicketDetail.test.tsx` (planned) →
+  `client/src/pages/StaffTicketDetailPage.test.tsx` — same co-location change as the Queue test
+  above
+- `client/tests/lab-03/UserManagement.test.tsx` (Issue #40, not #38+#39, included here since it
+  was checked at the same time): landed exactly as planned, no divergence.
 - Load/performance testing is out of scope for Lab 3, unchanged from Lab 2's position.
 - Cross-browser E2E remains Chromium-only, unchanged from Lab 2.
