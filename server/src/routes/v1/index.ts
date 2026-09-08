@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { resolveCurrentUser } from '../../auth/currentUser';
+import { authLoginRouter } from './auth';
 import { meRouter } from './me';
 import { devRouter } from './dev';
 import { categoriesV1Router } from './categories';
@@ -8,6 +9,10 @@ import { ticketsRouter } from './tickets';
 import { attachmentContentRouter } from './attachments';
 
 export const v1Router = Router();
+
+// POST /auth/login is the only route reachable with no session yet — mounted before
+// resolveCurrentUser so it never gets rejected for lacking a cookie that can't exist yet.
+v1Router.use('/auth/login', authLoginRouter);
 
 // /dev/* is how a caller gets identity in the first place (D-18) — it must stay reachable with
 // no identity yet, so it's mounted ahead of the blanket resolveCurrentUser below.
