@@ -28,6 +28,18 @@ const TERMINAL_STATUSES = new Set(['CLOSED', 'CANCELLED']);
 const PRIORITY_OPTIONS = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
 type SectionLoadState = 'loading' | 'loaded' | 'error';
+type FieldKey = 'owner' | 'priority' | 'status';
+
+function FieldRetryAlert({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div role="alert" className="alert alert-danger alert-sm mt-1 p-2">
+      <p className="mb-1">{message}</p>
+      <button type="button" className="btn btn-outline-danger btn-sm" onClick={onRetry}>
+        Retry
+      </button>
+    </div>
+  );
+}
 
 export function StaffTicketDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -54,13 +66,10 @@ export function StaffTicketDetailPage() {
   // that control rather than a page-level banner, so acting on one control's result is never
   // confused with another's") -- same panelAlert-style convention AdminUserManagementPage.tsx
   // uses for its one-click actions, and the same headerState==='error'-style Retry affordance
-  // this file already uses for the initial load.
-  const [ownerError, setOwnerError] = useState('');
-  const [lastOwnerAttempt, setLastOwnerAttempt] = useState('');
-  const [priorityError, setPriorityError] = useState('');
-  const [lastPriorityAttempt, setLastPriorityAttempt] = useState('');
-  const [statusError, setStatusError] = useState('');
-  const [lastStatusAttempt, setLastStatusAttempt] = useState('');
+  // this file already uses for the initial load. One record per concern (not three field sets)
+  // since owner/priority/status share the exact same set-error/retry shape.
+  const [fieldErrors, setFieldErrors] = useState<Record<FieldKey, string>>({ owner: '', priority: '', status: '' });
+  const [lastAttempts, setLastAttempts] = useState<Record<FieldKey, string>>({ owner: '', priority: '', status: '' });
 
   const loadHeader = useCallback(() => {
     setHeaderState('loading');
@@ -93,38 +102,33 @@ export function StaffTicketDetailPage() {
   useEffect(() => { loadNotes(); }, [loadNotes]);
   useEffect(() => { loadAttachments(); }, [loadAttachments]);
 
-  async function handleOwnerChange(ownerId: string) {
-    if (!ownerId) return;
-    setLastOwnerAttempt(ownerId);
-    setOwnerError('');
+  async function runFieldUpdate(
+    field: FieldKey,
+    value: string,
+    update: (id: string, value: string) => Promise<StaffTicketDetailDto>,
+    fallbackMessage: string,
+  ) {
+    setLastAttempts((prev) => ({ ...prev, [field]: value }));
+    setFieldErrors((prev) => ({ ...prev, [field]: '' }));
     try {
-      const updated = await updateTicketOwner(ticketId, ownerId);
+      const updated = await update(ticketId, value);
       setTicket(updated);
     } catch (error) {
-      setOwnerError(error instanceof ApiError ? error.message : 'Failed to update owner.');
+      setFieldErrors((prev) => ({ ...prev, [field]: error instanceof ApiError ? error.message : fallbackMessage }));
     }
+  }
+
+  async function handleOwnerChange(ownerId: string) {
+    if (!ownerId) return;
+    await runFieldUpdate('owner', ownerId, updateTicketOwner, 'Failed to update owner.');
   }
 
   async function handlePriorityChange(itPriority: string) {
-    setLastPriorityAttempt(itPriority);
-    setPriorityError('');
-    try {
-      const updated = await updateTicketPriority(ticketId, itPriority);
-      setTicket(updated);
-    } catch (error) {
-      setPriorityError(error instanceof ApiError ? error.message : 'Failed to update IT Priority.');
-    }
+    await runFieldUpdate('priority', itPriority, updateTicketPriority, 'Failed to update IT Priority.');
   }
 
   async function handleStatusChange(status: string) {
-    setLastStatusAttempt(status);
-    setStatusError('');
-    try {
-      const updated = await updateTicketStatus(ticketId, status);
-      setTicket(updated);
-    } catch (error) {
-      setStatusError(error instanceof ApiError ? error.message : 'Failed to update status.');
-    }
+    await runFieldUpdate('status', status, updateTicketStatus, 'Failed to update status.');
   }
 
   async function handlePostComment() {
@@ -196,17 +200,8 @@ export function StaffTicketDetailPage() {
               <option key={owner.id} value={owner.id}>{owner.displayName}</option>
             ))}
           </select>
-          {ownerError && (
-            <div role="alert" className="alert alert-danger alert-sm mt-1 p-2">
-              <p className="mb-1">{ownerError}</p>
-              <button
-                type="button"
-                className="btn btn-outline-danger btn-sm"
-                onClick={() => handleOwnerChange(lastOwnerAttempt)}
-              >
-                Retry
-              </button>
-            </div>
+          {fieldErrors.owner && (
+            <FieldRetryAlert message={fieldErrors.owner} onRetry={() => handleOwnerChange(lastAttempts.owner)} />
           )}
         </div>
 
@@ -224,17 +219,11 @@ export function StaffTicketDetailPage() {
               <option key={value} value={value}>{value}</option>
             ))}
           </select>
-          {priorityError && (
-            <div role="alert" className="alert alert-danger alert-sm mt-1 p-2">
-              <p className="mb-1">{priorityError}</p>
-              <button
-                type="button"
-                className="btn btn-outline-danger btn-sm"
-                onClick={() => handlePriorityChange(lastPriorityAttempt)}
-              >
-                Retry
-              </button>
-            </div>
+          {fieldErrors.priority && (
+            <FieldRetryAlert
+              message={fieldErrors.priority}
+              onRetry={() => handlePriorityChange(lastAttempts.priority)}
+            />
           )}
         </div>
 
@@ -268,17 +257,8 @@ export function StaffTicketDetailPage() {
               <option key={value} value={value}>{value}</option>
             ))}
           </select>
-          {statusError && (
-            <div role="alert" className="alert alert-danger alert-sm mt-1 p-2">
-              <p className="mb-1">{statusError}</p>
-              <button
-                type="button"
-                className="btn btn-outline-danger btn-sm"
-                onClick={() => handleStatusChange(lastStatusAttempt)}
-              >
-                Retry
-              </button>
-            </div>
+          {fieldErrors.status && (
+            <FieldRetryAlert message={fieldErrors.status} onRetry={() => handleStatusChange(lastAttempts.status)} />
           )}
         </div>
       </div>
