@@ -8,8 +8,13 @@ import {
 } from '../api/staffTickets';
 import { ApiError } from '../api/tickets';
 import { displayCommentBody } from '../lib/commentDisplay';
-import { TicketStatusBadge, PriorityBadge } from '../components/TicketStatusBadge';
+import { TicketStatusBadge, PriorityBadge, STATUS_OPTIONS, PRIORITY_OPTIONS } from '../components/TicketStatusBadge';
 import { Icon } from '../components/Icon';
+
+// Humanized labels for the option lists below, kept in sync with the badges via the same source
+// maps (ui-spec.md never shows raw enum strings like WAITING_FOR_REQUESTER to a user).
+const STATUS_LABELS: Record<string, string> = Object.fromEntries(STATUS_OPTIONS.map((o) => [o.value, o.label]));
+const PRIORITY_LABELS: Record<string, string> = Object.fromEntries(PRIORITY_OPTIONS.map((o) => [o.value, o.label]));
 
 // Mirrors server/src/services/ticketStatusTransitions.ts exactly (specification.md §4.4) so an
 // IT Staff member is never shown an option the server would reject (ui-spec.md §8).
@@ -25,7 +30,7 @@ const STATUS_TRANSITIONS: Record<string, string[]> = {
 };
 
 const TERMINAL_STATUSES = new Set(['CLOSED', 'CANCELLED']);
-const PRIORITY_OPTIONS = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
+const PRIORITY_VALUES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
 type SectionLoadState = 'loading' | 'loaded' | 'error';
 type FieldKey = 'owner' | 'priority' | 'status';
@@ -178,11 +183,38 @@ export function StaffTicketDetailPage() {
 
   return (
     <div>
-      <h1>{ticket.ticketNo}</h1>
-      <p>{ticket.summary}</p>
-      <p>{ticket.description}</p>
-      <p><strong>Requester:</strong> {ticket.requester.displayName}</p>
-      <p><strong>Requested Priority:</strong> <PriorityBadge priority={ticket.requestedPriority} /></p>
+      <div className="card mb-3">
+        <div className="card-body">
+          <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <h1 className="mb-0 me-2">{ticket.ticketNo}</h1>
+            <span data-testid="ticket-status-badge">
+              <TicketStatusBadge status={ticket.status} />
+            </span>
+          </div>
+
+          <dl className="row mb-4">
+            <dt className="col-6 col-md-2 field-label">Date</dt>
+            <dd className="col-6 col-md-4">{new Date(ticket.createdAt).toLocaleString()}</dd>
+            <dt className="col-6 col-md-2 field-label">Category</dt>
+            <dd className="col-6 col-md-4">{ticket.category.name}</dd>
+
+            <dt className="col-6 col-md-2 field-label">Related System</dt>
+            <dd className="col-6 col-md-4">{ticket.relatedSystem?.name ?? 'Not applicable'}</dd>
+            <dt className="col-6 col-md-2 field-label">Requester</dt>
+            <dd className="col-6 col-md-4">{ticket.requester.displayName}</dd>
+
+            <dt className="col-6 col-md-2 field-label">Requested Priority</dt>
+            <dd className="col-6 col-md-4"><PriorityBadge priority={ticket.requestedPriority} /></dd>
+          </dl>
+
+          <h2>Summary</h2>
+          <p>{ticket.summary}</p>
+          <h2>Description</h2>
+          <p style={{ whiteSpace: 'pre-wrap' }}>{ticket.description}</p>
+          <h2>Resolution</h2>
+          <p className="text-body-secondary mb-0">{ticket.resolutionSummary ?? 'No resolution yet'}</p>
+        </div>
+      </div>
 
       <div className="row g-3 mb-4">
         <div className="col-md-4">
@@ -215,8 +247,8 @@ export function StaffTicketDetailPage() {
             title={ticketLocked ? 'Locked: ticket is Closed/Cancelled' : undefined}
             onChange={(event) => handlePriorityChange(event.target.value)}
           >
-            {PRIORITY_OPTIONS.map((value) => (
-              <option key={value} value={value}>{value}</option>
+            {PRIORITY_VALUES.map((value) => (
+              <option key={value} value={value}>{PRIORITY_LABELS[value] ?? value}</option>
             ))}
           </select>
           {fieldErrors.priority && (
@@ -254,7 +286,7 @@ export function StaffTicketDetailPage() {
                 to" action, not a second display of current status. */}
             <option value="" disabled>Select new status…</option>
             {statusOptions.map((value) => (
-              <option key={value} value={value}>{value}</option>
+              <option key={value} value={value}>{STATUS_LABELS[value] ?? value}</option>
             ))}
           </select>
           {fieldErrors.status && (
@@ -262,8 +294,6 @@ export function StaffTicketDetailPage() {
           )}
         </div>
       </div>
-
-      <p><strong>Status:</strong> <TicketStatusBadge status={ticket.status} /></p>
 
       <section className="mb-4">
         <h2>Public Comments</h2>
