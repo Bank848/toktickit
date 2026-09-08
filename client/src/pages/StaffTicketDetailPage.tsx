@@ -6,8 +6,25 @@ import {
   fetchStaffTicketAttachments,
   type StaffTicketDetailDto, type UserSummaryDto, type CommentDto, type InternalNoteDto, type AttachmentDto,
 } from '../api/staffTickets';
+import { ApiError } from '../api/tickets';
 import { TicketStatusBadge, PriorityBadge } from '../components/TicketStatusBadge';
 import { Icon } from '../components/Icon';
+
+// Mirrors CommentSection.tsx's prefix-stripping + badge rendering exactly (ui-spec.md:124-126,
+// :212-214 -- IT Staff must see the same "Problem Appears Resolved" badge the Requester sees,
+// without parsing the stored text prefix themselves). Not imported from CommentSection.tsx
+// directly: that component owns its own fetch/post against the Requester-facing
+// /api/v1/tickets/:id/comments endpoint and bundles the "problem resolved" checkbox form, which
+// the staff side must not show (the staff POST endpoint 422s problemAppearsResolved -- api-spec
+// #22, A-08) -- and CommentSection.tsx currently exports no smaller piece to import instead.
+const PROBLEM_RESOLVED_PREFIX = '[Requester marked: problem appears resolved] ';
+
+function displayCommentBody(body: string): { text: string; flagged: boolean } {
+  if (body.startsWith(PROBLEM_RESOLVED_PREFIX)) {
+    return { text: body.slice(PROBLEM_RESOLVED_PREFIX.length), flagged: true };
+  }
+  return { text: body, flagged: false };
+}
 
 // Mirrors server/src/services/ticketStatusTransitions.ts exactly (specification.md §4.4) so an
 // IT Staff member is never shown an option the server would reject (ui-spec.md §8).
@@ -48,6 +65,18 @@ export function StaffTicketDetailPage() {
   const [attachments, setAttachments] = useState<AttachmentDto[]>([]);
   const [attachmentsState, setAttachmentsState] = useState<SectionLoadState>('loading');
 
+  // Per-control save-failure feedback (ui-spec.md:220-222: "shown as a small inline toast near
+  // that control rather than a page-level banner, so acting on one control's result is never
+  // confused with another's") -- same panelAlert-style convention AdminUserManagementPage.tsx
+  // uses for its one-click actions, and the same headerState==='error'-style Retry affordance
+  // this file already uses for the initial load.
+  const [ownerError, setOwnerError] = useState('');
+  const [lastOwnerAttempt, setLastOwnerAttempt] = useState('');
+  const [priorityError, setPriorityError] = useState('');
+  const [lastPriorityAttempt, setLastPriorityAttempt] = useState('');
+  const [statusError, setStatusError] = useState('');
+  const [lastStatusAttempt, setLastStatusAttempt] = useState('');
+
   const loadHeader = useCallback(() => {
     setHeaderState('loading');
     Promise.all([fetchStaffTicketDetail(ticketId), fetchAssignableOwners()])
@@ -81,18 +110,36 @@ export function StaffTicketDetailPage() {
 
   async function handleOwnerChange(ownerId: string) {
     if (!ownerId) return;
-    const updated = await updateTicketOwner(ticketId, ownerId);
-    setTicket(updated);
+    setLastOwnerAttempt(ownerId);
+    setOwnerError('');
+    try {
+      const updated = await updateTicketOwner(ticketId, ownerId);
+      setTicket(updated);
+    } catch (error) {
+      setOwnerError(error instanceof ApiError ? error.message : 'Failed to update owner.');
+    }
   }
 
   async function handlePriorityChange(itPriority: string) {
-    const updated = await updateTicketPriority(ticketId, itPriority);
-    setTicket(updated);
+    setLastPriorityAttempt(itPriority);
+    setPriorityError('');
+    try {
+      const updated = await updateTicketPriority(ticketId, itPriority);
+      setTicket(updated);
+    } catch (error) {
+      setPriorityError(error instanceof ApiError ? error.message : 'Failed to update IT Priority.');
+    }
   }
 
   async function handleStatusChange(status: string) {
-    const updated = await updateTicketStatus(ticketId, status);
-    setTicket(updated);
+    setLastStatusAttempt(status);
+    setStatusError('');
+    try {
+      const updated = await updateTicketStatus(ticketId, status);
+      setTicket(updated);
+    } catch (error) {
+      setStatusError(error instanceof ApiError ? error.message : 'Failed to update status.');
+    }
   }
 
   async function handlePostComment() {
@@ -153,6 +200,8 @@ export function StaffTicketDetailPage() {
             id="staff-detail-owner"
             className="form-select"
             value={ticket.owner?.id ?? ''}
+            disabled={priorityLocked}
+            title={priorityLocked ? 'Locked: ticket is Closed/Cancelled' : undefined}
             onChange={(event) => handleOwnerChange(event.target.value)}
           >
             {!ticket.owner && <option value="">Unassigned</option>}
@@ -160,6 +209,18 @@ export function StaffTicketDetailPage() {
               <option key={owner.id} value={owner.id}>{owner.displayName}</option>
             ))}
           </select>
+          {ownerError && (
+            <div role="alert" className="alert alert-danger alert-sm mt-1 p-2">
+              <p className="mb-1">{ownerError}</p>
+              <button
+                type="button"
+                className="btn btn-outline-danger btn-sm"
+                onClick={() => handleOwnerChange(lastOwnerAttempt)}
+              >
+                Retry
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="col-md-4">
@@ -176,6 +237,18 @@ export function StaffTicketDetailPage() {
               <option key={value} value={value}>{value}</option>
             ))}
           </select>
+          {priorityError && (
+            <div role="alert" className="alert alert-danger alert-sm mt-1 p-2">
+              <p className="mb-1">{priorityError}</p>
+              <button
+                type="button"
+                className="btn btn-outline-danger btn-sm"
+                onClick={() => handlePriorityChange(lastPriorityAttempt)}
+              >
+                Retry
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="col-md-4">
@@ -194,10 +267,32 @@ export function StaffTicketDetailPage() {
             }
             onChange={(event) => handleStatusChange(event.target.value)}
           >
+            {/* A real disabled placeholder option, not just an empty string default (N17): the
+                option list below is transition *targets*, which by design excludes the ticket's
+                own current status (specification.md §4.4) -- e.g. for a NEW, unassigned ticket
+                the only target is CANCELLED. Without this placeholder, the browser falls back to
+                visually selecting that lone option, so a New ticket's select would misleadingly
+                display "CANCELLED" even though the ticket is not cancelled (the TicketStatusBadge
+                just below already shows the real, correct status). Keeping the select -- rather
+                than removing it -- matches ui-spec.md's description of this control as a "change
+                to" action, not a second display of current status. */}
+            <option value="" disabled>Select new status…</option>
             {statusOptions.map((value) => (
               <option key={value} value={value}>{value}</option>
             ))}
           </select>
+          {statusError && (
+            <div role="alert" className="alert alert-danger alert-sm mt-1 p-2">
+              <p className="mb-1">{statusError}</p>
+              <button
+                type="button"
+                className="btn btn-outline-danger btn-sm"
+                onClick={() => handleStatusChange(lastStatusAttempt)}
+              >
+                Retry
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -213,14 +308,23 @@ export function StaffTicketDetailPage() {
           </div>
         )}
         {commentsState === 'loaded' && comments.length === 0 && <p>No comments yet.</p>}
-        {commentsState === 'loaded' && comments.map((comment) => (
-          <div key={comment.id} className="border-bottom py-2">
-            <strong>{comment.author.displayName}</strong>{' '}
-            <span className="badge badge-tone-neutral">{comment.authorRole === 'REQUESTER' ? 'Requester' : 'IT Staff'}</span>{' '}
-            <span className="text-body-secondary small">{new Date(comment.createdAt).toLocaleString()}</span>
-            <p className="mb-0">{comment.body}</p>
-          </div>
-        ))}
+        {commentsState === 'loaded' && comments.map((comment) => {
+          const { text, flagged } = displayCommentBody(comment.body);
+          return (
+            <div key={comment.id} className="border-bottom py-2">
+              <strong>{comment.author.displayName}</strong>{' '}
+              <span className="badge badge-tone-neutral">{comment.authorRole === 'REQUESTER' ? 'Requester' : 'IT Staff'}</span>{' '}
+              <span className="text-body-secondary small">{new Date(comment.createdAt).toLocaleString()}</span>{' '}
+              {flagged && (
+                <span className="badge badge-tone-pale">
+                  <Icon name="check-circle-fill" />
+                  Problem Appears Resolved
+                </span>
+              )}
+              <p className="mb-0">{text}</p>
+            </div>
+          );
+        })}
         <textarea
           className="form-control mt-2"
           placeholder="Type your comment here…"
