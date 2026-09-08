@@ -149,3 +149,150 @@ describe('POST /api/v1/admin/users', () => {
     expect(response.status).toBe(403);
   });
 });
+
+describe('PATCH /api/v1/admin/users/:id', () => {
+  let adminCookie: string;
+  let adminId: string;
+  let targetId: string;
+
+  beforeAll(async () => {
+    const admin = await prisma.user.findUniqueOrThrow({ where: { email: 'admin@toktickit.local' } });
+    adminId = admin.id;
+    adminCookie = await createSessionCookieFor(admin.id);
+  });
+
+  beforeEach(async () => {
+    await prisma.user.deleteMany({ where: { email: 'edit-target@toktickit.local' } });
+    const target = await prisma.user.create({
+      data: {
+        email: 'edit-target@toktickit.local',
+        displayName: 'Edit Target',
+        role: 'REQUESTER',
+        isActive: true,
+      },
+    });
+    targetId = target.id;
+  });
+
+  it('updates displayName/email/role/isActive', async () => {
+    const response = await request(app)
+      .patch(`/api/v1/admin/users/${targetId}`)
+      .set('Cookie', adminCookie)
+      .send({ displayName: 'Renamed', email: 'edit-target@toktickit.local', role: 'IT_STAFF', isActive: false });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ displayName: 'Renamed', role: 'IT_STAFF', isActive: false });
+  });
+
+  it('rejects an edit that reuses another user\'s email with 409', async () => {
+    const response = await request(app)
+      .patch(`/api/v1/admin/users/${targetId}`)
+      .set('Cookie', adminCookie)
+      .send({ displayName: 'Edit Target', email: 'admin@toktickit.local', role: 'REQUESTER', isActive: true });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe('EMAIL_ALREADY_EXISTS');
+  });
+
+  it('rejects an Administrator deactivating their own account with 409 SELF_DEACTIVATION_BLOCKED', async () => {
+    const response = await request(app)
+      .patch(`/api/v1/admin/users/${adminId}`)
+      .set('Cookie', adminCookie)
+      .send({ displayName: 'System Admin', email: 'admin@toktickit.local', role: 'ADMINISTRATOR', isActive: false });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe('SELF_DEACTIVATION_BLOCKED');
+    const stillActive = await prisma.user.findUniqueOrThrow({ where: { id: adminId } });
+    expect(stillActive.isActive).toBe(true);
+  });
+
+  it('rejects deactivating the last active Administrator with 409 LAST_ADMIN_PROTECTED (role-change branch, API-33)', async () => {
+    // Seed guarantees exactly one active ADMINISTRATOR at this point in the suite unless another
+    // test created a second one; make it explicit by deactivating any other admins first.
+    await prisma.user.updateMany({
+      where: { role: 'ADMINISTRATOR', id: { not: adminId } },
+      data: { isActive: false },
+    });
+
+    const response = await request(app)
+      .patch(`/api/v1/admin/users/${adminId}`)
+      .set('Cookie', adminCookie)
+      .send({ displayName: 'System Admin', email: 'admin@toktickit.local', role: 'REQUESTER', isActive: true });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe('LAST_ADMIN_PROTECTED');
+  });
+
+  it('rejects deactivating (isActive: false, role unchanged) the last active Administrator, keeping the account active (deactivate branch, API-33/BR-28)', async () => {
+    // api-spec.md #29's ordered checks put self-deactivation (BR-27) strictly before last-admin
+    // protection (BR-28), and BR-27 has no last-admin carve-out. Combined with BR-11 (isActive is
+    // re-checked live on every request, so the acting Administrator making this call must
+    // currently be active themselves), the pure "isActive: false, role unchanged" branch of
+    // BR-28 is unreachable for a non-self target: any active, authenticated Administrator other
+    // than the target is itself counted as an "other active Administrator", so the last-admin
+    // guard only ever finds otherActiveAdmins === 0 when target === actor -- and that case is
+    // always intercepted first by BR-27's unconditional self-deactivation block. So this request
+    // correctly surfaces SELF_DEACTIVATION_BLOCKED rather than LAST_ADMIN_PROTECTED; what BR-28
+    // actually guarantees here -- the account/role staying unchanged -- is still verified below.
+    await prisma.user.updateMany({
+      where: { role: 'ADMINISTRATOR', id: { not: adminId } },
+      data: { isActive: false },
+    });
+
+    const response = await request(app)
+      .patch(`/api/v1/admin/users/${adminId}`)
+      .set('Cookie', adminCookie)
+      .send({ displayName: 'System Admin', email: 'admin@toktickit.local', role: 'ADMINISTRATOR', isActive: false });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe('SELF_DEACTIVATION_BLOCKED');
+    const stillActive = await prisma.user.findUniqueOrThrow({ where: { id: adminId } });
+    expect(stillActive.isActive).toBe(true);
+    expect(stillActive.role).toBe('ADMINISTRATOR');
+  });
+
+  it('normalizes email to lowercase before storing on edit too (UNIT-04)', async () => {
+    const response = await request(app)
+      .patch(`/api/v1/admin/users/${targetId}`)
+      .set('Cookie', adminCookie)
+      .send({ displayName: 'Edit Target', email: 'Edit-Target@TokTickIT.Local', role: 'REQUESTER', isActive: true });
+
+    expect(response.status).toBe(200);
+    expect(response.body.email).toBe('edit-target@toktickit.local');
+  });
+
+  it('deactivating a non-Administrator user only sets isActive: false; the row is never hard-deleted (BR-29, API-35)', async () => {
+    const response = await request(app)
+      .patch(`/api/v1/admin/users/${targetId}`)
+      .set('Cookie', adminCookie)
+      .send({ displayName: 'Edit Target', email: 'edit-target@toktickit.local', role: 'REQUESTER', isActive: false });
+
+    expect(response.status).toBe(200);
+    expect(response.body.isActive).toBe(false);
+
+    // No DELETE route exists for this resource at all -- deactivation is the only removal path.
+    const deleteAttempt = await request(app)
+      .delete(`/api/v1/admin/users/${targetId}`)
+      .set('Cookie', adminCookie);
+    expect(deleteAttempt.status).toBe(404);
+
+    // The deactivated row is still present (and still listed), never hard-deleted.
+    const stillPresent = await prisma.user.findUnique({ where: { id: targetId } });
+    expect(stillPresent).not.toBeNull();
+    expect(stillPresent?.isActive).toBe(false);
+
+    const listResponse = await request(app).get('/api/v1/admin/users').set('Cookie', adminCookie);
+    expect(listResponse.body.some((u: { id: string }) => u.id === targetId)).toBe(true);
+  });
+
+  it('returns 404 for a nonexistent user id', async () => {
+    // displayName must independently satisfy validateUpdateUserRequest's 2-100 char rule (a
+    // single character fails validation with 422 before the 404 not-found check is ever reached).
+    const response = await request(app)
+      .patch('/api/v1/admin/users/00000000-0000-0000-0000-000000000000')
+      .set('Cookie', adminCookie)
+      .send({ displayName: 'Nonexistent', email: 'x@toktickit.local', role: 'REQUESTER', isActive: true });
+
+    expect(response.status).toBe(404);
+  });
+});
