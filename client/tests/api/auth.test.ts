@@ -1,12 +1,8 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { login, logout, fetchMe, changePassword, LoginRequestError, ChangePasswordRequestError } from '../../src/api/auth';
-import { mockJsonResponse, stubFetch } from './testHelpers';
+import { API_BASE_URL, mockJsonResponse, resetFetchAfterEach, stubFetch } from './testHelpers';
 
-const API_BASE_URL = 'http://localhost:4000';
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
+resetFetchAfterEach();
 
 const CURRENT_USER = {
   id: 'u1',

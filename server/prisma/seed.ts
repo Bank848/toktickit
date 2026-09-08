@@ -89,9 +89,11 @@ async function main() {
   // that predates the Lab 3 migration, so E2E can prove existing Requester tickets survive the
   // move to session-based auth. Upserted by the fixed ticketNo (unique) so re-running the seed
   // never duplicates it.
-  const lab2Requester = await prisma.user.findUniqueOrThrow({ where: { email: 'requester@toktickit.local' } });
-  const networkCategory = await prisma.category.findUniqueOrThrow({ where: { name: 'Network' } });
-  const vpnSystem = await prisma.relatedSystem.findUniqueOrThrow({ where: { code: 'VPN' } });
+  const [lab2Requester, networkCategory, vpnSystem] = await Promise.all([
+    prisma.user.findUniqueOrThrow({ where: { email: 'requester@toktickit.local' } }),
+    prisma.category.findUniqueOrThrow({ where: { name: 'Network' } }),
+    prisma.relatedSystem.findUniqueOrThrow({ where: { code: 'VPN' } }),
+  ]);
 
   await prisma.ticket.upsert({
     where: { ticketNo: 'TKT-2025-00001' },

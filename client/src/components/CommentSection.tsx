@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { fetchComments, postComment, type CommentDto } from '../api/comments';
 import { ApiError } from '../api/tickets';
+import { displayCommentBody } from '../lib/commentDisplay';
 import { Icon } from './Icon';
 
-// Must match the server's literal in server/src/routes/v1/comments.ts exactly (A-08) -- this
-// is a display-only parse, never sent back to the server as literal text.
-const PROBLEM_RESOLVED_PREFIX = '[Requester marked: problem appears resolved] ';
 const MAX_COMMENT_LENGTH = 2000;
 
 interface Props {
@@ -13,13 +11,6 @@ interface Props {
 }
 
 type ListState = 'loading' | 'loaded' | 'error';
-
-function displayBody(body: string): { text: string; flagged: boolean } {
-  if (body.startsWith(PROBLEM_RESOLVED_PREFIX)) {
-    return { text: body.slice(PROBLEM_RESOLVED_PREFIX.length), flagged: true };
-  }
-  return { text: body, flagged: false };
-}
 
 export function CommentSection({ ticketId }: Props) {
   const [comments, setComments] = useState<CommentDto[]>([]);
@@ -96,7 +87,7 @@ export function CommentSection({ ticketId }: Props) {
       {listState === 'loaded' && comments.length > 0 && (
         <ul className="list-unstyled comment-list">
           {comments.map((c) => {
-            const { text, flagged } = displayBody(c.body);
+            const { text, flagged } = displayCommentBody(c.body);
             return (
               <li key={c.id} data-testid="comment-row" className="comment-row">
                 <div className="d-flex flex-wrap align-items-center gap-2">

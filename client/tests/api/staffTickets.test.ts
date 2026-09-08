@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   fetchStaffTickets,
   fetchAssignableOwners,
@@ -12,13 +12,9 @@ import {
   postStaffNote,
   fetchStaffTicketAttachments,
 } from '../../src/api/staffTickets';
-import { mockJsonResponse, stubFetch } from './testHelpers';
+import { API_BASE_URL, mockJsonResponse, resetFetchAfterEach, stubFetch } from './testHelpers';
 
-const API_BASE_URL = 'http://localhost:4000';
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
+resetFetchAfterEach();
 
 describe('fetchStaffTickets', () => {
   it('requests the queue with no query string when called with no args', async () => {
