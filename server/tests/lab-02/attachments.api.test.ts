@@ -5,6 +5,7 @@ import { app } from '../../src/app';
 import { prisma } from '../../src/prisma';
 import { attachmentStorage } from '../../src/lib/attachmentStorage';
 import { truncateTicketTables } from '../helpers/resetDb';
+import { createSessionCookieFor } from '../helpers/session';
 
 const PNG_BYTES = Buffer.concat([
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
@@ -78,7 +79,7 @@ describe('Attachments API', () => {
     it('returns 404 for a nonexistent ticket', async () => {
       const response = await request(app)
         .post(`/api/v1/tickets/${randomUUID()}/attachments`)
-        .set('x-dev-user-id', requesterId)
+        .set('Cookie', await createSessionCookieFor(requesterId))
         .attach('file', PDF_BYTES, { filename: 'doc.pdf', contentType: 'application/pdf' });
       expect(response.status).toBe(404);
     });
@@ -88,7 +89,7 @@ describe('Attachments API', () => {
       const ticket = await createTicket({ requesterId: other.id });
       const response = await request(app)
         .post(`/api/v1/tickets/${ticket.id}/attachments`)
-        .set('x-dev-user-id', requesterId)
+        .set('Cookie', await createSessionCookieFor(requesterId))
         .attach('file', PDF_BYTES, { filename: 'doc.pdf', contentType: 'application/pdf' });
       expect(response.status).toBe(404);
     });
@@ -100,7 +101,7 @@ describe('Attachments API', () => {
       // 404 that ticket-ownership checking produces.
       const response = await request(app)
         .post(`/api/v1/tickets/${randomUUID()}/attachments`)
-        .set('x-dev-user-id', requesterId)
+        .set('Cookie', await createSessionCookieFor(requesterId))
         .set('Content-Type', 'multipart/form-data; boundary=----malformedBoundary')
         .send('this is not a valid multipart body');
       expect(response.status).toBe(404);
@@ -113,7 +114,7 @@ describe('Attachments API', () => {
       }
       const response = await request(app)
         .post(`/api/v1/tickets/${ticket.id}/attachments`)
-        .set('x-dev-user-id', requesterId)
+        .set('Cookie', await createSessionCookieFor(requesterId))
         .attach('file', PDF_BYTES, { filename: 'doc.pdf', contentType: 'application/pdf' });
       expect(response.status).toBe(409);
       expect(response.body.error.code).toBe('ATTACHMENT_LIMIT_REACHED');
@@ -128,7 +129,7 @@ describe('Attachments API', () => {
 
       const response = await request(app)
         .post(`/api/v1/tickets/${ticket.id}/attachments`)
-        .set('x-dev-user-id', requesterId)
+        .set('Cookie', await createSessionCookieFor(requesterId))
         .attach('file', PDF_BYTES, { filename: 'doc.pdf', contentType: 'application/pdf' });
       expect(response.status).toBe(201);
     });
@@ -137,7 +138,7 @@ describe('Attachments API', () => {
       const ticket = await createTicket();
       const response = await request(app)
         .post(`/api/v1/tickets/${ticket.id}/attachments`)
-        .set('x-dev-user-id', requesterId)
+        .set('Cookie', await createSessionCookieFor(requesterId))
         .attach('file', OVERSIZED_PDF_BYTES, { filename: 'big.pdf', contentType: 'application/pdf' });
       expect(response.status).toBe(413);
       expect(response.body.error.code).toBe('ATTACHMENT_TOO_LARGE');
@@ -147,7 +148,7 @@ describe('Attachments API', () => {
       const ticket = await createTicket();
       const response = await request(app)
         .post(`/api/v1/tickets/${ticket.id}/attachments`)
-        .set('x-dev-user-id', requesterId)
+        .set('Cookie', await createSessionCookieFor(requesterId))
         .attach('file', Buffer.from('MZ executable stub'), { filename: 'virus.exe', contentType: 'application/octet-stream' });
       expect(response.status).toBe(422);
       expect(response.body.error.code).toBe('ATTACHMENT_TYPE_REJECTED');
@@ -157,7 +158,7 @@ describe('Attachments API', () => {
       const ticket = await createTicket();
       const response = await request(app)
         .post(`/api/v1/tickets/${ticket.id}/attachments`)
-        .set('x-dev-user-id', requesterId)
+        .set('Cookie', await createSessionCookieFor(requesterId))
         .attach('file', PDF_BYTES, { filename: 'doc.pdf', contentType: 'application/pdf' });
 
       expect(response.status).toBe(201);
@@ -182,7 +183,7 @@ describe('Attachments API', () => {
 
       const response = await request(app)
         .post(`/api/v1/tickets/${ticket.id}/attachments`)
-        .set('x-dev-user-id', requesterId)
+        .set('Cookie', await createSessionCookieFor(requesterId))
         .attach('file', PDF_BYTES, { filename: 'doc.pdf', contentType: 'application/pdf' });
 
       expect(response.status).toBe(500);
@@ -209,7 +210,7 @@ describe('Attachments API', () => {
 
       const response = await request(app)
         .get(`/api/v1/attachments/${attachment.id}/content`)
-        .set('x-dev-user-id', requesterId)
+        .set('Cookie', await createSessionCookieFor(requesterId))
         .buffer(true)
         .parse((res, callback) => {
           const chunks: Buffer[] = [];
@@ -230,7 +231,7 @@ describe('Attachments API', () => {
 
       const response = await request(app)
         .get(`/api/v1/attachments/${attachment.id}/content`)
-        .set('x-dev-user-id', requesterId);
+        .set('Cookie', await createSessionCookieFor(requesterId));
       expect(response.status).toBe(410);
     });
 
@@ -241,7 +242,7 @@ describe('Attachments API', () => {
 
       const response = await request(app)
         .get(`/api/v1/attachments/${attachment.id}/content`)
-        .set('x-dev-user-id', requesterId);
+        .set('Cookie', await createSessionCookieFor(requesterId));
       expect(response.status).toBe(404);
     });
   });
@@ -250,7 +251,7 @@ describe('Attachments API', () => {
     it('returns 404 for a nonexistent attachment even with a malformed reason, before validating reason', async () => {
       const response = await request(app)
         .delete(`/api/v1/attachments/${randomUUID()}`)
-        .set('x-dev-user-id', requesterId)
+        .set('Cookie', await createSessionCookieFor(requesterId))
         .send({ reason: '' });
       expect(response.status).toBe(404);
     });
@@ -261,7 +262,7 @@ describe('Attachments API', () => {
 
       const response = await request(app)
         .delete(`/api/v1/attachments/${attachment.id}`)
-        .set('x-dev-user-id', requesterId)
+        .set('Cookie', await createSessionCookieFor(requesterId))
         .send({});
       expect(response.status).toBe(422);
     });
@@ -276,7 +277,7 @@ describe('Attachments API', () => {
 
       const response = await request(app)
         .delete(`/api/v1/attachments/${attachment.id}`)
-        .set('x-dev-user-id', requesterId)
+        .set('Cookie', await createSessionCookieFor(requesterId))
         .send({ reason: 'Not mine to remove' });
       expect(response.status).toBe(403);
       expect(response.body.error.code).toBe('ATTACHMENT_NOT_OWNED');
@@ -288,7 +289,7 @@ describe('Attachments API', () => {
 
       const response = await request(app)
         .delete(`/api/v1/attachments/${attachment.id}`)
-        .set('x-dev-user-id', requesterId)
+        .set('Cookie', await createSessionCookieFor(requesterId))
         .send({ reason: 'Uploaded by mistake' });
       expect(response.status).toBe(409);
       expect(response.body.error.code).toBe('TICKET_CLOSED');
@@ -300,7 +301,7 @@ describe('Attachments API', () => {
 
       const response = await request(app)
         .delete(`/api/v1/attachments/${attachment.id}`)
-        .set('x-dev-user-id', requesterId)
+        .set('Cookie', await createSessionCookieFor(requesterId))
         .send({ reason: 'Uploaded the wrong file' });
 
       expect(response.status).toBe(200);
@@ -315,7 +316,7 @@ describe('Attachments API', () => {
 
       const followUp = await request(app)
         .get(`/api/v1/attachments/${attachment.id}/content`)
-        .set('x-dev-user-id', requesterId);
+        .set('Cookie', await createSessionCookieFor(requesterId));
       expect(followUp.status).toBe(410);
     });
   });
