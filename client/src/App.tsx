@@ -7,6 +7,7 @@ import { SystemCheckPage } from './pages/SystemCheckPage';
 import { CreateTicketPage } from './pages/CreateTicketPage';
 import { MyTicketsPage } from './pages/MyTicketsPage';
 import { TicketDetailPage } from './pages/TicketDetailPage';
+import { StaffTicketQueuePage } from './pages/StaffTicketQueuePage';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
           <Route path="/tickets" element={<MyTicketsPage />} />
           <Route path="/tickets/new" element={<CreateTicketPage />} />
           <Route path="/tickets/:id" element={<TicketDetailPage />} />
+          <Route path="/staff/tickets" element={<StaffTicketQueuePage />} />
         </Route>
         <Route path="/" element={<Navigate to="/tickets" replace />} />
       </Routes>
