@@ -6,6 +6,7 @@ import { TicketDetailPage } from '../../src/pages/TicketDetailPage';
 import * as authApi from '../../src/api/auth';
 import * as ticketsApi from '../../src/api/tickets';
 import * as attachmentsApi from '../../src/api/attachments';
+import * as commentsApi from '../../src/api/comments';
 import { ApiError } from '../../src/api/tickets';
 
 const REQUESTER = {
@@ -53,6 +54,7 @@ describe('TicketDetailPage', () => {
     vi.restoreAllMocks();
     sessionStorage.clear();
     vi.spyOn(attachmentsApi, 'fetchAttachments').mockResolvedValue([]);
+    vi.spyOn(commentsApi, 'fetchComments').mockResolvedValue([]);
   });
 
   it('renders a loading state before the ticket resolves', async () => {
@@ -140,6 +142,16 @@ describe('TicketDetailPage', () => {
 
     renderPage();
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+  });
+
+  it('renders the Public Comments section but never an Internal Notes section (UI-09, Requester side)', async () => {
+    vi.spyOn(ticketsApi, 'fetchTicketDetail').mockResolvedValue(TICKET);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /public comments/i })).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/internal note/i)).not.toBeInTheDocument();
   });
 
 });
