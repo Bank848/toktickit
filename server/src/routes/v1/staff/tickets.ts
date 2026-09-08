@@ -7,11 +7,13 @@ import { isValidTransition, STATUS_TRANSITIONS, type TicketStatus } from '../../
 import { STAFF_TICKET_INCLUDE, serializeStaffTicketDetail, findTicketOrThrow } from './shared';
 import { staffCommentsRouter } from './comments';
 import { staffNotesRouter } from './notes';
+import { staffAttachmentsRouter } from './attachments';
 
 export const staffTicketsRouter = Router();
 
 staffTicketsRouter.use('/:id/comments', staffCommentsRouter);
 staffTicketsRouter.use('/:id/notes', staffNotesRouter);
+staffTicketsRouter.use('/:id/attachments', staffAttachmentsRouter);
 
 staffTicketsRouter.get('/', async (req, res, next) => {
   try {
