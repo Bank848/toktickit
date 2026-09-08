@@ -1,15 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { RequesterProvider } from '../../src/context/RequesterContext';
+import { AuthProvider } from '../../src/context/AuthContext';
 import { TicketDetailPage } from '../../src/pages/TicketDetailPage';
-import App from '../../src/App';
+import * as authApi from '../../src/api/auth';
 import * as ticketsApi from '../../src/api/tickets';
 import * as attachmentsApi from '../../src/api/attachments';
-import * as devApi from '../../src/api/dev';
 import { ApiError } from '../../src/api/tickets';
 
-const REQUESTER = { id: 'req-1', email: 'r1@test.dev', displayName: 'Ariya' };
+const REQUESTER = {
+  id: 'req-1',
+  email: 'r1@test.dev',
+  displayName: 'Ariya',
+  role: 'REQUESTER' as const,
+  mustChangePassword: false,
+};
 
 const TICKET: ticketsApi.TicketDetailDto = {
   id: 'tkt-1',
@@ -31,15 +36,15 @@ const TICKET: ticketsApi.TicketDetailDto = {
 };
 
 function renderPage(initialEntries: Array<string | { pathname: string; state?: unknown }> = ['/tickets/tkt-1']) {
-  sessionStorage.setItem('toktickit.selectedRequesterId', JSON.stringify(REQUESTER));
+  vi.spyOn(authApi, 'fetchMe').mockResolvedValue(REQUESTER);
   return render(
-    <RequesterProvider>
+    <AuthProvider>
       <MemoryRouter initialEntries={initialEntries}>
         <Routes>
           <Route path="/tickets/:id" element={<TicketDetailPage />} />
         </Routes>
       </MemoryRouter>
-    </RequesterProvider>,
+    </AuthProvider>,
   );
 }
 
@@ -60,7 +65,9 @@ describe('TicketDetailPage', () => {
 
     renderPage();
 
-    expect(screen.getByText(/loading/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/loading/i)).toBeInTheDocument();
+    });
     resolveFetch(TICKET);
     await waitFor(() => {
       expect(screen.queryByText(/loading ticket/i)).not.toBeInTheDocument();
@@ -135,42 +142,4 @@ describe('TicketDetailPage', () => {
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
   });
 
-  it('re-fetches fresh data for the new requester after switching via AppShell\'s Change Requester and revisiting a ticket-scoped route (W4-1 cache-discard regression)', async () => {
-    sessionStorage.setItem('toktickit.selectedRequesterId', JSON.stringify(REQUESTER));
-    const otherRequester = { id: 'req-2', email: 'r2@test.dev', displayName: 'Narin' };
-
-    vi.spyOn(devApi, 'fetchDevRequesters').mockResolvedValue([otherRequester]);
-    vi.spyOn(devApi, 'selectDevRequester').mockResolvedValue(otherRequester);
-    const fetchDetailSpy = vi.spyOn(ticketsApi, 'fetchTicketDetail').mockResolvedValue(TICKET);
-
-    render(
-      <MemoryRouter initialEntries={['/tickets/tkt-1']}>
-        <App />
-      </MemoryRouter>,
-    );
-
-    await waitFor(() => expect(fetchDetailSpy).toHaveBeenCalledWith(REQUESTER.id, 'tkt-1'));
-
-    fireEvent.click(await screen.findByRole('button', { name: /change requester/i }));
-    await screen.findByRole('heading', { name: /select development requester/i });
-
-    fireEvent.change(screen.getByLabelText(/development requester/i), { target: { value: otherRequester.id } });
-    fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(new RegExp(`testing as: ${otherRequester.displayName}`, 'i'))).toBeInTheDocument();
-    });
-
-    // Simulates "revisiting a ticket-scoped route" by navigating directly via a fresh render at
-    // the ticket route, now with the new requester already in sessionStorage/context.
-    render(
-      <MemoryRouter initialEntries={['/tickets/tkt-1']}>
-        <App />
-      </MemoryRouter>,
-    );
-
-    await waitFor(() => {
-      expect(fetchDetailSpy).toHaveBeenLastCalledWith(otherRequester.id, 'tkt-1');
-    });
-  });
 });

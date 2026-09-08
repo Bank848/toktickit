@@ -1,18 +1,10 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000';
 
-export function authHeaders(requesterId: string): HeadersInit {
-  return { 'x-dev-user-id': requesterId, 'Content-Type': 'application/json' };
-}
-
 export interface FieldError {
   field: string;
   message: string;
 }
 
-// Thrown by every tickets/attachments API call that receives a non-ok response. Carries the
-// server's status and fieldErrors (when present, e.g. a 422) so callers -- CreateTicketPage in
-// particular, per FR-11's "map fieldErrors onto the form" -- can react to more than just a
-// message string. A plain Error would lose that structured detail.
 export class ApiError extends Error {
   status: number;
   fieldErrors: FieldError[];
@@ -77,8 +69,6 @@ export interface ListTicketsResult {
   meta: ListTicketsMeta;
 }
 
-// Mirrors the server's ValidatedListTicketsQuery shape (server/src/validators/listTicketsQuery.ts)
-// so MyTicketsPage can pass its filter-bar state straight through without re-mapping field names.
 export interface ListTicketsQuery {
   status?: string[];
   categoryId?: number | null;
@@ -93,13 +83,11 @@ async function throwApiError(response: Response, fallbackMessage: string): Promi
   throw new ApiError(body?.error?.message ?? fallbackMessage, response.status, body?.error?.fieldErrors ?? []);
 }
 
-export async function createTicket(
-  requesterId: string,
-  payload: CreateTicketPayload,
-): Promise<TicketDetailDto> {
+export async function createTicket(payload: CreateTicketPayload): Promise<TicketDetailDto> {
   const response = await fetch(`${API_BASE_URL}/api/v1/tickets`, {
     method: 'POST',
-    headers: authHeaders(requesterId),
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
@@ -108,10 +96,7 @@ export async function createTicket(
   return response.json();
 }
 
-export async function fetchTickets(
-  requesterId: string,
-  query: ListTicketsQuery = {},
-): Promise<ListTicketsResult> {
+export async function fetchTickets(query: ListTicketsQuery = {}): Promise<ListTicketsResult> {
   const params = new URLSearchParams();
   for (const status of query.status ?? []) params.append('status', status);
   if (query.categoryId !== undefined && query.categoryId !== null) {
@@ -124,7 +109,7 @@ export async function fetchTickets(
 
   const qs = params.toString();
   const response = await fetch(`${API_BASE_URL}/api/v1/tickets${qs ? `?${qs}` : ''}`, {
-    headers: authHeaders(requesterId),
+    credentials: 'include',
   });
   if (!response.ok) {
     return throwApiError(response, 'Failed to load tickets');
@@ -132,9 +117,9 @@ export async function fetchTickets(
   return response.json();
 }
 
-export async function fetchTicketDetail(requesterId: string, ticketId: string): Promise<TicketDetailDto> {
+export async function fetchTicketDetail(ticketId: string): Promise<TicketDetailDto> {
   const response = await fetch(`${API_BASE_URL}/api/v1/tickets/${ticketId}`, {
-    headers: authHeaders(requesterId),
+    credentials: 'include',
   });
   if (!response.ok) {
     return throwApiError(response, 'Failed to load ticket');

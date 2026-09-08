@@ -35,7 +35,7 @@ export function AttachmentSection({ ticketId, requesterId, ticketStatus }: Props
 
   const loadAttachments = useCallback(() => {
     setListState('loading');
-    fetchAttachments(requesterId, ticketId)
+    fetchAttachments(ticketId)
       .then((data) => {
         setAttachments(data);
         setListState('loaded');
@@ -43,7 +43,7 @@ export function AttachmentSection({ ticketId, requesterId, ticketStatus }: Props
       .catch(() => {
         setListState('error');
       });
-  }, [requesterId, ticketId]);
+  }, [ticketId]);
 
   useEffect(() => {
     loadAttachments();
@@ -61,7 +61,7 @@ export function AttachmentSection({ ticketId, requesterId, ticketStatus }: Props
     for (const file of files) {
       setUploading((prev) => [...prev, file.name]);
       try {
-        const created = await uploadAttachment(requesterId, ticketId, file);
+        const created = await uploadAttachment(ticketId, file);
         setAttachments((prev) => [...prev, created]);
       } catch (error) {
         setUploadError(error instanceof Error ? error.message : `Failed to upload ${file.name}`);
@@ -88,7 +88,7 @@ export function AttachmentSection({ ticketId, requesterId, ticketStatus }: Props
 
   async function confirmRemoval(reason: string) {
     if (!removalTarget) return;
-    const updated = await removeAttachment(requesterId, removalTarget.id, reason);
+    const updated = await removeAttachment(removalTarget.id, reason);
     setAttachments((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
     setRemovalTarget(null);
   }
