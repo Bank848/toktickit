@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../../prisma';
 import { validateStaffListTicketsQuery } from '../../../validators/staffListTicketsQuery';
 import { ValidationHttpError, HttpError } from '../../../middleware/errorEnvelope';
+import { isValidTransition, STATUS_TRANSITIONS, type TicketStatus } from '../../../services/ticketStatusTransitions';
 
 export const staffTicketsRouter = Router();
 
@@ -159,6 +160,48 @@ staffTicketsRouter.patch('/:id/priority', async (req, res, next) => {
     const updated = await prisma.ticket.update({
       where: { id: ticket.id },
       data: { itPriority: itPriority as never },
+      include: STAFF_TICKET_INCLUDE,
+    });
+    res.status(200).json(serializeStaffTicketDetail(updated));
+  } catch (error) {
+    next(error);
+  }
+});
+
+// All 8 known TicketStatus values (including NEW). NEW is never a *valid transition target*
+// (STATUS_TRANSITIONS has no row that lists it as a destination -- isValidTransition() below
+// rejects it with 409 INVALID_STATUS_TRANSITION), but it is still a recognized status string, so
+// it must not be turned away as a 422 VALIDATION_FAILED input the way a genuinely unknown string
+// like "ON_HOLD" is (api-spec.md #20's UpdateStatusRequest comment covers the "never a valid
+// target" business rule, not the request-shape validation layer).
+const ALL_KNOWN_STATUSES = Object.keys(STATUS_TRANSITIONS) as TicketStatus[];
+
+staffTicketsRouter.patch('/:id/status', async (req, res, next) => {
+  try {
+    const { status } = req.body ?? {};
+    if (typeof status !== 'string' || !ALL_KNOWN_STATUSES.includes(status as TicketStatus)) {
+      throw new ValidationHttpError([{ field: 'status', message: 'status must be one of ' + ALL_KNOWN_STATUSES.join(', ') }]);
+    }
+
+    const ticket = await findTicketOrThrow(req.params.id);
+    const from = ticket.status as TicketStatus;
+    const to = status as TicketStatus;
+
+    if (!isValidTransition(from, to)) {
+      // Same distinction as the /priority endpoint (Task 22, Step 6.3): a rejected transition
+      // out of a terminal status (CLOSED/CANCELLED) is a lock violation, not a generic invalid
+      // transition -- api-spec.md requires TICKET_LOCKED here specifically. The one still-valid
+      // escape out of a terminal status, CLOSED -> REOPENED, is accepted by isValidTransition()
+      // above and never reaches this branch, so it is unaffected.
+      if (TERMINAL_STATUSES.includes(from as never)) {
+        throw new HttpError(409, 'TICKET_LOCKED', `Cannot change status on a ${from} ticket`);
+      }
+      throw new HttpError(409, 'INVALID_STATUS_TRANSITION', `Cannot change status from ${from} to ${to}`);
+    }
+
+    const updated = await prisma.ticket.update({
+      where: { id: ticket.id },
+      data: { status: to },
       include: STAFF_TICKET_INCLUDE,
     });
     res.status(200).json(serializeStaffTicketDetail(updated));
