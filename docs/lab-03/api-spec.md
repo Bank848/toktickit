@@ -152,7 +152,10 @@ StaffTicketListItemDto = TicketListItemDto + { owner: { id, displayName } | null
 StaffTicketDetailDto = TicketDetailDto
 
 // #14/#15/#21/#22 — Public Comments
-CommentDto { id, ticketId, body, author: { id, displayName }, createdAt }
+CommentDto { id, ticketId, body, author: { id, displayName }, authorRole: 'REQUESTER'|'IT_STAFF'|'ADMINISTRATOR', createdAt }
+// authorRole lets the UI show the "Requester"/"IT Staff" role tag ui-spec.md #6 calls for next to
+// each comment's author name -- shared verbatim by both the Requester (#14/#15) and Staff (#21/#22)
+// comment endpoints so the DTO never drifts between the two namespaces.
 CreateCommentRequest {
   body: string                        // required, 1..2000 chars after trim
   problemAppearsResolved?: boolean    // Requester-only flag; ignored (and rejected with 422 if sent) on the staff endpoint
