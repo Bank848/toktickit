@@ -107,8 +107,13 @@ export function StaffTicketQueuePage() {
     <div>
       <h1>My Queue</h1>
 
+      {/* This screen has more filter controls than My Tickets (IT Priority + Owner on top of
+          Search/Status/Sort/Clear), so packing them into one row at the same md (768px) breakpoint
+          My Tickets uses leaves each control too narrow at tablet width and clips their content.
+          Wrapping to two rows below lg (992px), same as it already does below md, gives every
+          control room down to tablet width instead of just mobile. */}
       <div className="row g-2 mb-3 align-items-start">
-        <div className="col-12 col-md-3">
+        <div className="col-12 col-lg-3">
           <label htmlFor="staff-queue-search" className="form-label">Search</label>
           <input
             id="staff-queue-search"
@@ -120,7 +125,7 @@ export function StaffTicketQueuePage() {
           />
         </div>
 
-        <div className="col-6 col-md-2">
+        <div className="col-6 col-lg-2">
           <label htmlFor="staff-queue-status" className="form-label">Status</label>
           <select id="staff-queue-status" className="form-select" multiple size={4} value={query.status} onChange={handleStatusChange}>
             {STATUS_OPTIONS.map((option) => (
@@ -129,7 +134,7 @@ export function StaffTicketQueuePage() {
           </select>
         </div>
 
-        <div className="col-6 col-md-2">
+        <div className="col-6 col-lg-2">
           <label htmlFor="staff-queue-priority" className="form-label">IT Priority</label>
           <select
             id="staff-queue-priority"
@@ -143,7 +148,7 @@ export function StaffTicketQueuePage() {
           </select>
         </div>
 
-        <div className="col-6 col-md-2">
+        <div className="col-6 col-lg-2">
           <label htmlFor="staff-queue-owner" className="form-label">Owner</label>
           <select
             id="staff-queue-owner"
@@ -159,7 +164,7 @@ export function StaffTicketQueuePage() {
           </select>
         </div>
 
-        <div className="col-6 col-md-2">
+        <div className="col-6 col-lg-2">
           <label htmlFor="staff-queue-sort" className="form-label">Sort</label>
           <select id="staff-queue-sort" className="form-select" value={query.sort} onChange={(event) => updateQuery({ sort: event.target.value })}>
             {SORT_OPTIONS.map((option) => (
@@ -168,9 +173,9 @@ export function StaffTicketQueuePage() {
           </select>
         </div>
 
-        <div className="col-6 col-md-1">
-          <label className="form-label d-none d-md-block" aria-hidden="true">&nbsp;</label>
-          <button type="button" className="btn btn-outline-primary w-100" onClick={handleClearFilters} disabled={!filtersActive}>
+        <div className="col-6 col-lg-1">
+          <label className="form-label d-none d-lg-block" aria-hidden="true">&nbsp;</label>
+          <button type="button" className="btn btn-outline-primary w-100 text-nowrap" onClick={handleClearFilters} disabled={!filtersActive}>
             Clear filters
           </button>
         </div>
@@ -178,9 +183,38 @@ export function StaffTicketQueuePage() {
 
       {loadState === 'loading' && (
         <div data-testid="staff-queue-skeleton" aria-busy="true" aria-live="polite">
-          <p className="text-body-secondary d-flex align-items-center gap-2">
-            <span className="spinner-border spinner-border-sm" aria-hidden="true" /> Loading queue…
-          </p>
+          <span className="visually-hidden">Loading queue…</span>
+          <div className="card d-none d-lg-block" aria-hidden="true">
+            <div className="card-body">
+              {/* Plain inline widths, not Bootstrap's .col-N grid classes -- .col-N assumes a
+                  .row parent to supply the compensating negative margin for its gutter padding;
+                  used directly inside this flex row, the widths summed past 100% and overflowed
+                  the viewport. */}
+              {[0, 1, 2, 3].map((row) => (
+                <div key={row} className="placeholder-glow d-flex gap-3 py-2 border-bottom">
+                  <span className="placeholder" style={{ width: '9%' }} />
+                  <span className="placeholder" style={{ width: '8%' }} />
+                  <span className="placeholder" style={{ width: '24%' }} />
+                  <span className="placeholder" style={{ width: '9%' }} />
+                  <span className="placeholder" style={{ width: '9%' }} />
+                  <span className="placeholder" style={{ width: '9%' }} />
+                  <span className="placeholder" style={{ width: '9%' }} />
+                  <span className="placeholder" style={{ width: '13%' }} />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="d-lg-none" aria-hidden="true">
+            {[0, 1, 2].map((row) => (
+              <div key={row} className="card mb-2 placeholder-glow">
+                <div className="card-body">
+                  <span className="placeholder col-6 d-block mb-2" />
+                  <span className="placeholder col-9 d-block mb-2" />
+                  <span className="placeholder col-4 d-block" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -217,7 +251,9 @@ export function StaffTicketQueuePage() {
 
       {loadState === 'loaded' && rows.length > 0 && (
         <>
-          <div className="card d-none d-md-block">
+          {/* Table shows at lg (992px) and up only -- at 8 columns, tablet width (768-991) clips
+              this table (unlike the 5-column My Tickets table, which fits at 768). */}
+          <div className="card d-none d-lg-block">
             <table className="table table-hover align-middle mb-0">
               <thead>
                 <tr>
@@ -254,7 +290,7 @@ export function StaffTicketQueuePage() {
             </table>
           </div>
 
-          <div className="d-md-none">
+          <div className="d-lg-none">
             {rows.map((ticket) => (
               <div
                 key={ticket.id}
@@ -266,8 +302,10 @@ export function StaffTicketQueuePage() {
               >
                 <div className="card-body">
                   <p className="mb-1"><strong>Ticket No.:</strong> {ticket.ticketNo}</p>
+                  <p className="mb-1"><strong>Created:</strong> {new Date(ticket.createdAt).toLocaleDateString()}</p>
                   <p className="mb-1"><strong>Summary:</strong> {ticket.summary}</p>
                   <p className="mb-1"><strong>Category:</strong> {ticket.category.name}</p>
+                  <p className="mb-1"><strong>Req. Priority:</strong> <PriorityBadge priority={ticket.requestedPriority} /></p>
                   <p className="mb-1"><strong>Status:</strong> <TicketStatusBadge status={ticket.status} /></p>
                   <p className="mb-1"><strong>IT Priority:</strong> <PriorityBadge priority={ticket.itPriority} /></p>
                   <p className="mb-0"><strong>Owner:</strong> {ticket.owner ? ticket.owner.displayName : 'Unassigned'}</p>

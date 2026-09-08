@@ -135,7 +135,10 @@ test('a Lab-2-seeded Requester logs in after the Lab 3 migration and sees their 
   // so a role query is required on both branches: role locators exclude CSS-hidden elements from
   // the accessibility tree, whereas getByTestId matches the DOM directly and would still resolve
   // the hidden branch too, tripping Playwright's strict-mode "multiple elements" check.
+  // .first() tolerates more than one ticket existing for this Requester -- other spec files in
+  // this same suite run share this DB and can create additional tickets for it before this test
+  // runs; this assertion only needs to confirm the list renders something, not a specific count.
   await expect(
-    page.getByRole('table').or(page.getByRole('button', { name: /Ticket No\.:/ })),
+    page.getByRole('table').or(page.getByRole('button', { name: /Ticket No\.:/ })).first(),
   ).toBeVisible();
 });
