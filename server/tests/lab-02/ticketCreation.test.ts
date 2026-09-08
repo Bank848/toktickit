@@ -4,6 +4,7 @@ import { app } from '../../src/app';
 import { prisma } from '../../src/prisma';
 import { truncateTicketTables } from '../helpers/resetDb';
 import { generateTicketNumber } from '../../src/services/ticketNumber';
+import { createSessionCookieFor } from '../helpers/session';
 
 describe('POST /api/v1/tickets', () => {
   let requesterId: string;
@@ -24,7 +25,7 @@ describe('POST /api/v1/tickets', () => {
 
     const response = await request(app)
       .post('/api/v1/tickets')
-      .set('x-dev-user-id', requesterId)
+      .set('Cookie', await createSessionCookieFor(requesterId))
       .send({
         summary: 'VPN keeps disconnecting',
         description: 'Drops every few minutes since this morning, on both wifi and ethernet.',
@@ -49,7 +50,7 @@ describe('POST /api/v1/tickets', () => {
 
     const response = await request(app)
       .post('/api/v1/tickets')
-      .set('x-dev-user-id', requesterId)
+      .set('Cookie', await createSessionCookieFor(requesterId))
       .send({
         summary: 'Printer out of toner',
         description: 'The 3rd floor printer shows a toner-empty light and will not print.',
@@ -74,7 +75,7 @@ describe('POST /api/v1/tickets', () => {
   it('returns 422 with fieldErrors for an invalid body', async () => {
     const response = await request(app)
       .post('/api/v1/tickets')
-      .set('x-dev-user-id', requesterId)
+      .set('Cookie', await createSessionCookieFor(requesterId))
       .send({ summary: 'ab', description: 'too short', categoryId: 1, requestedPriority: 'HIGH' });
 
     expect(response.status).toBe(422);
@@ -88,7 +89,7 @@ describe('POST /api/v1/tickets', () => {
 
     const response = await request(app)
       .post('/api/v1/tickets')
-      .set('x-dev-user-id', requesterId)
+      .set('Cookie', await createSessionCookieFor(requesterId))
       .send({
         summary: 'Testing inactive category rejection',
         description: 'This request targets a category that has been deactivated on purpose.',
@@ -104,12 +105,13 @@ describe('POST /api/v1/tickets', () => {
 
   it('produces 10 distinct ticket numbers with no gaps or duplicates under concurrent creation', async () => {
     const category = await prisma.category.findFirstOrThrow({ where: { isActive: true } });
+    const cookie = await createSessionCookieFor(requesterId);
 
     const responses = await Promise.all(
       Array.from({ length: 10 }, (_, i) =>
         request(app)
           .post('/api/v1/tickets')
-          .set('x-dev-user-id', requesterId)
+          .set('Cookie', cookie)
           .send({
             summary: `Concurrency test ticket ${i}`,
             description: 'Body text long enough to pass the 10-character minimum requirement.',
@@ -135,7 +137,7 @@ describe('POST /api/v1/tickets', () => {
     // transaction, not transaction rollback itself (see the next test for that).
     const response = await request(app)
       .post('/api/v1/tickets')
-      .set('x-dev-user-id', requesterId)
+      .set('Cookie', await createSessionCookieFor(requesterId))
       .send({
         summary: 'Nonexistent related system test',
         description: 'relatedSystemId below does not exist and must be rejected before insert.',
