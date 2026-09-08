@@ -213,6 +213,7 @@ export function AdminUserManagementPage() {
                 type="text"
                 className="form-control"
                 placeholder="Search users…"
+                aria-label="Search users"
                 value={searchInput}
                 onChange={(event) => setSearchInput(event.target.value)}
               />
