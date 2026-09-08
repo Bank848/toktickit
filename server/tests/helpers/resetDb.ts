@@ -5,3 +5,7 @@ export async function truncateTicketTables(): Promise<void> {
     'TRUNCATE "TicketEvent", "Comment", "Attachment", "Ticket", "TicketCounter" RESTART IDENTITY CASCADE'
   );
 }
+
+export async function truncateSessionTable(): Promise<void> {
+  await prisma.$executeRawUnsafe('TRUNCATE "Session" RESTART IDENTITY CASCADE');
+}
