@@ -1,12 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../prisma';
 import { HttpError } from '../middleware/errorEnvelope';
+import { verifySessionToken, TTK_SESSION_COOKIE } from './session';
 
 export interface CurrentUser {
   id: string;
   email: string;
   displayName: string;
   role: 'REQUESTER' | 'IT_STAFF' | 'ADMINISTRATOR';
+  mustChangePassword: boolean;
 }
 
 declare global {
@@ -18,43 +20,33 @@ declare global {
   }
 }
 
-function devIdentityAllowed(): boolean {
-  return process.env.NODE_ENV !== 'production' || process.env.ALLOW_DEV_IDENTITY === 'true';
-}
-
 export async function resolveCurrentUser(req: Request, _res: Response, next: NextFunction) {
   try {
-    if (!devIdentityAllowed()) {
-      throw new HttpError(401, 'UNAUTHENTICATED', 'No identity source is configured');
+    const token = req.cookies?.[TTK_SESSION_COOKIE];
+    if (typeof token !== 'string' || token.length === 0) {
+      throw new HttpError(401, 'UNAUTHENTICATED', 'No active session');
     }
 
-    const userId = req.header('x-dev-user-id');
-    if (!userId) {
-      throw new HttpError(401, 'UNAUTHENTICATED', 'No identity source is configured');
+    const session = await verifySessionToken(token);
+    if (!session) {
+      throw new HttpError(401, 'UNAUTHENTICATED', 'Session is invalid, expired, or revoked');
     }
 
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !user.isActive || user.role !== 'REQUESTER') {
-      throw new HttpError(401, 'UNAUTHENTICATED', 'Identity could not be resolved');
+    // BR-11: isActive is re-checked live on every request, never cached at login time.
+    const user = await prisma.user.findUnique({ where: { id: session.userId } });
+    if (!user || !user.isActive) {
+      throw new HttpError(401, 'UNAUTHENTICATED', 'Account is no longer active');
     }
 
-    req.user = { id: user.id, email: user.email, displayName: user.displayName, role: user.role };
+    req.user = {
+      id: user.id,
+      email: user.email,
+      displayName: user.displayName,
+      role: user.role,
+      mustChangePassword: user.mustChangePassword,
+    };
     next();
   } catch (error) {
     next(error);
-  }
-}
-
-/**
- * Lab 2 has no production identity provider yet (Lab 3 adds real sessions). Call this once at
- * boot; it throws (and should crash startup) if NODE_ENV=production without an explicit,
- * intentional override.
- */
-export function assertIdentitySeamBootGuard(): void {
-  if (!devIdentityAllowed()) {
-    throw new Error(
-      'Lab 2 has no production identity provider yet (Lab 3 adds real sessions). ' +
-        'Refusing to start with NODE_ENV=production unless ALLOW_DEV_IDENTITY=true is set explicitly.'
-    );
   }
 }
