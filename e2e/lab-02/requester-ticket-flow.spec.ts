@@ -1,6 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
-import path from 'node:path';
+import { saveEvidenceScreenshot, assertNoHorizontalOverflow } from '../support/evidence';
 
 // Matches server/prisma/seed.ts -- the two active Development Requesters used to prove
 // per-requester isolation (AC-11/AC-12/AC-18 in docs/lab-02/specification.md).
@@ -46,23 +45,6 @@ async function expectVisible(locator: Locator, message: string): Promise<void> {
     .toBe(true);
 }
 
-async function assertNoHorizontalOverflow(page: Page, location: string): Promise<void> {
-  const dimensions = await page.evaluate(() => ({
-    innerWidth: window.innerWidth,
-    scrollWidth: document.documentElement.scrollWidth,
-  }));
-  expect(
-    dimensions.scrollWidth,
-    `${location} overflows horizontally at ${dimensions.innerWidth}px`,
-  ).toBeLessThanOrEqual(dimensions.innerWidth + 1);
-}
-
-async function saveEvidenceScreenshot(page: Page, group: string, projectName: string, name: string): Promise<void> {
-  const directory = path.resolve('artifacts/lab-02/screenshots', group);
-  await mkdir(directory, { recursive: true });
-  await page.screenshot({ path: path.join(directory, `${projectName}-${name}.png`), fullPage: true });
-}
-
 // The primary nav (My Tickets, Create Ticket) collapses behind a navbar-toggler below the md
 // (768px) breakpoint (ui-spec.md §2 mobile navigation rule) -- on the mobile project the link is
 // in the DOM but not visible until the toggler is opened first.
@@ -97,7 +79,7 @@ test('requester can create, find, inspect, upload, remove, and isolate a Ticket'
   await expect(requesterSelector.locator('option')).toHaveCount(5, { timeout: 30_000 }); // placeholder + 4 active
   const requesterOptionLabels = await requesterSelector.locator('option').allTextContents();
   expect(requesterOptionLabels.some((label) => label.includes('inactive'))).toBe(false);
-  await saveEvidenceScreenshot(page, 'select-requester', projectName, 'initial');
+  await saveEvidenceScreenshot(page, 'lab-02', 'select-requester', projectName, 'initial');
   await assertNoHorizontalOverflow(page, 'Select Requester');
 
   await selectRequester(page, ACTIVE_REQUESTER);
@@ -117,7 +99,7 @@ test('requester can create, find, inspect, upload, remove, and isolate a Ticket'
   await page.getByLabel('Related System').selectOption({ label: 'Corporate Laptop' });
   await page.getByLabel('Summary', { exact: true }).fill(summary);
   await page.getByLabel('Description', { exact: true }).fill(description);
-  await saveEvidenceScreenshot(page, 'create-ticket', projectName, 'filled');
+  await saveEvidenceScreenshot(page, 'lab-02', 'create-ticket', projectName, 'filled');
   await assertNoHorizontalOverflow(page, 'Create Ticket (filled)');
 
   await page.getByRole('button', { name: 'Create Ticket', exact: true }).click();
@@ -134,7 +116,7 @@ test('requester can create, find, inspect, upload, remove, and isolate a Ticket'
 
   await expect(page.getByText(summary, { exact: true })).toBeVisible();
   await expect(page.getByText(INITIAL_ATTACHMENT, { exact: true })).toBeVisible();
-  await saveEvidenceScreenshot(page, 'ticket-detail', projectName, 'initial');
+  await saveEvidenceScreenshot(page, 'lab-02', 'ticket-detail', projectName, 'initial');
   await assertNoHorizontalOverflow(page, 'Ticket Detail (initial)');
 
   // --- Find it in My Tickets ------------------------------------------------------------------
@@ -145,7 +127,7 @@ test('requester can create, find, inspect, upload, remove, and isolate a Ticket'
     page.getByRole('button').filter({ hasText: ticketNumber }),
     `Ticket ${ticketNumber} should be visible in My Tickets after searching for its summary.`,
   );
-  await saveEvidenceScreenshot(page, 'my-tickets', projectName, 'filtered');
+  await saveEvidenceScreenshot(page, 'lab-02', 'my-tickets', projectName, 'filtered');
   await assertNoHorizontalOverflow(page, 'My Tickets (filtered)');
 
   // --- Open its detail -------------------------------------------------------------------------
@@ -157,7 +139,7 @@ test('requester can create, find, inspect, upload, remove, and isolate a Ticket'
   await expect(page.getByText(followUpAttachment, { exact: true })).toBeVisible({ timeout: 30_000 });
   const followUpRow = page.locator('li', { hasText: followUpAttachment });
   await expect(followUpRow.getByRole('link', { name: 'Download', exact: true })).toBeVisible();
-  await saveEvidenceScreenshot(page, 'ticket-detail', projectName, 'active-attachment');
+  await saveEvidenceScreenshot(page, 'lab-02', 'ticket-detail', projectName, 'active-attachment');
 
   // --- Remove an attachment, with a reason ------------------------------------------------------
   await followUpRow.getByRole('button', { name: 'Remove', exact: true }).click();
@@ -169,7 +151,7 @@ test('requester can create, find, inspect, upload, remove, and isolate a Ticket'
   await expect(followUpRow.locator('.badge.badge-tone-neutral')).toBeVisible();
   await expect(followUpRow.getByText('Duplicate follow-up evidence', { exact: false })).toBeVisible();
   await expect(followUpRow.getByRole('link', { name: 'Download', exact: true })).toHaveCount(0);
-  await saveEvidenceScreenshot(page, 'ticket-detail', projectName, 'removed-attachment');
+  await saveEvidenceScreenshot(page, 'lab-02', 'ticket-detail', projectName, 'removed-attachment');
   await assertNoHorizontalOverflow(page, 'Ticket Detail (removed attachment)');
 
   // --- Switch to a different requester and confirm isolation -----------------------------------
@@ -180,12 +162,12 @@ test('requester can create, find, inspect, upload, remove, and isolate a Ticket'
 
   await page.getByLabel('Search', { exact: true }).fill(summary);
   await expect(page.getByText('No tickets match your filters.', { exact: true })).toBeVisible({ timeout: 30_000 });
-  await saveEvidenceScreenshot(page, 'my-tickets', projectName, 'isolated-empty');
+  await saveEvidenceScreenshot(page, 'lab-02', 'my-tickets', projectName, 'isolated-empty');
   await assertNoHorizontalOverflow(page, 'My Tickets (switched requester, isolated)');
 
   // Direct navigation to the first requester's Ticket must not leak it to the new requester.
   await page.goto(`/tickets/${ticketId}`);
   await expect(page.getByText('Ticket not found.', { exact: true })).toBeVisible({ timeout: 30_000 });
-  await saveEvidenceScreenshot(page, 'ticket-detail', projectName, 'foreign-not-found');
+  await saveEvidenceScreenshot(page, 'lab-02', 'ticket-detail', projectName, 'foreign-not-found');
   await assertNoHorizontalOverflow(page, 'Ticket Detail (foreign, not found)');
 });

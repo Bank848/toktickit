@@ -6,7 +6,7 @@ const isCi = Boolean(process.env.CI);
 // 768px breakpoint MyTicketsPage's `d-none d-md-table` / `d-md-none` CSS toggle switches on, so
 // the mobile project actually exercises the stacked-card layout instead of the table.
 export default defineConfig({
-  testDir: './e2e/lab-02',
+  testDir: './e2e',
   fullyParallel: false,
   workers: 1,
   retries: isCi ? 1 : 0,
