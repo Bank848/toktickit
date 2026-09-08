@@ -50,3 +50,10 @@ export function PriorityBadge({ priority }: { priority: string }) {
   const meta = PRIORITY_META[priority] ?? { label: priority, icon: 'circle-fill' as IconName, badgeClass: 'badge-tone-neutral' };
   return renderBadge(meta);
 }
+
+// Reused by the Staff Ticket Detail page's IT Priority select so its option labels never drift
+// from PriorityBadge's labels (mirrors STATUS_OPTIONS' role for the status filter/select above).
+export const PRIORITY_OPTIONS = Object.entries(PRIORITY_META).map(([value, meta]) => ({
+  value,
+  label: meta.label,
+}));

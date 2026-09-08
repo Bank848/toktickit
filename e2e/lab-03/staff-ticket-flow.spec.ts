@@ -38,12 +38,11 @@ async function clickVisible(locator: Locator): Promise<void> {
   throw new Error('No visible matching element was found.');
 }
 
-// Scopes to the `<p><strong>Status:</strong> <TicketStatusBadge/></p>` paragraph on
-// StaffTicketDetailPage.tsx -- there is no data-testid="ticket-status-badge" on the real page, so
-// this reads the badge's visible label text (TicketStatusBadge.tsx's STATUS_META) via its
-// containing paragraph instead.
+// Scopes to the `data-testid="ticket-status-badge"` wrapper around the header's
+// <TicketStatusBadge/> on StaffTicketDetailPage.tsx, reading the badge's visible label text
+// (TicketStatusBadge.tsx's STATUS_META).
 function statusParagraph(page: Page): Locator {
-  return page.locator('p', { hasText: 'Status:' });
+  return page.getByTestId('ticket-status-badge');
 }
 
 // The queue/list search boxes debounce 300ms (SEARCH_DEBOUNCE_MS in
@@ -98,6 +97,10 @@ test('IT Staff claims, works, and resolves a ticket; Requester sees comments but
 
   await clickVisible(page.getByRole('button').filter({ hasText: ticketNumber }));
   await expect(page).toHaveURL(/\/staff\/tickets\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+  // Wait for the detail page's own settled content before screenshotting -- a URL match alone
+  // races the client-side route transition's first paint, and previously caught the outgoing
+  // queue page (or a mid-fetch loading state) instead of the ticket detail screen.
+  await expect(page.getByLabel('Ticket Owner', { exact: true })).toBeVisible({ timeout: 30_000 });
   await saveEvidenceScreenshot(page, 'lab-03', 'staff-ticket-detail', projectName, 'unowned-new');
 
   // AC-18: status select is disabled pre-claim (NEW, unowned).
@@ -111,13 +114,13 @@ test('IT Staff claims, works, and resolves a ticket; Requester sees comments but
   await expect(statusParagraph(page)).toContainText('Open');
 
   // --- Priority change, status walk OPEN -> IN_PROGRESS -> RESOLVED -> REOPENED (AC-19, AC-21) --
-  // IT Priority's <option> text is the literal enum string ('HIGH'), not a humanized label --
-  // there is no "Saved" toast either, so assert the select's own value instead.
-  await page.getByLabel('IT Priority', { exact: true }).selectOption({ label: 'HIGH' });
+  // IT Priority's <option> text is a humanized label (PriorityBadge's PRIORITY_META), not the
+  // raw enum -- there is no "Saved" toast either, so assert the select's own value instead.
+  await page.getByLabel('IT Priority', { exact: true }).selectOption({ label: 'High' });
   await expect(page.getByLabel('IT Priority', { exact: true })).toHaveValue('HIGH');
 
-  // Current Status's <option> text is likewise the literal enum string, not a humanized label.
-  await page.getByLabel('Current Status', { exact: true }).selectOption({ label: 'IN_PROGRESS' });
+  // Current Status's <option> text is likewise a humanized label (TicketStatusBadge's STATUS_META).
+  await page.getByLabel('Current Status', { exact: true }).selectOption({ label: 'In Progress' });
   await expect(statusParagraph(page)).toContainText('In Progress');
 
   // --- Public comment + internal note (AC-22, AC-23) -----------------------------------------
@@ -133,11 +136,11 @@ test('IT Staff claims, works, and resolves a ticket; Requester sees comments but
   await expect(page.getByText('Internal-only note for E2E.', { exact: false })).toBeVisible();
   await saveEvidenceScreenshot(page, 'lab-03', 'staff-ticket-detail', projectName, 'notes-and-comments');
 
-  await page.getByLabel('Current Status', { exact: true }).selectOption({ label: 'RESOLVED' });
+  await page.getByLabel('Current Status', { exact: true }).selectOption({ label: 'Resolved' });
   await expect(statusParagraph(page)).toContainText('Resolved');
 
   // AC-21: RESOLVED -> REOPENED succeeds.
-  await page.getByLabel('Current Status', { exact: true }).selectOption({ label: 'REOPENED' });
+  await page.getByLabel('Current Status', { exact: true }).selectOption({ label: 'Reopened' });
   await expect(statusParagraph(page)).toContainText('Reopened');
   await logout(page);
 
