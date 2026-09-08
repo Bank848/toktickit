@@ -101,3 +101,43 @@ staffTicketsRouter.get('/:id', async (req, res, next) => {
     next(error);
   }
 });
+
+const TERMINAL_STATUSES = ['CLOSED', 'CANCELLED'] as const;
+
+staffTicketsRouter.patch('/:id/owner', async (req, res, next) => {
+  try {
+    const { ownerId } = req.body ?? {};
+    if (typeof ownerId !== 'string' || ownerId.trim().length === 0) {
+      throw new ValidationHttpError([{ field: 'ownerId', message: 'ownerId is required' }]);
+    }
+
+    const ticket = await findTicketOrThrow(req.params.id);
+
+    if (TERMINAL_STATUSES.includes(ticket.status as never)) {
+      // BR-19: CLOSED/CANCELLED tickets accept no ownership change, no exception for owner
+      // (the CLOSED->REOPENED exception only applies to the status endpoint, api-spec.md #19/#20).
+      throw new HttpError(409, 'TICKET_LOCKED', 'Cannot change ownership on a Closed or Cancelled ticket');
+    }
+
+    const owner = await prisma.user.findUnique({ where: { id: ownerId } });
+    if (!owner || !owner.isActive || (owner.role !== 'IT_STAFF' && owner.role !== 'ADMINISTRATOR')) {
+      throw new HttpError(409, 'INVALID_OWNER', 'ownerId must reference an active IT Staff or Administrator user');
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // BR-15: NEW -> OPEN happens only as the side effect of the FIRST ownership assignment,
+      // in the same transaction as the ownerId write -- this is the only code path that ever
+      // moves a ticket out of NEW (api-spec.md #18).
+      const nextStatus = ticket.status === 'NEW' ? 'OPEN' : undefined;
+      return tx.ticket.update({
+        where: { id: ticket.id },
+        data: { ownerId: owner.id, ...(nextStatus ? { status: nextStatus } : {}) },
+        include: STAFF_TICKET_INCLUDE,
+      });
+    });
+
+    res.status(200).json(serializeStaffTicketDetail(updated));
+  } catch (error) {
+    next(error);
+  }
+});
