@@ -56,3 +56,88 @@ export async function fetchAssignableOwners(): Promise<UserSummaryDto[]> {
   if (!response.ok) return throwApiError(response, 'Failed to load assignable owners');
   return response.json();
 }
+
+export interface CommentDto {
+  id: string; ticketId: string; body: string;
+  author: { id: string; displayName: string };
+  authorRole: 'REQUESTER' | 'IT_STAFF' | 'ADMINISTRATOR';
+  createdAt: string;
+}
+export type InternalNoteDto = CommentDto;
+
+export interface AttachmentDto {
+  id: string; originalFilename: string; mimeType: string; sizeBytes: number; createdAt: string;
+  uploadedBy: { id: string; displayName: string };
+  status: 'ACTIVE' | 'REMOVED';
+  downloadUrl: string | null;
+  removal: { reason: string | null; removedAt: string | null; removedBy: { id: string; displayName: string } | null } | null;
+}
+
+export async function fetchStaffTicketDetail(ticketId: string): Promise<StaffTicketDetailDto> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/staff/tickets/${ticketId}`, { credentials: 'include' });
+  if (!response.ok) return throwApiError(response, 'Failed to load ticket');
+  return response.json();
+}
+
+export async function updateTicketOwner(ticketId: string, ownerId: string): Promise<StaffTicketDetailDto> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/staff/tickets/${ticketId}/owner`, {
+    method: 'PATCH', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ownerId }),
+  });
+  if (!response.ok) return throwApiError(response, 'Failed to update owner');
+  return response.json();
+}
+
+export async function updateTicketPriority(ticketId: string, itPriority: string): Promise<StaffTicketDetailDto> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/staff/tickets/${ticketId}/priority`, {
+    method: 'PATCH', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itPriority }),
+  });
+  if (!response.ok) return throwApiError(response, 'Failed to update IT Priority');
+  return response.json();
+}
+
+export async function updateTicketStatus(ticketId: string, status: string): Promise<StaffTicketDetailDto> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/staff/tickets/${ticketId}/status`, {
+    method: 'PATCH', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }),
+  });
+  if (!response.ok) return throwApiError(response, 'Failed to update status');
+  return response.json();
+}
+
+export async function fetchStaffComments(ticketId: string): Promise<CommentDto[]> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/staff/tickets/${ticketId}/comments`, { credentials: 'include' });
+  if (!response.ok) return throwApiError(response, 'Failed to load comments');
+  return response.json();
+}
+
+export async function postStaffComment(ticketId: string, body: string): Promise<CommentDto> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/staff/tickets/${ticketId}/comments`, {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body }),
+  });
+  if (!response.ok) return throwApiError(response, 'Failed to post comment');
+  return response.json();
+}
+
+export async function fetchStaffNotes(ticketId: string): Promise<InternalNoteDto[]> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/staff/tickets/${ticketId}/notes`, { credentials: 'include' });
+  if (!response.ok) return throwApiError(response, 'Failed to load internal notes');
+  return response.json();
+}
+
+export async function postStaffNote(ticketId: string, body: string): Promise<InternalNoteDto> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/staff/tickets/${ticketId}/notes`, {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body }),
+  });
+  if (!response.ok) return throwApiError(response, 'Failed to post internal note');
+  return response.json();
+}
+
+export async function fetchStaffTicketAttachments(ticketId: string): Promise<AttachmentDto[]> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/staff/tickets/${ticketId}/attachments`, { credentials: 'include' });
+  if (!response.ok) return throwApiError(response, 'Failed to load attachments');
+  return response.json();
+}
