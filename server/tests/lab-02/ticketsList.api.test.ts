@@ -29,7 +29,7 @@ describe('GET /api/v1/tickets', () => {
   async function createTicket(overrides: {
     requesterId: string;
     summary?: string;
-    status?: 'NEW' | 'ASSIGNED' | 'IN_PROGRESS' | 'PENDING_REQUESTER' | 'RESOLVED' | 'CLOSED' | 'CANCELLED';
+    status?: 'NEW' | 'OPEN' | 'IN_PROGRESS' | 'WAITING_FOR_REQUESTER' | 'RESOLVED' | 'CLOSED' | 'REOPENED' | 'CANCELLED';
     categoryId?: number;
   }) {
     const year = new Date().getUTCFullYear();
