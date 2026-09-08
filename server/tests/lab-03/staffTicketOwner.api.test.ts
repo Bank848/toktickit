@@ -104,9 +104,8 @@ describe('PATCH /api/v1/staff/tickets/:id/owner', () => {
     expect(response.body.error.code).toBe('INVALID_OWNER');
   });
 
-  // AC-18 cross-check: exercises PATCH .../status, which does not exist until Task 7.
-  // Skipped here per task-21-brief.md step 5.4 note; un-skip at the start of Task 7's Step 7.1.
-  it.skip('rejects setting status directly to OPEN on a NEW unowned ticket via the status endpoint (AC-18, cross-checked here)', async () => {
+  // AC-18 cross-check: exercises PATCH .../status, implemented in Task 7.
+  it('rejects setting status directly to OPEN on a NEW unowned ticket via the status endpoint (AC-18, cross-checked here)', async () => {
     const ticket = await createTicket();
     const response = await request(app)
       .patch(`/api/v1/staff/tickets/${ticket.id}/status`)
