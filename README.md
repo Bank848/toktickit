@@ -54,6 +54,23 @@ cd server && npm run test
 cd client && npm run test
 ```
 
+## Seeded accounts (local development only)
+
+`npx prisma db seed` creates every account below with the password `DevPass123!` (bcrypt-hashed,
+never stored or transmitted in plaintext). These are local-dev fixtures, not real credentials.
+
+| Email | Role | Active | Must change password at next login |
+|---|---|---|---|
+| requester@toktickit.local | Requester | yes | no |
+| requester2@toktickit.local .. requester4@toktickit.local | Requester | yes | no |
+| requester5-inactive@toktickit.local | Requester | no | no |
+| itstaff@toktickit.local, itstaff2@toktickit.local, itstaff3@toktickit.local | IT Staff | yes | no |
+| itstaff4-inactive@toktickit.local | IT Staff | no | no |
+| admin@toktickit.local | Administrator | yes | no |
+| onboarding@toktickit.local | IT Staff | yes | **yes** |
+
+Log in as `onboarding@toktickit.local` to exercise the mandatory first-login password change flow.
+
 ## Project structure
 
 See `docs/lab-01/` for the AI usage log, test documentation, and peer review evidence.

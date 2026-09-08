@@ -1,6 +1,15 @@
+import bcrypt from 'bcrypt';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
+
+const BCRYPT_COST = 10;
+
+// Fixed local-dev password shared by every seeded account except the one seeded specifically to
+// exercise the mandatory first-login flow (docs/lab-03/specification.md §6.2). Local development
+// only — never a real personal password or production secret. Documented in README.md.
+const DEV_PASSWORD = 'DevPass123!';
+const DEV_PASSWORD_HASH = bcrypt.hashSync(DEV_PASSWORD, BCRYPT_COST);
 
 const CATEGORIES: { name: string; code: string }[] = [
   { name: 'Account and Access', code: 'ACCESS' },
@@ -23,19 +32,19 @@ const USERS: {
   displayName: string;
   role: 'REQUESTER' | 'IT_STAFF' | 'ADMINISTRATOR';
   isActive: boolean;
+  mustChangePassword: boolean;
 }[] = [
-  { email: 'requester@toktickit.local', displayName: 'Nattapong R.', role: 'REQUESTER', isActive: true },
-  { email: 'requester2@toktickit.local', displayName: 'Siriporn K.', role: 'REQUESTER', isActive: true },
-  { email: 'requester3@toktickit.local', displayName: 'Somchai P.', role: 'REQUESTER', isActive: true },
-  { email: 'requester4@toktickit.local', displayName: 'Malee T.', role: 'REQUESTER', isActive: true },
-  {
-    email: 'requester5-inactive@toktickit.local',
-    displayName: 'Wichai S. (inactive)',
-    role: 'REQUESTER',
-    isActive: false,
-  },
-  { email: 'itstaff@toktickit.local', displayName: 'IT Support', role: 'IT_STAFF', isActive: true },
-  { email: 'admin@toktickit.local', displayName: 'System Admin', role: 'ADMINISTRATOR', isActive: true },
+  { email: 'requester@toktickit.local', displayName: 'Nattapong R.', role: 'REQUESTER', isActive: true, mustChangePassword: false },
+  { email: 'requester2@toktickit.local', displayName: 'Siriporn K.', role: 'REQUESTER', isActive: true, mustChangePassword: false },
+  { email: 'requester3@toktickit.local', displayName: 'Somchai P.', role: 'REQUESTER', isActive: true, mustChangePassword: false },
+  { email: 'requester4@toktickit.local', displayName: 'Malee T.', role: 'REQUESTER', isActive: true, mustChangePassword: false },
+  { email: 'requester5-inactive@toktickit.local', displayName: 'Wichai S. (inactive)', role: 'REQUESTER', isActive: false, mustChangePassword: false },
+  { email: 'itstaff@toktickit.local', displayName: 'IT Support', role: 'IT_STAFF', isActive: true, mustChangePassword: false },
+  { email: 'itstaff2@toktickit.local', displayName: 'Pakorn W.', role: 'IT_STAFF', isActive: true, mustChangePassword: false },
+  { email: 'itstaff3@toktickit.local', displayName: 'Suda N.', role: 'IT_STAFF', isActive: true, mustChangePassword: false },
+  { email: 'itstaff4-inactive@toktickit.local', displayName: 'Anan C. (inactive)', role: 'IT_STAFF', isActive: false, mustChangePassword: false },
+  { email: 'admin@toktickit.local', displayName: 'System Admin', role: 'ADMINISTRATOR', isActive: true, mustChangePassword: false },
+  { email: 'onboarding@toktickit.local', displayName: 'New Hire (must change password)', role: 'IT_STAFF', isActive: true, mustChangePassword: true },
 ];
 
 async function main() {
@@ -58,8 +67,21 @@ async function main() {
   for (const user of USERS) {
     await prisma.user.upsert({
       where: { email: user.email },
-      update: { displayName: user.displayName, role: user.role, isActive: user.isActive },
-      create: user,
+      update: {
+        displayName: user.displayName,
+        role: user.role,
+        isActive: user.isActive,
+        passwordHash: DEV_PASSWORD_HASH,
+        mustChangePassword: user.mustChangePassword,
+      },
+      create: {
+        email: user.email,
+        displayName: user.displayName,
+        role: user.role,
+        isActive: user.isActive,
+        passwordHash: DEV_PASSWORD_HASH,
+        mustChangePassword: user.mustChangePassword,
+      },
     });
   }
 }
