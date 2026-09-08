@@ -7,24 +7,9 @@ import {
   type StaffTicketDetailDto, type UserSummaryDto, type CommentDto, type InternalNoteDto, type AttachmentDto,
 } from '../api/staffTickets';
 import { ApiError } from '../api/tickets';
+import { displayCommentBody } from '../lib/commentDisplay';
 import { TicketStatusBadge, PriorityBadge } from '../components/TicketStatusBadge';
 import { Icon } from '../components/Icon';
-
-// Mirrors CommentSection.tsx's prefix-stripping + badge rendering exactly (ui-spec.md:124-126,
-// :212-214 -- IT Staff must see the same "Problem Appears Resolved" badge the Requester sees,
-// without parsing the stored text prefix themselves). Not imported from CommentSection.tsx
-// directly: that component owns its own fetch/post against the Requester-facing
-// /api/v1/tickets/:id/comments endpoint and bundles the "problem resolved" checkbox form, which
-// the staff side must not show (the staff POST endpoint 422s problemAppearsResolved -- api-spec
-// #22, A-08) -- and CommentSection.tsx currently exports no smaller piece to import instead.
-const PROBLEM_RESOLVED_PREFIX = '[Requester marked: problem appears resolved] ';
-
-function displayCommentBody(body: string): { text: string; flagged: boolean } {
-  if (body.startsWith(PROBLEM_RESOLVED_PREFIX)) {
-    return { text: body.slice(PROBLEM_RESOLVED_PREFIX.length), flagged: true };
-  }
-  return { text: body, flagged: false };
-}
 
 // Mirrors server/src/services/ticketStatusTransitions.ts exactly (specification.md §4.4) so an
 // IT Staff member is never shown an option the server would reject (ui-spec.md §8).
@@ -183,7 +168,9 @@ export function StaffTicketDetailPage() {
   // status (BR-19: CLOSED/CANCELLED), matching priorityLocked's terminal-status check exactly
   // below rather than only handling the pre-claim case.
   const statusLocked = (ticket.status === 'NEW' && !ticket.owner) || TERMINAL_STATUSES.has(ticket.status);
-  const priorityLocked = TERMINAL_STATUSES.has(ticket.status);
+  // Gates both Owner and IT Priority: BR-19 locks the whole ticket (not just one field) once it
+  // reaches a terminal status.
+  const ticketLocked = TERMINAL_STATUSES.has(ticket.status);
 
   return (
     <div>
@@ -200,8 +187,8 @@ export function StaffTicketDetailPage() {
             id="staff-detail-owner"
             className="form-select"
             value={ticket.owner?.id ?? ''}
-            disabled={priorityLocked}
-            title={priorityLocked ? 'Locked: ticket is Closed/Cancelled' : undefined}
+            disabled={ticketLocked}
+            title={ticketLocked ? 'Locked: ticket is Closed/Cancelled' : undefined}
             onChange={(event) => handleOwnerChange(event.target.value)}
           >
             {!ticket.owner && <option value="">Unassigned</option>}
@@ -229,8 +216,8 @@ export function StaffTicketDetailPage() {
             id="staff-detail-priority"
             className="form-select"
             value={ticket.itPriority}
-            disabled={priorityLocked}
-            title={priorityLocked ? 'Locked: ticket is Closed/Cancelled' : undefined}
+            disabled={ticketLocked}
+            title={ticketLocked ? 'Locked: ticket is Closed/Cancelled' : undefined}
             onChange={(event) => handlePriorityChange(event.target.value)}
           >
             {PRIORITY_OPTIONS.map((value) => (

@@ -1,12 +1,8 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createTicket, fetchTickets, fetchTicketDetail, ApiError } from '../../src/api/tickets';
-import { mockJsonResponse, stubFetch } from './testHelpers';
+import { API_BASE_URL, mockJsonResponse, resetFetchAfterEach, stubFetch } from './testHelpers';
 
-const API_BASE_URL = 'http://localhost:4000';
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
+resetFetchAfterEach();
 
 describe('createTicket', () => {
   it('POSTs the payload as JSON and returns the created ticket', async () => {

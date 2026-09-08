@@ -1,4 +1,7 @@
-import { vi } from 'vitest';
+import { afterEach, vi } from 'vitest';
+
+/** Matches every `client/src/api/*.ts` module's `VITE_API_BASE_URL` fallback. */
+export const API_BASE_URL = 'http://localhost:4000';
 
 /**
  * Builds a minimal fake `Response` for mocking `fetch` in API client unit tests.
@@ -18,4 +21,11 @@ export function stubFetch(): ReturnType<typeof vi.fn> {
   const fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
+}
+
+/** Call once at module scope in a test file that uses stubFetch(), to undo the stub after each test. */
+export function resetFetchAfterEach(): void {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
 }
