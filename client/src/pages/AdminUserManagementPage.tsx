@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   fetchUsers,
@@ -10,6 +10,7 @@ import {
   type UserRole,
 } from '../api/adminUsers';
 import { Icon } from '../components/Icon';
+import { PasswordRulesChecklist } from '../components/PasswordRulesChecklist';
 
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
   { value: 'REQUESTER', label: 'Requester' },
@@ -60,6 +61,9 @@ export function AdminUserManagementPage() {
   const [passwordDialogValue, setPasswordDialogValue] = useState('');
   const [passwordDialogError, setPasswordDialogError] = useState('');
 
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const firstFieldRef = useRef<HTMLInputElement | null>(null);
+
   // Debounce the raw search box, same pattern as MyTicketsPage.
   useEffect(() => {
     const trimmed = searchInput.trim();
@@ -103,6 +107,16 @@ export function AdminUserManagementPage() {
     setPanelMode('edit');
   }
 
+  // The Create/Edit panel sits in a second column that renders below the users list on
+  // tablet/mobile (no side-by-side room), so opening it needs to actively bring itself into view
+  // and put focus in the first field -- otherwise activating Create/Edit looks like nothing
+  // happened on any viewport narrower than the two-column desktop layout.
+  useEffect(() => {
+    if (panelMode === 'closed') return;
+    panelRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    firstFieldRef.current?.focus();
+  }, [panelMode, editingUser]);
+
   function closePanel() {
     setPanelMode('closed');
     setEditingUser(null);
@@ -110,7 +124,15 @@ export function AdminUserManagementPage() {
 
   function applyApiError(error: unknown) {
     if (error instanceof ApiError) {
-      if (error.fieldErrors.length > 0) {
+      // EMAIL_ALREADY_EXISTS is the one duplicate-email case ui-spec.md §9 asks to show as an
+      // inline field error rather than a panel alert -- the server sends it with no fieldErrors
+      // entry (it's a uniqueness conflict, not a per-request validation failure), so it has to be
+      // special-cased by code here rather than falling through the fieldErrors.length check below.
+      // SELF_DEACTIVATION_BLOCKED and LAST_ADMIN_PROTECTED explicitly stay as panel alerts per
+      // the same spec section, since neither is about a specific field's value.
+      if (error.code === 'EMAIL_ALREADY_EXISTS') {
+        setFieldErrors({ email: error.message });
+      } else if (error.fieldErrors.length > 0) {
         const next: Record<string, string> = {};
         for (const fe of error.fieldErrors) next[fe.field] = fe.message;
         setFieldErrors(next);
@@ -127,6 +149,7 @@ export function AdminUserManagementPage() {
     setSubmitting(true);
     setFieldErrors({});
     setPanelAlert('');
+    setSuccessMessage('');
     try {
       if (panelMode === 'create') {
         await createUser({
@@ -156,6 +179,7 @@ export function AdminUserManagementPage() {
   }
 
   async function handleToggleActive(target: UserAdminDto) {
+    setSuccessMessage('');
     try {
       await updateUser(target.id, {
         displayName: target.displayName,
@@ -165,10 +189,10 @@ export function AdminUserManagementPage() {
       });
       setSuccessMessage(target.isActive ? 'User deactivated' : 'User activated');
       loadUsers();
-    } catch {
+    } catch (error) {
       // A dedicated one-click action -- surfaced as a page-level alert since there's no form
       // panel field to attach a field error to here.
-      setPanelAlert('Could not update this user\'s status.');
+      setPanelAlert(error instanceof ApiError ? error.message : "Could not update this user's status.");
     }
   }
 
@@ -176,6 +200,7 @@ export function AdminUserManagementPage() {
     event.preventDefault();
     if (!passwordDialogUser) return;
     setPasswordDialogError('');
+    setSuccessMessage('');
     try {
       await setInitialPassword(passwordDialogUser.id, passwordDialogValue);
       setSuccessMessage('Password reset — user must change it at next login');
@@ -253,45 +278,76 @@ export function AdminUserManagementPage() {
           )}
 
           {loadState === 'loaded' && users.length > 0 && (
-            <table className="table table-hover align-middle">
-              <thead>
-                <tr>
-                  <th scope="col">Name</th>
-                  <th scope="col">Role</th>
-                  <th scope="col">Status</th>
-                  <th scope="col" />
-                </tr>
-              </thead>
-              <tbody>
+            <>
+              <table className="table table-hover align-middle d-none d-md-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Role</th>
+                    <th scope="col">Status</th>
+                    <th scope="col" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((target) => (
+                    <tr key={target.id}>
+                      <td>{target.displayName}</td>
+                      <td>{ROLE_OPTIONS.find((r) => r.value === target.role)?.label}</td>
+                      <td>
+                        <span className={`badge ${target.isActive ? 'badge-tone-success' : 'badge-tone-neutral'}`}>
+                          {target.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn-outline-secondary btn-sm"
+                          aria-label={`Edit ${target.displayName}`}
+                          onClick={() => openEditPanel(target)}
+                        >
+                          <Icon name="pencil" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div className="d-md-none">
                 {users.map((target) => (
-                  <tr key={target.id}>
-                    <td>{target.displayName}</td>
-                    <td>{ROLE_OPTIONS.find((r) => r.value === target.role)?.label}</td>
-                    <td>
-                      <span className={`badge ${target.isActive ? 'badge-tone-success' : 'badge-tone-neutral'}`}>
-                        {target.isActive ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td>
+                  <div key={target.id} className="card mb-2">
+                    <div className="card-body d-flex justify-content-between align-items-center gap-2">
+                      <div>
+                        <p className="mb-1"><strong>Name:</strong> {target.displayName}</p>
+                        <p className="mb-1">
+                          <strong>Role:</strong> {ROLE_OPTIONS.find((r) => r.value === target.role)?.label}
+                        </p>
+                        <p className="mb-0">
+                          <strong>Status:</strong>{' '}
+                          <span className={`badge ${target.isActive ? 'badge-tone-success' : 'badge-tone-neutral'}`}>
+                            {target.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </p>
+                      </div>
                       <button
                         type="button"
-                        className="btn btn-outline-secondary btn-sm"
+                        className="btn btn-outline-secondary btn-sm flex-shrink-0"
                         aria-label={`Edit ${target.displayName}`}
                         onClick={() => openEditPanel(target)}
                       >
                         <Icon name="pencil" />
                       </button>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </>
           )}
         </div>
 
-        <div className="col-12 col-lg-6">
+        <div className="col-12 col-lg-6" ref={panelRef}>
           {panelMode === 'closed' && (
-            <p className="text-body-secondary">Select a user to edit, or create a new one.</p>
+            <p className="text-body-secondary d-none d-lg-block">Select a user to edit, or create a new one.</p>
           )}
 
           {panelMode !== 'closed' && (
@@ -310,6 +366,7 @@ export function AdminUserManagementPage() {
                 </label>
                 <input
                   id="user-form-name"
+                  ref={firstFieldRef}
                   className="form-control"
                   value={form.displayName}
                   disabled={submitting}
@@ -325,12 +382,13 @@ export function AdminUserManagementPage() {
                 <input
                   id="user-form-email"
                   type="email"
-                  className="form-control"
+                  className={`form-control${fieldErrors.email ? ' is-invalid' : ''}`}
+                  aria-invalid={fieldErrors.email ? 'true' : undefined}
                   value={form.email}
                   disabled={submitting}
                   onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
                 />
-                {fieldErrors.email && <div className="text-danger small">{fieldErrors.email}</div>}
+                {fieldErrors.email && <div className="invalid-feedback d-block">{fieldErrors.email}</div>}
               </div>
 
               <div className="mb-3">
@@ -383,6 +441,7 @@ export function AdminUserManagementPage() {
                   {fieldErrors.initialPassword && (
                     <div className="text-danger small">{fieldErrors.initialPassword}</div>
                   )}
+                  <PasswordRulesChecklist value={form.initialPassword} />
                   <p className="form-text">The user must change this password at first login.</p>
                 </div>
               )}

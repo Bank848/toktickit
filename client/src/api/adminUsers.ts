@@ -8,11 +8,13 @@ export interface FieldError {
 export class ApiError extends Error {
   status: number;
   fieldErrors: FieldError[];
-  constructor(message: string, status: number, fieldErrors: FieldError[] = []) {
+  code?: string;
+  constructor(message: string, status: number, fieldErrors: FieldError[] = [], code?: string) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.fieldErrors = fieldErrors;
+    this.code = code;
   }
 }
 
@@ -31,7 +33,7 @@ export interface UserAdminDto {
 async function throwApiError(response: Response): Promise<never> {
   const body = await response.json().catch(() => null);
   const error = body?.error;
-  throw new ApiError(error?.message ?? 'Request failed', response.status, error?.fieldErrors ?? []);
+  throw new ApiError(error?.message ?? 'Request failed', response.status, error?.fieldErrors ?? [], error?.code);
 }
 
 export async function fetchUsers(params: { q?: string; role?: UserRole | '' }): Promise<UserAdminDto[]> {

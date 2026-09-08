@@ -154,7 +154,12 @@ test('Administrator creates, edits, and password-resets a user; safety rails hol
   // aria-label="Role filter" -- "Any role" is only the visible text of its default <option>, not
   // an accessible name Playwright's getByLabel would match.
   await page.getByLabel('Role filter', { exact: false }).selectOption({ label: 'IT Staff' });
-  await expect(page.getByText(`${displayName} (edited)`, { exact: true })).toBeVisible();
+  // The list row now renders once in a desktop table and once in a mobile card
+  // (AdminUserManagementPage.tsx, CSS-only toggled like MyTicketsPage/StaffTicketQueuePage) --
+  // getByText matches the DOM directly and would resolve the CSS-hidden branch too on a narrow
+  // viewport, tripping strict mode; the Edit button's accessible name carries the same text and
+  // role locators exclude CSS-hidden elements from the accessibility tree.
+  await expect(page.getByRole('button', { name: `Edit ${displayName} (edited)`, exact: false })).toBeVisible();
   await saveEvidenceScreenshot(page, 'lab-03', 'user-management', projectName, 'role-filter-it-staff');
   await assertNoHorizontalOverflow(page, 'User Management (role filter)');
 
