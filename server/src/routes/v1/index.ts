@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { resolveCurrentUser } from '../../auth/currentUser';
-import { authLoginRouter } from './auth';
+import { authLoginRouter, authRouter } from './auth';
 import { meRouter } from './me';
 import { devRouter } from './dev';
 import { categoriesV1Router } from './categories';
@@ -22,6 +22,7 @@ v1Router.use('/dev', devRouter);
 // forget it (the risk with the old per-route `router.get('/', resolveCurrentUser, ...)` pattern).
 v1Router.use(resolveCurrentUser);
 
+v1Router.use('/auth', authRouter);
 v1Router.use('/me', meRouter);
 v1Router.use('/categories', categoriesV1Router);
 v1Router.use('/related-systems', relatedSystemsRouter);
