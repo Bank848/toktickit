@@ -141,3 +141,28 @@ staffTicketsRouter.patch('/:id/owner', async (req, res, next) => {
     next(error);
   }
 });
+
+const VALID_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
+
+staffTicketsRouter.patch('/:id/priority', async (req, res, next) => {
+  try {
+    const { itPriority } = req.body ?? {};
+    if (typeof itPriority !== 'string' || !VALID_PRIORITIES.includes(itPriority)) {
+      throw new ValidationHttpError([{ field: 'itPriority', message: 'itPriority must be one of ' + VALID_PRIORITIES.join(', ') }]);
+    }
+
+    const ticket = await findTicketOrThrow(req.params.id);
+    if (TERMINAL_STATUSES.includes(ticket.status as never)) {
+      throw new HttpError(409, 'TICKET_LOCKED', 'Cannot change IT Priority on a Closed or Cancelled ticket');
+    }
+
+    const updated = await prisma.ticket.update({
+      where: { id: ticket.id },
+      data: { itPriority: itPriority as never },
+      include: STAFF_TICKET_INCLUDE,
+    });
+    res.status(200).json(serializeStaffTicketDetail(updated));
+  } catch (error) {
+    next(error);
+  }
+});
