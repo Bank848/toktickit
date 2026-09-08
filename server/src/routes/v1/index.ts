@@ -7,6 +7,7 @@ import { categoriesV1Router } from './categories';
 import { relatedSystemsRouter } from './relatedSystems';
 import { ticketsRouter } from './tickets';
 import { attachmentContentRouter } from './attachments';
+import { staffRouter } from './staff';
 
 export const v1Router = Router();
 
@@ -21,3 +22,4 @@ v1Router.use('/categories', categoriesV1Router);
 v1Router.use('/related-systems', relatedSystemsRouter);
 v1Router.use('/tickets', ticketsRouter);
 v1Router.use('/attachments', attachmentContentRouter);
+v1Router.use('/staff', staffRouter);
