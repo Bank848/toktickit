@@ -75,3 +75,77 @@ describe('GET /api/v1/admin/users', () => {
     expect(requesterCookie).toBeTruthy();
   });
 });
+
+describe('POST /api/v1/admin/users', () => {
+  let adminCookie: string;
+
+  beforeAll(async () => {
+    const admin = await prisma.user.findUniqueOrThrow({ where: { email: 'admin@toktickit.local' } });
+    adminCookie = await createSessionCookieFor(admin.id);
+  });
+
+  const validPayload = {
+    displayName: 'Test Newbie',
+    email: 'newbie@toktickit.local',
+    role: 'REQUESTER',
+    isActive: true,
+    initialPassword: 'Str0ng!Pass',
+  };
+
+  beforeEach(async () => {
+    await prisma.user.deleteMany({ where: { email: validPayload.email } });
+  });
+
+  it('creates a user with mustChangePassword forced true, ignoring any client-supplied value', async () => {
+    const response = await request(app)
+      .post('/api/v1/admin/users')
+      .set('Cookie', adminCookie)
+      .send({ ...validPayload, mustChangePassword: false });
+
+    expect(response.status).toBe(201);
+    expect(response.body.mustChangePassword).toBe(true);
+    expect(response.body.email).toBe(validPayload.email);
+    expect(response.body).not.toHaveProperty('passwordHash');
+
+    const stored = await prisma.user.findUniqueOrThrow({ where: { email: validPayload.email } });
+    expect(stored.passwordHash).not.toBe(validPayload.initialPassword);
+    expect(stored.mustChangePassword).toBe(true);
+  });
+
+  it('normalizes email to lowercase before storing', async () => {
+    const response = await request(app)
+      .post('/api/v1/admin/users')
+      .set('Cookie', adminCookie)
+      .send({ ...validPayload, email: 'NewBie@TokTickIT.Local' });
+
+    expect(response.status).toBe(201);
+    expect(response.body.email).toBe('newbie@toktickit.local');
+  });
+
+  it('rejects a duplicate email with 409 EMAIL_ALREADY_EXISTS', async () => {
+    const response = await request(app)
+      .post('/api/v1/admin/users')
+      .set('Cookie', adminCookie)
+      .send({ ...validPayload, email: 'admin@toktickit.local' });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe('EMAIL_ALREADY_EXISTS');
+  });
+
+  it('rejects a password that fails the policy with 422', async () => {
+    const response = await request(app)
+      .post('/api/v1/admin/users')
+      .set('Cookie', adminCookie)
+      .send({ ...validPayload, initialPassword: 'weak' });
+
+    expect(response.status).toBe(422);
+    expect(response.body.error.fieldErrors.some((e: { field: string }) => e.field === 'initialPassword')).toBe(true);
+  });
+
+  it('rejects a non-Administrator caller with 403', async () => {
+    const staff = await prisma.user.findUniqueOrThrow({ where: { email: 'itstaff@toktickit.local' } });
+    const cookie = await createSessionCookieFor(staff.id);
+    const response = await request(app).post('/api/v1/admin/users').set('Cookie', cookie).send(validPayload);
+    expect(response.status).toBe(403);
+  });
+});
