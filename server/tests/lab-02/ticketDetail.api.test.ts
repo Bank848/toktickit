@@ -5,6 +5,7 @@ import { app } from '../../src/app';
 import { prisma } from '../../src/prisma';
 import { truncateTicketTables } from '../helpers/resetDb';
 import { generateTicketNumber } from '../../src/services/ticketNumber';
+import { createSessionCookieFor } from '../helpers/session';
 
 describe('GET /api/v1/tickets/:id', () => {
   let requesterId: string;
@@ -46,7 +47,7 @@ describe('GET /api/v1/tickets/:id', () => {
 
     const response = await request(app)
       .get(`/api/v1/tickets/${ticket.id}`)
-      .set('x-dev-user-id', requesterId);
+      .set('Cookie', await createSessionCookieFor(requesterId));
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
@@ -77,10 +78,10 @@ describe('GET /api/v1/tickets/:id', () => {
 
     const foreignResponse = await request(app)
       .get(`/api/v1/tickets/${ticket.id}`)
-      .set('x-dev-user-id', requesterId);
+      .set('Cookie', await createSessionCookieFor(requesterId));
     const missingResponse = await request(app)
       .get(`/api/v1/tickets/${randomUUID()}`)
-      .set('x-dev-user-id', requesterId);
+      .set('Cookie', await createSessionCookieFor(requesterId));
 
     expect(foreignResponse.status).toBe(404);
     expect(missingResponse.status).toBe(404);

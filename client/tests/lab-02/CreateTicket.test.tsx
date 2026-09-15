@@ -1,14 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { RequesterProvider } from '../../src/context/RequesterContext';
+import { AuthProvider } from '../../src/context/AuthContext';
 import { CreateTicketPage } from '../../src/pages/CreateTicketPage';
+import * as authApi from '../../src/api/auth';
 import * as lookupsApi from '../../src/api/lookups';
 import * as ticketsApi from '../../src/api/tickets';
 import * as attachmentsApi from '../../src/api/attachments';
 import { ApiError } from '../../src/api/tickets';
 
-const REQUESTER = { id: 'req-1', email: 'r1@test.dev', displayName: 'Ariya' };
+const REQUESTER = {
+  id: 'req-1',
+  email: 'r1@test.dev',
+  displayName: 'Ariya',
+  role: 'REQUESTER' as const,
+  mustChangePassword: false,
+};
 const CATEGORIES = [{ id: 1, name: 'Hardware' }];
 const RELATED_SYSTEMS = [{ id: 1, code: 'ERP', name: 'ERP System' }];
 
@@ -42,9 +49,9 @@ function TicketDetailStub() {
 }
 
 function renderPage() {
-  sessionStorage.setItem('toktickit.selectedRequesterId', JSON.stringify(REQUESTER));
+  vi.spyOn(authApi, 'fetchMe').mockResolvedValue(REQUESTER);
   return render(
-    <RequesterProvider>
+    <AuthProvider>
       <MemoryRouter initialEntries={['/tickets/new']}>
         <Routes>
           <Route path="/tickets/new" element={<CreateTicketPage />} />
@@ -52,7 +59,7 @@ function renderPage() {
           <Route path="/tickets" element={<div>MY TICKETS PAGE</div>} />
         </Routes>
       </MemoryRouter>
-    </RequesterProvider>,
+    </AuthProvider>,
   );
 }
 

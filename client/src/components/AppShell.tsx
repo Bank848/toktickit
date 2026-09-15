@@ -1,19 +1,49 @@
 import { useState } from 'react';
-import { Outlet, Navigate, NavLink, useNavigate } from 'react-router-dom';
-import { useRequester } from '../context/RequesterContext';
+import { Outlet, Navigate, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+
+const ROLE_LABEL: Record<string, string> = {
+  REQUESTER: 'Requester',
+  IT_STAFF: 'IT Staff',
+  ADMINISTRATOR: 'Administrator',
+};
+
+const HOME_ROUTE: Record<string, string> = {
+  REQUESTER: '/tickets',
+  IT_STAFF: '/staff/tickets',
+  ADMINISTRATOR: '/admin/users',
+};
+
+function requiredRoleFor(pathname: string): string | null {
+  if (pathname.startsWith('/staff')) return 'IT_STAFF';
+  if (pathname.startsWith('/admin')) return 'ADMINISTRATOR';
+  if (pathname.startsWith('/tickets')) return 'REQUESTER';
+  return null;
+}
 
 export function AppShell() {
-  const { requester, clearRequester } = useRequester();
+  const { currentUser, isLoading, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [navOpen, setNavOpen] = useState(false);
 
-  if (!requester) {
-    return <Navigate to="/select-requester" replace />;
+  if (isLoading) {
+    return <div className="container py-4">Loading…</div>;
+  }
+  if (!currentUser) {
+    return <Navigate to="/login" replace />;
+  }
+  if (currentUser.mustChangePassword) {
+    return <Navigate to="/change-password" replace />;
+  }
+  const requiredRole = requiredRoleFor(location.pathname);
+  if (requiredRole && requiredRole !== currentUser.role) {
+    return <Navigate to={HOME_ROUTE[currentUser.role]} replace />;
   }
 
-  const handleChangeRequester = () => {
-    clearRequester();
-    navigate('/select-requester', { state: { from: 'change-requester' } });
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
   };
 
   return (
@@ -24,9 +54,11 @@ export function AppShell() {
             <span className="navbar-brand fw-semibold mb-0">TokTickIT</span>
 
             <div className="d-flex align-items-center gap-2 ms-auto order-md-2">
-              <span className="navbar-text small">Testing as: {requester.displayName}</span>
-              <button type="button" className="btn btn-sm btn-header" onClick={handleChangeRequester}>
-                Change Requester
+              <span className="navbar-text small">
+                Signed in as: {currentUser.displayName} ({ROLE_LABEL[currentUser.role]})
+              </span>
+              <button type="button" className="btn btn-sm btn-header" onClick={handleLogout}>
+                Logout
               </button>
             </div>
 
@@ -43,16 +75,34 @@ export function AppShell() {
 
             <div id="primary-nav" className={`collapse navbar-collapse order-md-1${navOpen ? ' show' : ''}`}>
               <ul className="navbar-nav me-auto">
-                <li className="nav-item">
-                  <NavLink to="/tickets" end className="nav-link" onClick={() => setNavOpen(false)}>
-                    My Tickets
-                  </NavLink>
-                </li>
-                <li className="nav-item">
-                  <NavLink to="/tickets/new" className="nav-link" onClick={() => setNavOpen(false)}>
-                    Create Ticket
-                  </NavLink>
-                </li>
+                {currentUser.role === 'REQUESTER' && (
+                  <>
+                    <li className="nav-item">
+                      <NavLink to="/tickets" end className="nav-link" onClick={() => setNavOpen(false)}>
+                        My Tickets
+                      </NavLink>
+                    </li>
+                    <li className="nav-item">
+                      <NavLink to="/tickets/new" className="nav-link" onClick={() => setNavOpen(false)}>
+                        Create Ticket
+                      </NavLink>
+                    </li>
+                  </>
+                )}
+                {currentUser.role === 'IT_STAFF' && (
+                  <li className="nav-item">
+                    <NavLink to="/staff/tickets" className="nav-link" onClick={() => setNavOpen(false)}>
+                      My Queue
+                    </NavLink>
+                  </li>
+                )}
+                {currentUser.role === 'ADMINISTRATOR' && (
+                  <li className="nav-item">
+                    <NavLink to="/admin/users" className="nav-link" onClick={() => setNavOpen(false)}>
+                      Users
+                    </NavLink>
+                  </li>
+                )}
               </ul>
             </div>
           </div>

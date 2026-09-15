@@ -147,7 +147,7 @@ describe('AttachmentSection', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /^remove$/i }));
 
     await waitFor(() => {
-      expect(removeSpy).toHaveBeenCalledWith(REQUESTER_ID, 'att-1', 'Wrong file');
+      expect(removeSpy).toHaveBeenCalledWith('att-1', 'Wrong file');
     });
     await waitFor(() => {
       expect(screen.getAllByText(/removed/i).length).toBeGreaterThan(0);
