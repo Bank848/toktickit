@@ -133,14 +133,16 @@ describe('StaffTicketQueuePage', () => {
 
     await waitFor(() => expect(screen.getAllByText('TCK-2026-0001').length).toBeGreaterThan(0));
 
-    // The desktop table is hidden below md via Bootstrap's `d-none d-md-block`; the card list
-    // is shown only below md via `d-md-none` -- this dual-DOM pair is what actually produces
-    // "stacked cards, no horizontal scroll" at a sub-768px viewport (pixel-for-pixel confirmed
-    // in the mobile Playwright project, e2e/lab-03/staff-ticket-flow.spec.ts's
-    // assertNoHorizontalOverflow calls -- jsdom has no real layout engine to assert overflow
-    // against directly, so this test instead pins the markup structure that overflow depends on).
-    const desktopTable = container.querySelector('.d-none.d-md-block table');
-    const mobileCards = container.querySelector('.d-md-none');
+    // The desktop table is hidden below lg via Bootstrap's `d-none d-lg-block`; the card list
+    // is shown below lg via `d-lg-none` -- raised from the md (768px) breakpoint My Tickets uses,
+    // because this table's 8 columns (vs. My Tickets' 5) clip at tablet width, so tablet renders
+    // cards here too. This dual-DOM pair is what actually produces "stacked cards, no horizontal
+    // scroll" below that width (pixel-for-pixel confirmed in the mobile Playwright project,
+    // e2e/lab-03/staff-ticket-flow.spec.ts's assertNoHorizontalOverflow calls -- jsdom has no real
+    // layout engine to assert overflow against directly, so this test instead pins the markup
+    // structure that overflow depends on).
+    const desktopTable = container.querySelector('.d-none.d-lg-block table');
+    const mobileCards = container.querySelector('.d-lg-none');
     expect(desktopTable).not.toBeNull();
     expect(mobileCards).not.toBeNull();
     expect(mobileCards?.textContent).toContain('TCK-2026-0001');

@@ -84,6 +84,33 @@ async function main() {
       },
     });
   }
+
+  // AC-12: requester@toktickit.local (a Lab 2 seeded Requester) must carry at least one ticket
+  // that predates the Lab 3 migration, so E2E can prove existing Requester tickets survive the
+  // move to session-based auth. Upserted by the fixed ticketNo (unique) so re-running the seed
+  // never duplicates it.
+  const [lab2Requester, networkCategory, vpnSystem] = await Promise.all([
+    prisma.user.findUniqueOrThrow({ where: { email: 'requester@toktickit.local' } }),
+    prisma.category.findUniqueOrThrow({ where: { name: 'Network' } }),
+    prisma.relatedSystem.findUniqueOrThrow({ where: { code: 'VPN' } }),
+  ]);
+
+  await prisma.ticket.upsert({
+    where: { ticketNo: 'TKT-2025-00001' },
+    update: {},
+    create: {
+      ticketNo: 'TKT-2025-00001',
+      summary: 'VPN client fails to connect after Windows update',
+      description:
+        'VPN client shows a certificate error and cannot establish a tunnel since the latest Windows update was applied.',
+      status: 'OPEN',
+      requestedPriority: 'MEDIUM',
+      itPriority: 'MEDIUM',
+      requesterId: lab2Requester.id,
+      categoryId: networkCategory.id,
+      relatedSystemId: vpnSystem.id,
+    },
+  });
 }
 
 main()

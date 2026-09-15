@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { StaffTicketDetailPage } from '../../src/pages/StaffTicketDetailPage';
 import * as api from '../../src/api/staffTickets';
+import { ApiError } from '../../src/api/tickets';
 
 vi.mock('../../src/api/staffTickets');
 
@@ -51,11 +52,28 @@ describe('StaffTicketDetailPage', () => {
 
     const select = screen.getByLabelText('Current Status') as HTMLSelectElement;
     const optionValues = Array.from(select.options).map((o) => o.value);
-    // OPEN's allowed targets per specification.md §4.4: IN_PROGRESS, WAITING_FOR_REQUESTER, CANCELLED.
-    expect(optionValues.sort()).toEqual(['CANCELLED', 'IN_PROGRESS', 'WAITING_FOR_REQUESTER'].sort());
+    // OPEN's allowed targets per specification.md §4.4: IN_PROGRESS, WAITING_FOR_REQUESTER,
+    // CANCELLED, plus the disabled "" placeholder option (N17) that keeps the browser from
+    // defaulting the visible selection onto one of those real status values.
+    expect(optionValues.sort()).toEqual(['', 'CANCELLED', 'IN_PROGRESS', 'WAITING_FOR_REQUESTER'].sort());
 
     fireEvent.change(select, { target: { value: 'IN_PROGRESS' } });
     await waitFor(() => expect(api.updateTicketStatus).toHaveBeenCalledWith('t1', 'IN_PROGRESS'));
+  });
+
+  it('never visually displays a status the ticket does not have -- the select falls back to the disabled placeholder, not the first transition option (N17)', async () => {
+    // NEW + unowned only offers one transition target (CANCELLED); before the fix, with no
+    // option matching the controlled value="", the browser fell back to visually selecting that
+    // lone option, so the dropdown showed "CANCELLED" for a ticket that is actually New.
+    vi.mocked(api.fetchStaffTicketDetail).mockResolvedValue({ ...DETAIL, status: 'NEW', owner: null });
+    renderPage();
+
+    const select = await screen.findByLabelText('Current Status') as HTMLSelectElement;
+    expect(select.value).toBe('');
+    expect(select.selectedOptions[0]).toHaveTextContent('Select new status…');
+    // The badge is the source of truth for the ticket's real status, and must show New, not
+    // whatever the (disabled) select's option list happens to contain.
+    expect(screen.getByText('New')).toBeInTheDocument();
   });
 
   it('disables the status select with a tooltip when the ticket is NEW and unowned (BR-15)', async () => {
@@ -125,5 +143,59 @@ describe('StaffTicketDetailPage', () => {
 
     await waitFor(() => expect(api.postStaffComment).toHaveBeenCalledWith('t1', 'Looking into it'));
     await waitFor(() => expect(screen.getByText('Looking into it')).toBeInTheDocument());
+  });
+
+  it('renders a "Problem Appears Resolved" badge and strips the stored prefix, instead of showing it raw (N1)', async () => {
+    vi.mocked(api.fetchStaffComments).mockResolvedValue([
+      {
+        id: 'c1', ticketId: 't1',
+        body: '[Requester marked: problem appears resolved] Thanks, that fixed it',
+        author: { id: 'r1', displayName: 'Nattapong R.' }, authorRole: 'REQUESTER', createdAt: '2026-09-01T00:00:00Z',
+      },
+    ]);
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Thanks, that fixed it')).toBeInTheDocument());
+    expect(screen.getByText('Problem Appears Resolved')).toBeInTheDocument();
+    expect(screen.queryByText(/Requester marked: problem appears resolved/)).not.toBeInTheDocument();
+  });
+
+  it('shows a visible error with Retry when changing the owner fails, and Retry resubmits the same change (N2)', async () => {
+    vi.mocked(api.updateTicketOwner)
+      .mockRejectedValueOnce(new ApiError('Ticket is locked', 409, []))
+      .mockResolvedValueOnce({ ...DETAIL, owner: { id: 'owner-2', displayName: 'John Staff' } });
+    renderPage();
+    await waitFor(() => expect(screen.getByLabelText('Ticket Owner')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText('Ticket Owner'), { target: { value: 'owner-2' } });
+    await waitFor(() => expect(screen.getByText('Ticket is locked')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(api.updateTicketOwner).toHaveBeenCalledTimes(2));
+    expect(api.updateTicketOwner).toHaveBeenNthCalledWith(2, 't1', 'owner-2');
+  });
+
+  it('shows a visible error with Retry when changing the IT Priority fails (N2)', async () => {
+    vi.mocked(api.updateTicketPriority).mockRejectedValueOnce(new ApiError('Ticket is locked', 409, []));
+    renderPage();
+    await waitFor(() => expect(screen.getByLabelText('IT Priority')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText('IT Priority'), { target: { value: 'URGENT' } });
+    await waitFor(() => expect(screen.getByText('Ticket is locked')).toBeInTheDocument());
+  });
+
+  it('shows a visible error with Retry when changing the status fails (N2)', async () => {
+    vi.mocked(api.updateTicketStatus).mockRejectedValueOnce(new ApiError('Invalid transition', 422, []));
+    renderPage();
+    await waitFor(() => expect(screen.getByLabelText('Current Status')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByLabelText('Current Status'), { target: { value: 'IN_PROGRESS' } });
+    await waitFor(() => expect(screen.getByText('Invalid transition')).toBeInTheDocument());
+  });
+
+  it('disables the Ticket Owner select with a tooltip when the ticket is Closed/Cancelled (N3, same lock as IT Priority)', async () => {
+    vi.mocked(api.fetchStaffTicketDetail).mockResolvedValue({ ...DETAIL, status: 'CLOSED' });
+    renderPage();
+    await waitFor(() => expect(screen.getByLabelText('Ticket Owner')).toBeDisabled());
+    expect(screen.getByLabelText('Ticket Owner')).toHaveAttribute('title', 'Locked: ticket is Closed/Cancelled');
   });
 });

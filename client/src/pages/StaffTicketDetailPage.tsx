@@ -6,8 +6,15 @@ import {
   fetchStaffTicketAttachments,
   type StaffTicketDetailDto, type UserSummaryDto, type CommentDto, type InternalNoteDto, type AttachmentDto,
 } from '../api/staffTickets';
-import { TicketStatusBadge, PriorityBadge } from '../components/TicketStatusBadge';
+import { ApiError } from '../api/tickets';
+import { displayCommentBody } from '../lib/commentDisplay';
+import { TicketStatusBadge, PriorityBadge, STATUS_OPTIONS, PRIORITY_OPTIONS } from '../components/TicketStatusBadge';
 import { Icon } from '../components/Icon';
+
+// Humanized labels for the option lists below, kept in sync with the badges via the same source
+// maps (ui-spec.md never shows raw enum strings like WAITING_FOR_REQUESTER to a user).
+const STATUS_LABELS: Record<string, string> = Object.fromEntries(STATUS_OPTIONS.map((o) => [o.value, o.label]));
+const PRIORITY_LABELS: Record<string, string> = Object.fromEntries(PRIORITY_OPTIONS.map((o) => [o.value, o.label]));
 
 // Mirrors server/src/services/ticketStatusTransitions.ts exactly (specification.md §4.4) so an
 // IT Staff member is never shown an option the server would reject (ui-spec.md §8).
@@ -23,9 +30,21 @@ const STATUS_TRANSITIONS: Record<string, string[]> = {
 };
 
 const TERMINAL_STATUSES = new Set(['CLOSED', 'CANCELLED']);
-const PRIORITY_OPTIONS = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
+const PRIORITY_VALUES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
 type SectionLoadState = 'loading' | 'loaded' | 'error';
+type FieldKey = 'owner' | 'priority' | 'status';
+
+function FieldRetryAlert({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div role="alert" className="alert alert-danger alert-sm mt-1 p-2">
+      <p className="mb-1">{message}</p>
+      <button type="button" className="btn btn-outline-danger btn-sm" onClick={onRetry}>
+        Retry
+      </button>
+    </div>
+  );
+}
 
 export function StaffTicketDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -47,6 +66,15 @@ export function StaffTicketDetailPage() {
 
   const [attachments, setAttachments] = useState<AttachmentDto[]>([]);
   const [attachmentsState, setAttachmentsState] = useState<SectionLoadState>('loading');
+
+  // Per-control save-failure feedback (ui-spec.md:220-222: "shown as a small inline toast near
+  // that control rather than a page-level banner, so acting on one control's result is never
+  // confused with another's") -- same panelAlert-style convention AdminUserManagementPage.tsx
+  // uses for its one-click actions, and the same headerState==='error'-style Retry affordance
+  // this file already uses for the initial load. One record per concern (not three field sets)
+  // since owner/priority/status share the exact same set-error/retry shape.
+  const [fieldErrors, setFieldErrors] = useState<Record<FieldKey, string>>({ owner: '', priority: '', status: '' });
+  const [lastAttempts, setLastAttempts] = useState<Record<FieldKey, string>>({ owner: '', priority: '', status: '' });
 
   const loadHeader = useCallback(() => {
     setHeaderState('loading');
@@ -79,20 +107,33 @@ export function StaffTicketDetailPage() {
   useEffect(() => { loadNotes(); }, [loadNotes]);
   useEffect(() => { loadAttachments(); }, [loadAttachments]);
 
+  async function runFieldUpdate(
+    field: FieldKey,
+    value: string,
+    update: (id: string, value: string) => Promise<StaffTicketDetailDto>,
+    fallbackMessage: string,
+  ) {
+    setLastAttempts((prev) => ({ ...prev, [field]: value }));
+    setFieldErrors((prev) => ({ ...prev, [field]: '' }));
+    try {
+      const updated = await update(ticketId, value);
+      setTicket(updated);
+    } catch (error) {
+      setFieldErrors((prev) => ({ ...prev, [field]: error instanceof ApiError ? error.message : fallbackMessage }));
+    }
+  }
+
   async function handleOwnerChange(ownerId: string) {
     if (!ownerId) return;
-    const updated = await updateTicketOwner(ticketId, ownerId);
-    setTicket(updated);
+    await runFieldUpdate('owner', ownerId, updateTicketOwner, 'Failed to update owner.');
   }
 
   async function handlePriorityChange(itPriority: string) {
-    const updated = await updateTicketPriority(ticketId, itPriority);
-    setTicket(updated);
+    await runFieldUpdate('priority', itPriority, updateTicketPriority, 'Failed to update IT Priority.');
   }
 
   async function handleStatusChange(status: string) {
-    const updated = await updateTicketStatus(ticketId, status);
-    setTicket(updated);
+    await runFieldUpdate('status', status, updateTicketStatus, 'Failed to update status.');
   }
 
   async function handlePostComment() {
@@ -136,15 +177,44 @@ export function StaffTicketDetailPage() {
   // status (BR-19: CLOSED/CANCELLED), matching priorityLocked's terminal-status check exactly
   // below rather than only handling the pre-claim case.
   const statusLocked = (ticket.status === 'NEW' && !ticket.owner) || TERMINAL_STATUSES.has(ticket.status);
-  const priorityLocked = TERMINAL_STATUSES.has(ticket.status);
+  // Gates both Owner and IT Priority: BR-19 locks the whole ticket (not just one field) once it
+  // reaches a terminal status.
+  const ticketLocked = TERMINAL_STATUSES.has(ticket.status);
 
   return (
     <div>
-      <h1>{ticket.ticketNo}</h1>
-      <p>{ticket.summary}</p>
-      <p>{ticket.description}</p>
-      <p><strong>Requester:</strong> {ticket.requester.displayName}</p>
-      <p><strong>Requested Priority:</strong> <PriorityBadge priority={ticket.requestedPriority} /></p>
+      <div className="card mb-3">
+        <div className="card-body">
+          <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <h1 className="mb-0 me-2">{ticket.ticketNo}</h1>
+            <span data-testid="ticket-status-badge">
+              <TicketStatusBadge status={ticket.status} />
+            </span>
+          </div>
+
+          <dl className="row mb-4">
+            <dt className="col-6 col-md-2 field-label">Date</dt>
+            <dd className="col-6 col-md-4">{new Date(ticket.createdAt).toLocaleString()}</dd>
+            <dt className="col-6 col-md-2 field-label">Category</dt>
+            <dd className="col-6 col-md-4">{ticket.category.name}</dd>
+
+            <dt className="col-6 col-md-2 field-label">Related System</dt>
+            <dd className="col-6 col-md-4">{ticket.relatedSystem?.name ?? 'Not applicable'}</dd>
+            <dt className="col-6 col-md-2 field-label">Requester</dt>
+            <dd className="col-6 col-md-4">{ticket.requester.displayName}</dd>
+
+            <dt className="col-6 col-md-2 field-label">Requested Priority</dt>
+            <dd className="col-6 col-md-4"><PriorityBadge priority={ticket.requestedPriority} /></dd>
+          </dl>
+
+          <h2>Summary</h2>
+          <p>{ticket.summary}</p>
+          <h2>Description</h2>
+          <p style={{ whiteSpace: 'pre-wrap' }}>{ticket.description}</p>
+          <h2>Resolution</h2>
+          <p className="text-body-secondary mb-0">{ticket.resolutionSummary ?? 'No resolution yet'}</p>
+        </div>
+      </div>
 
       <div className="row g-3 mb-4">
         <div className="col-md-4">
@@ -153,6 +223,8 @@ export function StaffTicketDetailPage() {
             id="staff-detail-owner"
             className="form-select"
             value={ticket.owner?.id ?? ''}
+            disabled={ticketLocked}
+            title={ticketLocked ? 'Locked: ticket is Closed/Cancelled' : undefined}
             onChange={(event) => handleOwnerChange(event.target.value)}
           >
             {!ticket.owner && <option value="">Unassigned</option>}
@@ -160,6 +232,9 @@ export function StaffTicketDetailPage() {
               <option key={owner.id} value={owner.id}>{owner.displayName}</option>
             ))}
           </select>
+          {fieldErrors.owner && (
+            <FieldRetryAlert message={fieldErrors.owner} onRetry={() => handleOwnerChange(lastAttempts.owner)} />
+          )}
         </div>
 
         <div className="col-md-4">
@@ -168,14 +243,20 @@ export function StaffTicketDetailPage() {
             id="staff-detail-priority"
             className="form-select"
             value={ticket.itPriority}
-            disabled={priorityLocked}
-            title={priorityLocked ? 'Locked: ticket is Closed/Cancelled' : undefined}
+            disabled={ticketLocked}
+            title={ticketLocked ? 'Locked: ticket is Closed/Cancelled' : undefined}
             onChange={(event) => handlePriorityChange(event.target.value)}
           >
-            {PRIORITY_OPTIONS.map((value) => (
-              <option key={value} value={value}>{value}</option>
+            {PRIORITY_VALUES.map((value) => (
+              <option key={value} value={value}>{PRIORITY_LABELS[value] ?? value}</option>
             ))}
           </select>
+          {fieldErrors.priority && (
+            <FieldRetryAlert
+              message={fieldErrors.priority}
+              onRetry={() => handlePriorityChange(lastAttempts.priority)}
+            />
+          )}
         </div>
 
         <div className="col-md-4">
@@ -194,14 +275,25 @@ export function StaffTicketDetailPage() {
             }
             onChange={(event) => handleStatusChange(event.target.value)}
           >
+            {/* A real disabled placeholder option, not just an empty string default (N17): the
+                option list below is transition *targets*, which by design excludes the ticket's
+                own current status (specification.md §4.4) -- e.g. for a NEW, unassigned ticket
+                the only target is CANCELLED. Without this placeholder, the browser falls back to
+                visually selecting that lone option, so a New ticket's select would misleadingly
+                display "CANCELLED" even though the ticket is not cancelled (the TicketStatusBadge
+                just below already shows the real, correct status). Keeping the select -- rather
+                than removing it -- matches ui-spec.md's description of this control as a "change
+                to" action, not a second display of current status. */}
+            <option value="" disabled>Select new status…</option>
             {statusOptions.map((value) => (
-              <option key={value} value={value}>{value}</option>
+              <option key={value} value={value}>{STATUS_LABELS[value] ?? value}</option>
             ))}
           </select>
+          {fieldErrors.status && (
+            <FieldRetryAlert message={fieldErrors.status} onRetry={() => handleStatusChange(lastAttempts.status)} />
+          )}
         </div>
       </div>
-
-      <p><strong>Status:</strong> <TicketStatusBadge status={ticket.status} /></p>
 
       <section className="mb-4">
         <h2>Public Comments</h2>
@@ -213,14 +305,23 @@ export function StaffTicketDetailPage() {
           </div>
         )}
         {commentsState === 'loaded' && comments.length === 0 && <p>No comments yet.</p>}
-        {commentsState === 'loaded' && comments.map((comment) => (
-          <div key={comment.id} className="border-bottom py-2">
-            <strong>{comment.author.displayName}</strong>{' '}
-            <span className="badge badge-tone-neutral">{comment.authorRole === 'REQUESTER' ? 'Requester' : 'IT Staff'}</span>{' '}
-            <span className="text-body-secondary small">{new Date(comment.createdAt).toLocaleString()}</span>
-            <p className="mb-0">{comment.body}</p>
-          </div>
-        ))}
+        {commentsState === 'loaded' && comments.map((comment) => {
+          const { text, flagged } = displayCommentBody(comment.body);
+          return (
+            <div key={comment.id} className="border-bottom py-2">
+              <strong>{comment.author.displayName}</strong>{' '}
+              <span className="badge badge-tone-neutral">{comment.authorRole === 'REQUESTER' ? 'Requester' : 'IT Staff'}</span>{' '}
+              <span className="text-body-secondary small">{new Date(comment.createdAt).toLocaleString()}</span>{' '}
+              {flagged && (
+                <span className="badge badge-tone-pale">
+                  <Icon name="check-circle-fill" />
+                  Problem Appears Resolved
+                </span>
+              )}
+              <p className="mb-0">{text}</p>
+            </div>
+          );
+        })}
         <textarea
           className="form-control mt-2"
           placeholder="Type your comment here…"
