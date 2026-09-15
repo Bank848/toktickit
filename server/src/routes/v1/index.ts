@@ -8,6 +8,8 @@ import { relatedSystemsRouter } from './relatedSystems';
 import { ticketsRouter } from './tickets';
 import { attachmentContentRouter } from './attachments';
 import { staffRouter } from './staff';
+import { adminUsersRouter } from './adminUsers';
+import { requireRole } from '../../middleware/requireRole';
 
 export const v1Router = Router();
 
@@ -23,3 +25,4 @@ v1Router.use('/related-systems', relatedSystemsRouter);
 v1Router.use('/tickets', ticketsRouter);
 v1Router.use('/attachments', attachmentContentRouter);
 v1Router.use('/staff', staffRouter);
+v1Router.use('/admin/users', requireRole('ADMINISTRATOR'), adminUsersRouter);
