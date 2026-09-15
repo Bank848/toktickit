@@ -15,11 +15,12 @@ enum UserRole {
 
 enum TicketStatus {
   NEW
-  ASSIGNED
+  OPEN
   IN_PROGRESS
-  PENDING_REQUESTER
+  WAITING_FOR_REQUESTER
   RESOLVED
   CLOSED
+  REOPENED
   CANCELLED
 }
 
@@ -38,21 +39,36 @@ enum TicketEventType {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  displayName  String
-  role         UserRole @default(REQUESTER)
-  passwordHash String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                 String   @id @default(uuid())
+  email              String   @unique
+  displayName        String
+  role               UserRole @default(REQUESTER)
+  passwordHash       String?
+  mustChangePassword Boolean  @default(false)
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  requestedTickets   Ticket[]      @relation("TicketRequester")
-  ownedTickets       Ticket[]      @relation("TicketOwner")
+  requestedTickets   Ticket[]       @relation("TicketRequester")
+  ownedTickets       Ticket[]       @relation("TicketOwner")
   comments           Comment[]
-  attachments        Attachment[]  @relation("AttachmentUploader")
-  deletedAttachments Attachment[]  @relation("AttachmentDeleter")
+  attachments        Attachment[]   @relation("AttachmentUploader")
+  deletedAttachments Attachment[]   @relation("AttachmentDeleter")
   events             TicketEvent[]
+  sessions           Session[]
+  internalNotes      InternalNote[]
+}
+
+model Session {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  @@index([userId])
 }
 
 model RelatedSystem {
@@ -74,18 +90,18 @@ model Category {
 }
 
 model Ticket {
-  id                              String        @id @default(uuid())
-  ticketNo                        String        @unique
-  summary                         String
-  description                     String
-  status                          TicketStatus  @default(NEW)
-  requestedPriority               Priority
-  itPriority                      Priority
-  resolutionSummary               String?
-  requesterResolutionConfirmedAt  DateTime?
-  version                         Int           @default(0)
-  createdAt                       DateTime      @default(now())
-  updatedAt                       DateTime      @updatedAt
+  id                             String       @id @default(uuid())
+  ticketNo                       String       @unique
+  summary                        String
+  description                    String
+  status                         TicketStatus @default(NEW)
+  requestedPriority              Priority
+  itPriority                     Priority
+  resolutionSummary              String?
+  requesterResolutionConfirmedAt DateTime?
+  version                        Int          @default(0)
+  createdAt                      DateTime     @default(now())
+  updatedAt                      DateTime     @updatedAt
 
   requesterId     String
   requester       User           @relation("TicketRequester", fields: [requesterId], references: [id], onDelete: Restrict)
@@ -96,9 +112,10 @@ model Ticket {
   relatedSystemId Int?
   relatedSystem   RelatedSystem? @relation(fields: [relatedSystemId], references: [id], onDelete: Restrict)
 
-  comments    Comment[]
-  attachments Attachment[]
-  events      TicketEvent[]
+  comments      Comment[]
+  internalNotes InternalNote[]
+  attachments   Attachment[]
+  events        TicketEvent[]
 
   @@index([requesterId, createdAt])
   @@index([status])
@@ -106,6 +123,18 @@ model Ticket {
 }
 
 model Comment {
+  id        String   @id @default(uuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  body      String   @db.VarChar(2000)
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+model InternalNote {
   id        String   @id @default(uuid())
   ticketId  String
   ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Restrict)
