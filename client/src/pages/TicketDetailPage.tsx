@@ -3,6 +3,7 @@ import { useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { fetchTicketDetail, ApiError, type TicketDetailDto } from '../api/tickets';
 import { AttachmentSection } from '../components/AttachmentSection';
+import { CommentSection } from '../components/CommentSection';
 import { TicketStatusBadge, PriorityBadge } from '../components/TicketStatusBadge';
 import { Icon } from '../components/Icon';
 
@@ -159,6 +160,12 @@ export function TicketDetailPage() {
           <div className="card mt-3">
             <div className="card-body">
               <AttachmentSection ticketId={ticket.id} requesterId={currentUser.id} ticketStatus={ticket.status} />
+            </div>
+          </div>
+
+          <div className="card mt-3">
+            <div className="card-body">
+              <CommentSection ticketId={ticket.id} />
             </div>
           </div>
         </>
