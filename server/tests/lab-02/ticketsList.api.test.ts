@@ -4,6 +4,7 @@ import { app } from '../../src/app';
 import { prisma } from '../../src/prisma';
 import { truncateTicketTables } from '../helpers/resetDb';
 import { generateTicketNumber } from '../../src/services/ticketNumber';
+import { createSessionCookieFor } from '../helpers/session';
 
 describe('GET /api/v1/tickets', () => {
   let requesterId: string;
@@ -29,7 +30,7 @@ describe('GET /api/v1/tickets', () => {
   async function createTicket(overrides: {
     requesterId: string;
     summary?: string;
-    status?: 'NEW' | 'ASSIGNED' | 'IN_PROGRESS' | 'PENDING_REQUESTER' | 'RESOLVED' | 'CLOSED' | 'CANCELLED';
+    status?: 'NEW' | 'OPEN' | 'IN_PROGRESS' | 'WAITING_FOR_REQUESTER' | 'RESOLVED' | 'CLOSED' | 'REOPENED' | 'CANCELLED';
     categoryId?: number;
   }) {
     const year = new Date().getUTCFullYear();
@@ -52,7 +53,7 @@ describe('GET /api/v1/tickets', () => {
     await createTicket({ requesterId, summary: 'Mine' });
     await createTicket({ requesterId: otherRequesterId, summary: 'Not mine' });
 
-    const response = await request(app).get('/api/v1/tickets').set('x-dev-user-id', requesterId);
+    const response = await request(app).get('/api/v1/tickets').set('Cookie', await createSessionCookieFor(requesterId));
 
     expect(response.status).toBe(200);
     expect(response.body.data).toHaveLength(1);
@@ -66,7 +67,7 @@ describe('GET /api/v1/tickets', () => {
     const response = await request(app)
       .get('/api/v1/tickets')
       .query({ q: 'vpn' })
-      .set('x-dev-user-id', requesterId);
+      .set('Cookie', await createSessionCookieFor(requesterId));
 
     expect(response.status).toBe(200);
     expect(response.body.data).toHaveLength(1);
@@ -75,7 +76,7 @@ describe('GET /api/v1/tickets', () => {
     const byTicketNo = await request(app)
       .get('/api/v1/tickets')
       .query({ q: ticket.ticketNo.toLowerCase() })
-      .set('x-dev-user-id', requesterId);
+      .set('Cookie', await createSessionCookieFor(requesterId));
     expect(byTicketNo.body.data).toHaveLength(1);
     expect(byTicketNo.body.data[0].id).toBe(ticket.id);
   });
@@ -88,7 +89,7 @@ describe('GET /api/v1/tickets', () => {
     const response = await request(app)
       .get('/api/v1/tickets')
       .query({ q: 'VPN', status: 'NEW', categoryId })
-      .set('x-dev-user-id', requesterId);
+      .set('Cookie', await createSessionCookieFor(requesterId));
 
     expect(response.status).toBe(200);
     expect(response.body.data).toHaveLength(1);
@@ -99,7 +100,7 @@ describe('GET /api/v1/tickets', () => {
     const response = await request(app)
       .get('/api/v1/tickets')
       .query({ sort: 'summary:asc' })
-      .set('x-dev-user-id', requesterId);
+      .set('Cookie', await createSessionCookieFor(requesterId));
 
     expect(response.status).toBe(422);
     expect(response.body.error.fieldErrors).toEqual([
@@ -111,14 +112,14 @@ describe('GET /api/v1/tickets', () => {
     const response = await request(app)
       .get('/api/v1/tickets')
       .query({ pageSize: 999 })
-      .set('x-dev-user-id', requesterId);
+      .set('Cookie', await createSessionCookieFor(requesterId));
 
     expect(response.status).toBe(200);
     expect(response.body.meta.pageSize).toBe(50);
   });
 
   it('distinguishes zero-tickets-ever from zero-matches-for-filters via an accurate meta.total', async () => {
-    const zeroEver = await request(app).get('/api/v1/tickets').set('x-dev-user-id', requesterId);
+    const zeroEver = await request(app).get('/api/v1/tickets').set('Cookie', await createSessionCookieFor(requesterId));
     expect(zeroEver.status).toBe(200);
     expect(zeroEver.body.data).toHaveLength(0);
     expect(zeroEver.body.meta.total).toBe(0);
@@ -127,7 +128,7 @@ describe('GET /api/v1/tickets', () => {
     const zeroMatches = await request(app)
       .get('/api/v1/tickets')
       .query({ q: 'nonexistent-search-term' })
-      .set('x-dev-user-id', requesterId);
+      .set('Cookie', await createSessionCookieFor(requesterId));
     expect(zeroMatches.status).toBe(200);
     expect(zeroMatches.body.data).toHaveLength(0);
     expect(zeroMatches.body.meta.total).toBe(0);
@@ -145,7 +146,7 @@ describe('GET /api/v1/tickets', () => {
     const response = await request(app)
       .get('/api/v1/tickets')
       .query({ requesterId: otherRequesterId })
-      .set('x-dev-user-id', requesterId);
+      .set('Cookie', await createSessionCookieFor(requesterId));
 
     expect(response.status).toBe(200);
     expect(response.body.data).toHaveLength(1);
@@ -161,7 +162,7 @@ describe('POST /api/v1/tickets response shape', () => {
 
     const response = await request(app)
       .post('/api/v1/tickets')
-      .set('x-dev-user-id', requester.id)
+      .set('Cookie', await createSessionCookieFor(requester.id))
       .send({
         summary: 'Test ticket for DTO shape',
         description: 'Checking that commentCount is not present in the response body.',

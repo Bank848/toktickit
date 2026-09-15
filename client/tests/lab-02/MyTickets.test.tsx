@@ -1,12 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { RequesterProvider } from '../../src/context/RequesterContext';
+import { AuthProvider } from '../../src/context/AuthContext';
 import { MyTicketsPage } from '../../src/pages/MyTicketsPage';
+import * as authApi from '../../src/api/auth';
 import * as ticketsApi from '../../src/api/tickets';
 import * as lookupsApi from '../../src/api/lookups';
 
-const REQUESTER = { id: 'req-1', email: 'r1@test.dev', displayName: 'Ariya' };
+const REQUESTER = {
+  id: 'req-1',
+  email: 'r1@test.dev',
+  displayName: 'Ariya',
+  role: 'REQUESTER' as const,
+  mustChangePassword: false,
+};
 const CATEGORIES = [{ id: 1, name: 'Hardware' }];
 
 const TICKET: ticketsApi.TicketListItemDto = {
@@ -36,9 +43,9 @@ function TicketDetailStub() {
 }
 
 function renderPage() {
-  sessionStorage.setItem('toktickit.selectedRequesterId', JSON.stringify(REQUESTER));
+  vi.spyOn(authApi, 'fetchMe').mockResolvedValue(REQUESTER);
   return render(
-    <RequesterProvider>
+    <AuthProvider>
       <MemoryRouter initialEntries={['/tickets']}>
         <Routes>
           <Route path="/tickets" element={<MyTicketsPage />} />
@@ -46,7 +53,7 @@ function renderPage() {
           <Route path="/tickets/:id" element={<TicketDetailStub />} />
         </Routes>
       </MemoryRouter>
-    </RequesterProvider>,
+    </AuthProvider>,
   );
 }
 
@@ -128,7 +135,7 @@ describe('MyTicketsPage', () => {
 
     vi.advanceTimersByTime(150);
     await vi.waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
-    expect(fetchSpy.mock.calls[1][1]).toMatchObject({ q: 'vpn' });
+    expect(fetchSpy.mock.calls[1][0]).toMatchObject({ q: 'vpn' });
   });
 
   it('resets to page 1 when a filter changes', async () => {
@@ -140,7 +147,7 @@ describe('MyTicketsPage', () => {
     fireEvent.change(screen.getByLabelText(/^category$/i), { target: { value: '1' } });
 
     await waitFor(() => {
-      expect(fetchSpy).toHaveBeenLastCalledWith(REQUESTER.id, expect.objectContaining({ page: 1, categoryId: 1 }));
+      expect(fetchSpy).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, categoryId: 1 }));
     });
   });
 

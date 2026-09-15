@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
-import { useRequester } from '../context/RequesterContext';
+import { useAuth } from '../context/AuthContext';
 import { fetchTicketDetail, ApiError, type TicketDetailDto } from '../api/tickets';
 import { AttachmentSection } from '../components/AttachmentSection';
+import { CommentSection } from '../components/CommentSection';
 import { TicketStatusBadge, PriorityBadge } from '../components/TicketStatusBadge';
 import { Icon } from '../components/Icon';
 
@@ -25,7 +26,7 @@ type LoadState = 'loading' | 'loaded' | 'not-found' | 'error';
 
 export function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { requester } = useRequester();
+  const { currentUser } = useAuth();
   const location = useLocation();
 
   const [ticket, setTicket] = useState<TicketDetailDto | null>(null);
@@ -33,9 +34,9 @@ export function TicketDetailPage() {
   const [uploadSummaryDismissed, setUploadSummaryDismissed] = useState(false);
 
   const loadTicket = useCallback(() => {
-    if (!requester || !id) return;
+    if (!id) return;
     setLoadState('loading');
-    fetchTicketDetail(requester.id, id)
+    fetchTicketDetail(id)
       .then((data) => {
         setTicket(data);
         setLoadState('loaded');
@@ -50,16 +51,14 @@ export function TicketDetailPage() {
           setLoadState('error');
         }
       });
-  }, [requester, id]);
+  }, [id]);
 
-  // Fetches on every mount, not just when id changes -- satisfies the "discard cached data on
-  // requester switch" rule from W4-1 (AppShell remounts this page after Change Requester).
   useEffect(() => {
     loadTicket();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, requester?.id]);
+  }, [id]);
 
-  if (!requester) return null;
+  if (!currentUser) return null;
 
   const uploadSummary = (location.state as LocationState | null)?.uploadSummary;
 
@@ -160,7 +159,13 @@ export function TicketDetailPage() {
 
           <div className="card mt-3">
             <div className="card-body">
-              <AttachmentSection ticketId={ticket.id} requesterId={requester.id} ticketStatus={ticket.status} />
+              <AttachmentSection ticketId={ticket.id} requesterId={currentUser.id} ticketStatus={ticket.status} />
+            </div>
+          </div>
+
+          <div className="card mt-3">
+            <div className="card-body">
+              <CommentSection ticketId={ticket.id} />
             </div>
           </div>
         </>

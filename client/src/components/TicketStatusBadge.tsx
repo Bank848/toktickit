@@ -6,11 +6,12 @@ import { Icon, type IconName } from './Icon';
 // raw Primary/Secondary, which ui-spec.md §1 reserves for header/primary-action chrome.
 const STATUS_META: Record<string, { label: string; icon: IconName; badgeClass: string }> = {
   NEW: { label: 'New', icon: 'circle-fill', badgeClass: 'badge-tone-info' },
-  ASSIGNED: { label: 'Assigned', icon: 'person-check', badgeClass: 'badge-tone-info' },
+  OPEN: { label: 'Open', icon: 'person-check', badgeClass: 'badge-tone-info' },
   IN_PROGRESS: { label: 'In Progress', icon: 'arrow-repeat', badgeClass: 'badge-tone-warning' },
-  PENDING_REQUESTER: { label: 'Pending Requester', icon: 'pause-circle-fill', badgeClass: 'badge-tone-neutral' },
+  WAITING_FOR_REQUESTER: { label: 'Waiting for Requester', icon: 'pause-circle-fill', badgeClass: 'badge-tone-neutral' },
   RESOLVED: { label: 'Resolved', icon: 'check-circle-fill', badgeClass: 'badge-tone-success' },
   CLOSED: { label: 'Closed', icon: 'dash-circle-fill', badgeClass: 'badge-tone-dark' },
+  REOPENED: { label: 'Reopened', icon: 'arrow-clockwise', badgeClass: 'badge-tone-warning' },
   CANCELLED: { label: 'Cancelled', icon: 'x-circle-fill', badgeClass: 'badge-tone-danger' },
 };
 
@@ -49,3 +50,10 @@ export function PriorityBadge({ priority }: { priority: string }) {
   const meta = PRIORITY_META[priority] ?? { label: priority, icon: 'circle-fill' as IconName, badgeClass: 'badge-tone-neutral' };
   return renderBadge(meta);
 }
+
+// Reused by the Staff Ticket Detail page's IT Priority select so its option labels never drift
+// from PriorityBadge's labels (mirrors STATUS_OPTIONS' role for the status filter/select above).
+export const PRIORITY_OPTIONS = Object.entries(PRIORITY_META).map(([value, meta]) => ({
+  value,
+  label: meta.label,
+}));
