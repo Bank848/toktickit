@@ -60,9 +60,8 @@ before merge. No PR in this set merged without one.
 
 ## Lab 3 release pull request
 
-- **PR `<#NN>` — "Lab 3: TokTickIT Authentication, Staff Workflow, and Administration"**
-  `<link, filled in once the release PR is opened>`
-- Branch: `lab3-staging` → `main`. 63 commits, 200 files changed.
+- **PR [#51](https://github.com/Bank848/toktickit/pull/51) — "Lab 3: TokTickIT Authentication, Staff Workflow, and Administration"**
+- Branch: `lab3-staging` → `main`. 64 commits, 200 files changed.
 
 `<Quote the release PR's APPROVED review verbatim once it lands, same as docs/lab-02/reviewer.md's
 final section.>`
