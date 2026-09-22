@@ -56,7 +56,9 @@
   <div class="card">
     <strong>Goal.</strong> Lab 4 adds a formal, auditable "what did IT Staff actually do" record (<code>ActionTaken</code>) under each Ticket, makes <code>RESOLVED</code> mean something by blocking that transition until at least one such record exists, and gives all three roles a landing-page dashboard summarizing their own operational picture without duplicating the existing Ticket Queue / My Tickets screens. Every Lab 1-3 capability keeps passing unchanged.
     <br><br>
-    <strong>Key decisions.</strong> The resolution gate (D-02) checks only that a qualifying record &lt;em&gt;exists&lt;/em&gt; — never that its &lt;code&gt;Result&lt;/code&gt; equals &lt;code&gt;RESOLVED&lt;/code&gt; — because a ticket can legitimately close after a final action whose result was &lt;code&gt;ESCALATED&lt;/code&gt; or &lt;code&gt;NO_ACTION_NEEDED&lt;/code&gt;, and because an editable record makes "the most recent Result" an unstable thing to gate on. Dashboards are aggregate-only (BR-13): every metric is a database &lt;code&gt;count&lt;/code&gt;/&lt;code&gt;groupBy&lt;/code&gt;, never a full list fetched and counted in application code — this plan widens &lt;code&gt;Ticket.ownerId&lt;/code&gt;'s index specifically so the two staff-dashboard metrics that filter on it don't table-scan. Creating or editing an Action Taken never touches &lt;code&gt;Ticket.updatedAt&lt;/code&gt; (D-06), matching how Comment/InternalNote already behave. The plan also had to fix a real pre-existing gap surfaced along the way: &lt;code&gt;staffRouter&lt;/code&gt; currently gates the entire &lt;code&gt;/staff/*&lt;/code&gt; namespace to &lt;code&gt;IT_STAFF&lt;/code&gt; only, which would have silently 403'd every Administrator out of the IT Staff Dashboard the spec explicitly makes their landing page — Task 12 widens that gate.
+    <strong>Key decisions.</strong> The resolution gate (D-02) checks only that a qualifying record &lt;em&gt;exists&lt;/em&gt; — never that its &lt;code&gt;Result&lt;/code&gt; equals &lt;code&gt;RESOLVED&lt;/code&gt; — because a ticket can legitimately close after a final action whose result was &lt;code&gt;ESCALATED&lt;/code&gt; or &lt;code&gt;NO_ACTION_NEEDED&lt;/code&gt;, and because an editable record makes "the most recent Result" an unstable thing to gate on. Dashboards are aggregate-only (BR-13): every metric is a database &lt;code&gt;count&lt;/code&gt;/&lt;code&gt;groupBy&lt;/code&gt;, never a full list fetched and counted in application code — this plan widens both &lt;code&gt;Ticket.ownerId&lt;/code&gt; and &lt;code&gt;Ticket.updatedAt&lt;/code&gt;'s indexes specifically so those dashboard queries don't table-scan. Creating or editing an Action Taken never touches &lt;code&gt;Ticket.updatedAt&lt;/code&gt; (D-06), matching how Comment/InternalNote already behave. &lt;code&gt;ownedByMeCount&lt;/code&gt; counts every status including Closed/Cancelled (FR-08 states no non-terminal qualifier), while &lt;code&gt;unassignedCount&lt;/code&gt; stays non-terminal-only per AC-10's explicit wording — these two metrics are deliberately asymmetric, not a copy/paste of the same filter.
+&lt;br&gt;&lt;br&gt;
+Two review rounds fixed real gaps before execution. Round 1 (2 spawned &lt;code&gt;general-purpose&lt;/code&gt; agents) caught a missing &lt;code&gt;Ticket.updatedAt&lt;/code&gt; index, a wrong &lt;code&gt;AuthContext&lt;/code&gt; mock shape across 3 client tests, and that &lt;code&gt;staffRouter&lt;/code&gt; currently gates the entire &lt;code&gt;/staff/*&lt;/code&gt; namespace to &lt;code&gt;IT_STAFF&lt;/code&gt; only — silently 403'ing every Administrator out of the IT Staff Dashboard the spec makes their landing page (Task 12 widens the gate). Round 2 (an independent Codex review requested by the user) caught four more: &lt;strong&gt;&lt;code&gt;HOME_ROUTE&lt;/code&gt; existed as three separate hardcoded copies&lt;/strong&gt; — fixing only &lt;code&gt;AppShell.tsx&lt;/code&gt;'s copy would have left &lt;code&gt;LoginPage.tsx&lt;/code&gt; and &lt;code&gt;ChangePasswordPage.tsx&lt;/code&gt; still sending every role to its old Lab 1-3 screen after login/password-change, since neither imports from &lt;code&gt;AppShell.tsx&lt;/code&gt; (fixed with one shared &lt;code&gt;client/src/lib/homeRoute.ts&lt;/code&gt;, Task 15); a genuine timezone bug in the Action Date/Time picker (UTC digits displayed and round-tripped as if they were local time, shifting the stored instant by the runner's UTC offset — fixed with dedicated conversion helpers, Task 7); the resolution-gate UI branched on a message-text regex instead of the server's actual error code, which &lt;code&gt;ApiError&lt;/code&gt; discarded at the client layer entirely (fixed by adding &lt;code&gt;code&lt;/code&gt; to &lt;code&gt;ApiError&lt;/code&gt;, Task 8); and FR-10's "linked, filtered to match" requirement was unmet by both dashboards' plain nav-style links, compounded by &lt;code&gt;MyTicketsPage&lt;/code&gt;/&lt;code&gt;StaffTicketQueuePage&lt;/code&gt; never reading the URL at all (fixed with real query-string links plus one-directional URL-to-initial-state hydration on both list pages, Tasks 13/14). Also closed: FR-08's missing IT Priority cards on the Staff Dashboard, two BR-11 field-parity gaps (staff view was missing &lt;code&gt;attachmentNotes&lt;/code&gt;, Requester view was missing &lt;code&gt;lastEditedBy&lt;/code&gt;), and the three still-open companion docs (&lt;code&gt;api-spec.md&lt;/code&gt;/&lt;code&gt;ui-spec.md&lt;/code&gt;/&lt;code&gt;tests.md&lt;/code&gt;) the Definition of Done requires — closed as a new Task 17.
   </div>
 
   <h3>Before &rarr; After: Ticket / Action Taken relationship</h3>
@@ -137,19 +139,31 @@ flowchart LR
 <li class="mod"><code>server/src/routes/v1/index.ts</code>, <code>server/src/routes/v1/staff/index.ts</code> — modified: mount dashboard routes, widen staff role gate to admit Administrator</li>
 <li class="mod"><code>server/tests/helpers/resetDb.ts</code> — modified: truncate <code>ActionTaken</code></li>
 <li class="add"><code>client/src/api/staffActions.ts</code>, <code>client/src/api/actions.ts</code>, <code>client/src/api/dashboard.ts</code> — new: API clients</li>
+<li class="mod"><code>client/src/api/tickets.ts</code> — modified: <code>ApiError</code> gains an optional <code>code</code> field</li>
+<li class="mod"><code>client/src/api/staffTickets.ts</code> — modified: <code>throwApiError</code> passes <code>code</code> through</li>
+<li class="add"><code>client/src/lib/datetimeLocal.ts</code> — new: timezone-safe <code>&lt;input type="datetime-local"&gt;</code> conversion helpers</li>
+<li class="add"><code>client/src/lib/homeRoute.ts</code> — new: single shared <code>HOME_ROUTE</code> map (replaces 3 duplicated copies)</li>
 <li class="add"><code>client/src/components/ActionsTakenSection.tsx</code> — new: staff create/edit/list UI</li>
 <li class="add"><code>client/src/components/ActionsTakenReadOnlySection.tsx</code> — new: Requester read-only UI</li>
+<li class="mod"><code>client/src/context/AuthContext.tsx</code> — modified: exports <code>AuthContext</code> (was module-private)</li>
 <li class="add"><code>client/src/pages/RequesterDashboardPage.tsx</code>, <code>client/src/pages/StaffDashboardPage.tsx</code> — new</li>
-<li class="mod"><code>client/src/pages/StaffTicketDetailPage.tsx</code>, <code>client/src/pages/TicketDetailPage.tsx</code> — modified: compose the new sections, resolution-gate inline message</li>
+<li class="mod"><code>client/src/pages/StaffTicketDetailPage.tsx</code>, <code>client/src/pages/TicketDetailPage.tsx</code> — modified: compose the new sections, resolution-gate inline message keyed on error code</li>
+<li class="mod"><code>client/src/pages/MyTicketsPage.tsx</code>, <code>client/src/pages/StaffTicketQueuePage.tsx</code> — modified: hydrate initial filters from the URL query string (FR-10)</li>
+<li class="mod"><code>client/src/pages/LoginPage.tsx</code>, <code>client/src/pages/ChangePasswordPage.tsx</code> — modified: import the shared <code>HOME_ROUTE</code> instead of each keeping its own stale copy</li>
 <li class="mod"><code>client/src/App.tsx</code>, <code>client/src/components/AppShell.tsx</code> — modified: dashboard routes, nav links, widened role gate</li>
-<li class="mod"><code>docs/lab-04/test-run-*.md</code> or <code>tests.md</code> — new/modified: documented Playwright run</li>
+<li class="add"><code>docs/lab-04/api-spec.md</code>, <code>docs/lab-04/ui-spec.md</code>, <code>docs/lab-04/tests.md</code> — new: companion docs required by the Definition of Done</li>
+<li class="add"><code>docs/lab-04/test-run-*.md</code> — new: documented Playwright run</li>
   </ul>
 
   <h3>⚡ Parallelization analysis</h3>
   <div class="card">
-    <p>Six batches, following the spec's own roadmap ordering (contract done → foundation → {UI, resolution-gate, dashboards} in parallel → hardening). Critical path is 6 batches deep: Task 1 → Task 3 → Task 4 → Task 6 → Task 15 → Task 16.</p>
-<ul><li><strong>Batch 1 (solo):</strong> Task 1 — the schema/migration every other task's Prisma types depend on. Nothing else can start first.</li><li><strong>Batch 2 (3-way parallel, all depend only on Task 1):</strong> Task 2 (<code>seed.ts</code>), Task 3 (<code>validators/actionTakenRequest.ts</code>), Task 11 (<code>services/dashboardMetrics.ts</code>) — three disjoint files, no shared imports between them.</li><li><strong>Batch 3 (6-way parallel):</strong> Task 4 (<code>staff/actions.ts</code> + <code>staff/tickets.ts</code> mount, needs Task 3's validator), Task 5 (<code>routes/v1/actions.ts</code> + <code>tickets.ts</code> mount, needs only Task 1), Task 12 (<code>dashboard.ts</code> + <code>staff/dashboard.ts</code> + both <code>index.ts</code> mounts, needs Task 11), Task 7 (client staff Action Taken API + component — client tests mock the API module, so no server task needs to be <em>done</em>, only Task 3's contract needs to be stable, which it is by Batch 2), Task 9 (client Requester read-only Action Taken API + component, same reasoning), Task 13 (client <code>dashboard.ts</code> API + <code>RequesterDashboardPage.tsx</code>, same reasoning against Task 12's contract). All six touch disjoint files.</li><li><strong>Batch 4 (4-way parallel):</strong> Task 6 (<code>staff/tickets.ts</code> status handler — must follow Task 4 since both touch <code>staff/tickets.ts</code>, a genuine shared-file sequential dependency, not just a roadmap convention), Task 8 (<code>StaffTicketDetailPage.tsx</code>, needs Task 7's component), Task 10 (<code>TicketDetailPage.tsx</code>, needs Task 9's component), Task 14 (<code>StaffDashboardPage.tsx</code>, needs Task 13's <code>api/dashboard.ts</code> file to already export <code>fetchStaffDashboard</code>). All four touch disjoint files from each other.</li><li><strong>Batch 5 (solo):</strong> Task 15 — <code>App.tsx</code> and <code>AppShell.tsx</code> are shared integration points that only this task touches; it needs <code>RequesterDashboardPage</code>/<code>StaffDashboardPage</code> (Task 13/14) to exist to import.</li><li><strong>Batch 6 (solo):</strong> Task 16 — final regression, depends on everything.</li></ul>
-<p><strong>Cannot be parallel (shared files):</strong> Task 4 and Task 6 both edit <code>server/src/routes/v1/staff/tickets.ts</code> — Task 6 must land after Task 4. Task 13 and Task 14 both touch <code>client/src/api/dashboard.ts</code> conceptually (Task 14 imports what Task 13 wrote) but that is a cross-batch dependency, not a same-batch conflict, since they run in Batch 3 and Batch 4 respectively.</p>
+    <p>Seven batches, following the spec's own roadmap ordering (contract done → foundation → {UI, resolution-gate, dashboards} in parallel → hardening → docs). Critical path is 7 batches deep: Task 1 → Task 3 → Task 4 → Task 6 → Task 15 → Task 16 → Task 17.</p>
+<ul><li><strong>Batch 1 (solo):</strong> Task 1 — the schema/migration every other task's Prisma types depend on. Nothing else can start first.</li><li><strong>Batch 2 (3-way parallel, all depend only on Task 1):</strong> Task 2 (<code>seed.ts</code>), Task 3 (<code>validators/actionTakenRequest.ts</code>), Task 11 (<code>services/dashboardMetrics.ts</code>) — three disjoint files, no shared imports between them.</li><li><strong>Batch 3 (6-way parallel):</strong></li><li>Task 4 (<code>staff/actions.ts</code> + <code>staff/tickets.ts</code> mount, needs Task 3's validator)</li><li>Task 5 (<code>routes/v1/actions.ts</code> + <code>tickets.ts</code> mount, needs only Task 1)</li><li>Task 12 (<code>dashboard.ts</code> + <code>staff/dashboard.ts</code> + both <code>index.ts</code> mounts, needs Task 11)</li><li>Task 7 (client staff Action Taken API + component + <code>client/src/lib/datetimeLocal.ts</code> + exports <code>AuthContext</code> from <code>client/src/context/AuthContext.tsx</code> — the export lands here, one batch ahead of every task that needs it, specifically to avoid the same-batch race the review caught in an earlier draft)</li><li>Task 9 (client Requester read-only Action Taken API + component)</li><li>Task 13 (client <code>dashboard.ts</code> API + <code>RequesterDashboardPage.tsx</code> + <code>MyTicketsPage.tsx</code> URL-filter hydration)</li></ul>
+<p>All six touch disjoint files. Note the file-overlap check that matters here: Task 7 is the only Batch 3 task touching <code>client/src/context/AuthContext.tsx</code>; nothing else in this batch (or Batch 2) touches it, so there's no race on that export landing correctly before Batch 4 starts.</p>
+<ul><li><strong>Batch 4 (4-way parallel):</strong></li><li>Task 6 (<code>server/src/routes/v1/staff/tickets.ts</code> status handler — must follow Task 4 since both touch that file, a genuine shared-file sequential dependency, not just a roadmap convention; also exercises an Administrator-authenticated Action Taken create, safe here because both Task 4's route and Task 12's widened role gate are guaranteed to exist by the time Batch 4 starts)</li><li>Task 8 (<code>client/src/api/tickets.ts</code> + <code>client/src/api/staffTickets.ts</code> + <code>StaffTicketDetailPage.tsx</code>, needs Task 7's component; no other Batch 4 task touches <code>tickets.ts</code>/<code>staffTickets.ts</code>)</li><li>Task 10 (<code>TicketDetailPage.tsx</code>, needs Task 9's component and Task 7's <code>AuthContext</code> export)</li><li>Task 14 (<code>StaffDashboardPage.tsx</code> + <code>StaffTicketQueuePage.tsx</code> URL-filter hydration, needs Task 13's <code>api/dashboard.ts</code> file and Task 7's <code>AuthContext</code> export)</li></ul>
+<p>All four touch disjoint files from each other.</p>
+<ul><li><strong>Batch 5 (solo):</strong> Task 15 — <code>client/src/lib/homeRoute.ts</code> (new), <code>App.tsx</code>, <code>AppShell.tsx</code>, <code>LoginPage.tsx</code>, <code>ChangePasswordPage.tsx</code> are all touched only by this task; it needs <code>RequesterDashboardPage</code>/<code>StaffDashboardPage</code> (Task 13/14) to exist to import into <code>App.tsx</code>.</li><li><strong>Batch 6 (solo):</strong> Task 16 — final regression, depends on everything.</li><li><strong>Batch 7 (solo):</strong> Task 17 — the three companion docs (<code>api-spec.md</code>/<code>ui-spec.md</code>/<code>tests.md</code>), written last since it transcribes facts fixed by every earlier task, including Task 16's own test-file list.</li></ul>
+<p><strong>Cannot be parallel (shared files):</strong> Task 4 and Task 6 both edit <code>server/src/routes/v1/staff/tickets.ts</code> — Task 6 must land after Task 4. Task 7 and Task 8 both touch API-client files but not the <em>same</em> one (Task 7 owns <code>staffActions.ts</code> + <code>AuthContext.tsx</code>; Task 8 owns <code>tickets.ts</code> + <code>staffTickets.ts</code>) — no conflict, and Task 8 (Batch 4) already runs after Task 7 (Batch 3) regardless. Task 13 and Task 14 both touch <code>client/src/api/dashboard.ts</code> conceptually (Task 14 imports what Task 13 wrote) but that is a cross-batch dependency, not a same-batch conflict, since they run in Batch 3 and Batch 4 respectively.</p>
   </div>
 
   <hr class="section" />
@@ -161,7 +175,7 @@ flowchart LR
   <div class="card">
     <strong>Goal:</strong> Add an <code>ActionTaken</code> audit record under each Ticket, gate the <code>RESOLVED</code> status transition on at least one such record existing, and ship Requester/IT Staff/Administrator dashboards, without touching any of the Lab 1-3 behavior the spec explicitly excludes from this sprint.<br>
     <strong>Architecture:</strong> Follows the Lab 3 layering exactly: Prisma model → thin Express route (staff-write / requester-read split, same as Comment/InternalNote) → hand-rolled <code>fetch</code> API client → React page/section component. The resolution gate is one extra check inserted into the existing <code>PATCH /staff/tickets/:id/status</code> handler, after the transition-matrix and terminal-lock checks it already runs. Dashboards are a new <code>dashboardMetrics</code> service (<code>groupBy</code>/<code>count</code> only, per BR-13) consumed by two new route files and two new pages reachable from primary navigation.<br>
-    <strong>Tech Stack:</strong> Express 4 + Prisma 5 + PostgreSQL (server), React 18 + React Router 6 + hand-rolled <code>fetch</code> wrappers, no Zod/axios/react-query anywhere in this codebase (Vitest + Supertest server-side, Vitest + Testing Library client-side, Playwright e2e).<br>
+    <strong>Tech Stack:</strong> Express 4 + Prisma 5 + PostgreSQL (server), React 19.2 + React Router DOM 7.18 (classic <code>&lt;Routes&gt;/&lt;Route&gt;</code> declarative API, not the v7 data router) + hand-rolled <code>fetch</code> wrappers, no Zod/axios/react-query anywhere in this codebase (Vitest + Supertest server-side, Vitest + Testing Library client-side, Playwright e2e).<br>
     <strong>Spec:</strong> <code><code>docs/lab-04/specification.md</code></code>
   </div>
 
@@ -173,7 +187,7 @@ flowchart LR
 
   <h3>File structure</h3>
   <ul class="changes">
-    <li class="mod"><code>server/prisma/schema.prisma</code> — modified: <code>ActionTaken</code> model, <code>ActionResult</code> enum, <code>TicketEventType</code> extension, <code>Ticket.ownerId</code> index</li><li class="mod"><code>server/prisma/seed.ts</code> — modified: Lab 4 demonstration Tickets/ActionTaken rows</li><li class="mod"><code>server/prisma/verify-seed-lab4.ts</code> — new: seed invariant checks</li><li class="mod"><code>server/src/validators/actionTakenRequest.ts</code> — new: create/edit request validation</li><li class="mod"><code>server/src/routes/v1/staff/actions.ts</code> — new: staff create/edit/list Action Taken</li><li class="mod"><code>server/src/routes/v1/actions.ts</code> — new: Requester read-only Action Taken</li><li class="mod"><code>server/src/routes/v1/staff/tickets.ts</code> — modified: mount actions router, insert FR-06/BR-09 gate</li><li class="mod"><code>server/src/routes/v1/tickets.ts</code> — modified: mount actions router</li><li class="mod"><code>server/src/services/dashboardMetrics.ts</code> — new: aggregate-only dashboard queries</li><li class="mod"><code>server/src/routes/v1/dashboard.ts</code> — new: Requester dashboard route</li><li class="mod"><code>server/src/routes/v1/staff/dashboard.ts</code> — new: Staff/Administrator dashboard route</li><li class="mod"><code>server/src/routes/v1/index.ts</code>, <code>server/src/routes/v1/staff/index.ts</code> — modified: mount dashboard routes, widen staff role gate to admit Administrator</li><li class="mod"><code>server/tests/helpers/resetDb.ts</code> — modified: truncate <code>ActionTaken</code></li><li class="mod"><code>client/src/api/staffActions.ts</code>, <code>client/src/api/actions.ts</code>, <code>client/src/api/dashboard.ts</code> — new: API clients</li><li class="mod"><code>client/src/components/ActionsTakenSection.tsx</code> — new: staff create/edit/list UI</li><li class="mod"><code>client/src/components/ActionsTakenReadOnlySection.tsx</code> — new: Requester read-only UI</li><li class="mod"><code>client/src/pages/RequesterDashboardPage.tsx</code>, <code>client/src/pages/StaffDashboardPage.tsx</code> — new</li><li class="mod"><code>client/src/pages/StaffTicketDetailPage.tsx</code>, <code>client/src/pages/TicketDetailPage.tsx</code> — modified: compose the new sections, resolution-gate inline message</li><li class="mod"><code>client/src/App.tsx</code>, <code>client/src/components/AppShell.tsx</code> — modified: dashboard routes, nav links, widened role gate</li><li class="mod"><code>docs/lab-04/test-run-*.md</code> or <code>tests.md</code> — new/modified: documented Playwright run</li>
+    <li class="mod"><code>server/prisma/schema.prisma</code> — modified: <code>ActionTaken</code> model, <code>ActionResult</code> enum, <code>TicketEventType</code> extension, <code>Ticket.ownerId</code> index</li><li class="mod"><code>server/prisma/seed.ts</code> — modified: Lab 4 demonstration Tickets/ActionTaken rows</li><li class="mod"><code>server/prisma/verify-seed-lab4.ts</code> — new: seed invariant checks</li><li class="mod"><code>server/src/validators/actionTakenRequest.ts</code> — new: create/edit request validation</li><li class="mod"><code>server/src/routes/v1/staff/actions.ts</code> — new: staff create/edit/list Action Taken</li><li class="mod"><code>server/src/routes/v1/actions.ts</code> — new: Requester read-only Action Taken</li><li class="mod"><code>server/src/routes/v1/staff/tickets.ts</code> — modified: mount actions router, insert FR-06/BR-09 gate</li><li class="mod"><code>server/src/routes/v1/tickets.ts</code> — modified: mount actions router</li><li class="mod"><code>server/src/services/dashboardMetrics.ts</code> — new: aggregate-only dashboard queries</li><li class="mod"><code>server/src/routes/v1/dashboard.ts</code> — new: Requester dashboard route</li><li class="mod"><code>server/src/routes/v1/staff/dashboard.ts</code> — new: Staff/Administrator dashboard route</li><li class="mod"><code>server/src/routes/v1/index.ts</code>, <code>server/src/routes/v1/staff/index.ts</code> — modified: mount dashboard routes, widen staff role gate to admit Administrator</li><li class="mod"><code>server/tests/helpers/resetDb.ts</code> — modified: truncate <code>ActionTaken</code></li><li class="mod"><code>client/src/api/staffActions.ts</code>, <code>client/src/api/actions.ts</code>, <code>client/src/api/dashboard.ts</code> — new: API clients</li><li class="mod"><code>client/src/api/tickets.ts</code> — modified: <code>ApiError</code> gains an optional <code>code</code> field</li><li class="mod"><code>client/src/api/staffTickets.ts</code> — modified: <code>throwApiError</code> passes <code>code</code> through</li><li class="mod"><code>client/src/lib/datetimeLocal.ts</code> — new: timezone-safe <code>&lt;input type="datetime-local"&gt;</code> conversion helpers</li><li class="mod"><code>client/src/lib/homeRoute.ts</code> — new: single shared <code>HOME_ROUTE</code> map (replaces 3 duplicated copies)</li><li class="mod"><code>client/src/components/ActionsTakenSection.tsx</code> — new: staff create/edit/list UI</li><li class="mod"><code>client/src/components/ActionsTakenReadOnlySection.tsx</code> — new: Requester read-only UI</li><li class="mod"><code>client/src/context/AuthContext.tsx</code> — modified: exports <code>AuthContext</code> (was module-private)</li><li class="mod"><code>client/src/pages/RequesterDashboardPage.tsx</code>, <code>client/src/pages/StaffDashboardPage.tsx</code> — new</li><li class="mod"><code>client/src/pages/StaffTicketDetailPage.tsx</code>, <code>client/src/pages/TicketDetailPage.tsx</code> — modified: compose the new sections, resolution-gate inline message keyed on error code</li><li class="mod"><code>client/src/pages/MyTicketsPage.tsx</code>, <code>client/src/pages/StaffTicketQueuePage.tsx</code> — modified: hydrate initial filters from the URL query string (FR-10)</li><li class="mod"><code>client/src/pages/LoginPage.tsx</code>, <code>client/src/pages/ChangePasswordPage.tsx</code> — modified: import the shared <code>HOME_ROUTE</code> instead of each keeping its own stale copy</li><li class="mod"><code>client/src/App.tsx</code>, <code>client/src/components/AppShell.tsx</code> — modified: dashboard routes, nav links, widened role gate</li><li class="mod"><code>docs/lab-04/api-spec.md</code>, <code>docs/lab-04/ui-spec.md</code>, <code>docs/lab-04/tests.md</code> — new: companion docs required by the Definition of Done</li><li class="mod"><code>docs/lab-04/test-run-*.md</code> — new: documented Playwright run</li>
   </ul>
 
   
@@ -789,6 +803,11 @@ describe('Staff Action Taken routes', () =&gt; {
     categoryId = (await prisma.category.findFirstOrThrow({ where: { isActive: true } })).id;
   });
 
+  // NOTE: FR-01/FR-02's "Administrator can also create/edit an Action Taken" is exercised in
+  // Task 12's test suite, not here -- Administrator access to /staff/* only exists after Task
+  // 12 widens staffRouter's role gate, and Task 4/Task 12 run in the same parallel batch, so a
+  // test here that logs in as Administrator would be a same-batch ordering hazard.
+
   beforeEach(async () =&gt; {
     await truncateTicketTables();
   });
@@ -834,6 +853,30 @@ describe('Staff Action Taken routes', () =&gt; {
     await request(app).post(`/api/v1/staff/tickets/${ticket.id}/actions`).set('Cookie', staff1Cookie).send(VALID_BODY);
     const reloaded = await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
     expect(reloaded.updatedAt.getTime()).toBe(ticket.updatedAt.getTime());
+  });
+
+  it('does not bump Ticket.updatedAt on edit either (D-06/BR-14)', async () =&gt; {
+    const ticket = await createTicket();
+    const created = (
+      await request(app).post(`/api/v1/staff/tickets/${ticket.id}/actions`).set('Cookie', staff1Cookie).send(VALID_BODY)
+    ).body;
+    const ticketAfterCreate = await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
+    await request(app)
+      .patch(`/api/v1/staff/tickets/${ticket.id}/actions/${created.id}`)
+      .set('Cookie', staff2Cookie)
+      .send({ ...VALID_BODY, description: 'Edited description.' });
+    const reloaded = await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
+    expect(reloaded.updatedAt.getTime()).toBe(ticketAfterCreate.updatedAt.getTime());
+  });
+
+  it('attachmentNotes creates no Attachment row (BR-06 -- it is a free-text field, not a file upload)', async () =&gt; {
+    const ticket = await createTicket();
+    await request(app)
+      .post(`/api/v1/staff/tickets/${ticket.id}/actions`)
+      .set('Cookie', staff1Cookie)
+      .send({ ...VALID_BODY, attachmentNotes: 'Photo shared via email, see attached.' });
+    const attachmentCount = await prisma.attachment.count({ where: { ticketId: ticket.id } });
+    expect(attachmentCount).toBe(0);
   });
 
   it('ignores a client-supplied performedById/performedBy and always uses the session user (FR-04)', async () =&gt; {
@@ -1103,7 +1146,7 @@ staffActionsRouter.patch&lt;{ id: string; actionId: string }&gt;('/:actionId', a
 <pre><code>staffTicketsRouter.use('/:id/actions', staffActionsRouter);</code></pre>
 <div class="step"><label><input type="checkbox"> <strong>Step 4: Run test to verify it passes</strong></label></div>
 <p class="note">Run: <code>npm test --prefix server -- lab-04/staffActions.api.test.ts</code></p>
-<p class="note">Expected: PASS (all 15 tests)</p>
+<p class="note">Expected: PASS (all 17 tests)</p>
 <div class="step"><label><input type="checkbox"> <strong>Step 5: Commit</strong></label></div>
 <pre><code>git add server/src/routes/v1/staff/actions.ts server/src/routes/v1/staff/tickets.ts server/tests/lab-04/staffActions.api.test.ts
 git commit -m "feat(lab-04): add staff Action Taken create/edit/list routes"</code></pre>
@@ -1183,6 +1226,15 @@ describe('Requester Action Taken read route', () =&gt; {
       .send({});
     expect(response.status).toBe(404);
   });
+
+  it('there is no edit route for a Requester either -- PATCH also 404s, never 403/405 (AC-09)', async () =&gt; {
+    const ticket = await createOwnedTicket();
+    const response = await request(app)
+      .patch(`/api/v1/tickets/${ticket.id}/actions/00000000-0000-0000-0000-000000000000`)
+      .set('Cookie', requesterCookie)
+      .send({});
+    expect(response.status).toBe(404);
+  });
 });</code></pre>
 <div class="step"><label><input type="checkbox"> <strong>Step 2: Run test to verify it fails</strong></label></div>
 <p class="note">Run: <code>npm test --prefix server -- lab-04/requesterActions.api.test.ts</code></p>
@@ -1238,7 +1290,7 @@ ticketActionsRouter.get&lt;{ id: string }&gt;('/', async (req, res, next) =&gt; 
 <pre><code>ticketsRouter.use('/:id/actions', ticketActionsRouter);</code></pre>
 <div class="step"><label><input type="checkbox"> <strong>Step 4: Run test to verify it passes</strong></label></div>
 <p class="note">Run: <code>npm test --prefix server -- lab-04/requesterActions.api.test.ts</code></p>
-<p class="note">Expected: PASS (all 3 tests)</p>
+<p class="note">Expected: PASS (all 4 tests)</p>
 <div class="step"><label><input type="checkbox"> <strong>Step 5: Commit</strong></label></div>
 <pre><code>git add server/src/routes/v1/actions.ts server/src/routes/v1/tickets.ts server/tests/lab-04/requesterActions.api.test.ts
 git commit -m "feat(lab-04): add Requester-facing read-only Action Taken route"</code></pre>
@@ -1260,12 +1312,14 @@ import { generateTicketNumber } from '../../src/services/ticketNumber';
 describe('FR-06/BR-09 resolution gate', () =&gt; {
   let staffCookie: string;
   let staffId: string;
+  let adminCookie: string;
   let requesterId: string;
   let categoryId: number;
 
   beforeAll(async () =&gt; {
     staffCookie = await loginAs(SEED_EMAILS.itStaff1);
     staffId = (await prisma.user.findUniqueOrThrow({ where: { email: SEED_EMAILS.itStaff1 } })).id;
+    adminCookie = await loginAs(SEED_EMAILS.admin);
     requesterId = (await prisma.user.findUniqueOrThrow({ where: { email: SEED_EMAILS.requester } })).id;
     categoryId = (await prisma.category.findFirstOrThrow({ where: { isActive: true } })).id;
   });
@@ -1367,6 +1421,27 @@ describe('FR-06/BR-09 resolution gate', () =&gt; {
       .send({ status: 'RESOLVED' });
     expect(response.status).toBe(200);
   });
+
+  it('FR-01/FR-02: an Administrator can create an Action Taken and use it to satisfy the gate, exactly like IT Staff', async () =&gt; {
+    // Safe to exercise the Administrator-authenticated staff/actions route here (Batch 4) even
+    // though staff/actions.ts (Task 4) and the widened staffRouter role gate (Task 12) are both
+    // Batch 3 tasks -- Batch 4 only starts after Batch 3 fully lands, so both dependencies are
+    // guaranteed to exist by the time this test runs.
+    const ticket = await createTicket('IN_PROGRESS');
+    const created = await request(app)
+      .post(`/api/v1/staff/tickets/${ticket.id}/actions`)
+      .set('Cookie', adminCookie)
+      .send({
+        actionAt: new Date().toISOString(), description: 'Administrator personally verified the fix.',
+        result: 'RESOLVED', followUpRequired: false,
+      });
+    expect(created.status).toBe(201);
+    const response = await request(app)
+      .patch(`/api/v1/staff/tickets/${ticket.id}/status`)
+      .set('Cookie', adminCookie)
+      .send({ status: 'RESOLVED' });
+    expect(response.status).toBe(200);
+  });
 });</code></pre>
 <div class="step"><label><input type="checkbox"> <strong>Step 2: Run test to verify it fails</strong></label></div>
 <p class="note">Run: <code>npm test --prefix server -- lab-04/resolutionGate.api.test.ts</code></p>
@@ -1389,7 +1464,7 @@ describe('FR-06/BR-09 resolution gate', () =&gt; {
     }</code></pre>
 <div class="step"><label><input type="checkbox"> <strong>Step 4: Run test to verify it passes</strong></label></div>
 <p class="note">Run: <code>npm test --prefix server -- lab-04/resolutionGate.api.test.ts</code></p>
-<p class="note">Expected: PASS (all 7 tests)</p>
+<p class="note">Expected: PASS (all 8 tests)</p>
 <div class="step"><label><input type="checkbox"> <strong>Step 5: Run the full server suite to confirm no Lab 1-3 regression</strong></label></div>
 <p class="note">Run: <code>npm test --prefix server</code></p>
 <p class="note">Expected: PASS — no prior test asserted a bare <code>RESOLVED</code> transition without first creating an Action Taken now unexpectedly fails; if any Lab 3 test does fail here, add an <code>ActionTaken</code> fixture to that test rather than weaken the gate.</p>
@@ -1398,9 +1473,13 @@ describe('FR-06/BR-09 resolution gate', () =&gt; {
 git commit -m "feat(lab-04): enforce FR-06/BR-09 resolution gate on status RESOLVED transitions"</code></pre>
 
   <h3>Task 7: Client — staff Action Taken API client and <code>ActionsTakenSection</code> component</h3>
-  <p class="pathline">Create: <code>client/src/api/staffActions.ts</code> &middot; Create: <code>client/src/components/ActionsTakenSection.tsx</code> &middot; Test: <code>client/tests/lab-04/ActionsTakenSection.test.tsx</code></p>
-  <div class="card"><ul><li>Produces: <code>fetchStaffActions(ticketId)</code>, <code>postStaffAction(ticketId, payload)</code>, <code>updateStaffAction(ticketId, actionId, payload)</code>, types <code>ActionTakenDto</code>, <code>ActionTakenPayload</code>. Component <code>&lt;ActionsTakenSection ticketId={string} ticketLocked={boolean} /&gt;</code> — Task 8 imports and composes this by that exact name and prop shape.</li></ul></div>
-  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write the failing component test</strong></label></div>
+  <p class="pathline">Create: <code>client/src/api/staffActions.ts</code> &middot; Create: <code>client/src/components/ActionsTakenSection.tsx</code> &middot; Modify: <code>client/src/context/AuthContext.tsx</code> (export <code>AuthContext</code> for later tasks' test wrappers) &middot; Test: <code>client/tests/lab-04/ActionsTakenSection.test.tsx</code></p>
+  <div class="card"><ul><li>Produces: <code>fetchStaffActions(ticketId)</code>, <code>postStaffAction(ticketId, payload)</code>, <code>updateStaffAction(ticketId, actionId, payload)</code>, types <code>ActionTakenDto</code>, <code>ActionTakenPayload</code>. Component <code>&lt;ActionsTakenSection ticketId={string} ticketLocked={boolean} /&gt;</code> — Task 8 imports and composes this by that exact name and prop shape. Also produces the exported <code>AuthContext</code> object that Tasks 10, 14, and 15 (all Batch 4/5, strictly after this Batch 3 task) build <code>&lt;AuthContext.Provider&gt;</code> test wrappers against.</li></ul></div>
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Export <code>AuthContext</code> for later tasks' test wrappers</strong></label></div>
+<p><code>client/src/context/AuthContext.tsx</code> currently declares <code>const AuthContext = createContext&lt;AuthContextValue | undefined&gt;(undefined);</code> without exporting it — only <code>AuthProvider</code> and <code>useAuth</code> are exported. This has to land in a batch strictly before any task that needs <code>&lt;AuthContext.Provider&gt;</code> in a test; putting it here (Batch 3) rather than in Task 10 (Batch 4) avoids a same-batch race, since Task 14 also needs it and Task 10/Task 14 both run in Batch 4 — two same-batch tasks racing to add the same export would be a real bug. Add <code>export</code> to that line:</p>
+<pre><code>export const AuthContext = createContext&lt;AuthContextValue | undefined&gt;(undefined);</code></pre>
+<p>This is a pure addition — <code>useAuth</code> keeps working unchanged since it still reads from the same context object. Note the real <code>AuthContextValue</code> shape while you're in this file: <code>{ currentUser, isLoading, setCurrentUser, logout }</code> — there is no <code>login</code> field; every later task's test mock uses <code>setCurrentUser: vi.fn()</code> to match. No test/commit step needed for this one-line change on its own — it lands as part of this task's Step 7 commit below (verified indirectly: every later task's <code>&lt;AuthContext.Provider&gt;</code>-based test would fail to compile without it).</p>
+<div class="step"><label><input type="checkbox"> <strong>Step 2: Write the failing component test</strong></label></div>
 <pre><code>// client/tests/lab-04/ActionsTakenSection.test.tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
@@ -1508,11 +1587,33 @@ describe('ActionsTakenSection', () =&gt; {
     await waitFor(() =&gt; expect(screen.getByRole('alert')).toBeInTheDocument());
     expect(screen.getByLabelText(/^description/i)).toHaveValue('Attempted a fix.');
   });
+
+  it('shows attachmentNotes on a staff list row, matching the Requester-facing field detail (BR-11)', async () =&gt; {
+    vi.spyOn(staffActionsApi, 'fetchStaffActions').mockResolvedValue([
+      action({ attachmentNotes: 'Photo of the damaged cable shared via email.' }),
+    ]);
+    render(&lt;ActionsTakenSection ticketId={TICKET_ID} ticketLocked={false} /&gt;);
+    await waitFor(() =&gt; screen.getByText('Replaced the network cable.'));
+    expect(within(screen.getByTestId('action-row')).getByText(/photo of the damaged cable/i)).toBeInTheDocument();
+  });
+
+  it('disables Save when the Action Date/Time field is cleared, and never calls postStaffAction (timezone-fix regression guard)', async () =&gt; {
+    vi.spyOn(staffActionsApi, 'fetchStaffActions').mockResolvedValue([]);
+    const postSpy = vi.spyOn(staffActionsApi, 'postStaffAction');
+    render(&lt;ActionsTakenSection ticketId={TICKET_ID} ticketLocked={false} /&gt;);
+    await waitFor(() =&gt; screen.getByText(/no actions taken yet/i));
+
+    fireEvent.click(screen.getByRole('button', { name: /record action taken/i }));
+    fireEvent.change(screen.getByLabelText(/^description/i), { target: { value: 'Some fix.' } });
+    fireEvent.change(screen.getByLabelText(/action date\/time/i), { target: { value: '' } });
+    expect(screen.getByRole('button', { name: /^save$/i })).toBeDisabled();
+    expect(postSpy).not.toHaveBeenCalled();
+  });
 });</code></pre>
-<div class="step"><label><input type="checkbox"> <strong>Step 2: Run test to verify it fails</strong></label></div>
+<div class="step"><label><input type="checkbox"> <strong>Step 3: Run test to verify it fails</strong></label></div>
 <p class="note">Run: <code>npm test --prefix client -- lab-04/ActionsTakenSection.test.tsx</code></p>
 <p class="note">Expected: FAIL — both source modules do not exist yet.</p>
-<div class="step"><label><input type="checkbox"> <strong>Step 3: Write the API client</strong></label></div>
+<div class="step"><label><input type="checkbox"> <strong>Step 4: Write the API client</strong></label></div>
 <pre><code>// client/src/api/staffActions.ts
 import { ApiError } from './tickets';
 
@@ -1572,7 +1673,51 @@ export async function updateStaffAction(ticketId: string, actionId: string, payl
   if (!response.ok) return throwApiError(response, 'Failed to save Action Taken');
   return response.json();
 }</code></pre>
-<div class="step"><label><input type="checkbox"> <strong>Step 4: Write the component</strong></label></div>
+<div class="step"><label><input type="checkbox"> <strong>Step 5: Write the datetime-local helper module, its tests, and the component</strong></label></div>
+<p>The <code>&lt;input type="datetime-local"&gt;</code> widget always displays and accepts its value as local wall-clock time, with no timezone info in the string itself. The server's <code>actionAt</code> is always a UTC ISO string. Converting between the two needs an explicit offset adjustment — a naive <code>.toISOString().slice(0,16)</code> (UTC digits) shown directly in a <code>datetime-local</code> field displays the wrong clock time everywhere except UTC+0, and re-submitting it re-interprets those UTC digits as local time, shifting the stored instant again. Write this as its own tested module rather than inlining it in the component:</p>
+<pre><code>// client/src/lib/datetimeLocal.ts
+// `&lt;input type="datetime-local"&gt;` always reads/writes local wall-clock time with no timezone
+// designator. `toDatetimeLocalValue` converts a UTC ISO timestamp into that local-clock string
+// for display; `fromDatetimeLocalValue` converts back. Do not replace either with a bare
+// `.toISOString().slice(0,16)` / `new Date(x).toISOString()` pair without the offset shift below
+// -- that reintroduces the display/round-trip timezone bug this module exists to fix.
+export function toDatetimeLocalValue(isoUtc: string): string {
+  const utc = new Date(isoUtc);
+  const localOffsetMs = utc.getTimezoneOffset() * 60000;
+  const shifted = new Date(utc.getTime() - localOffsetMs);
+  return shifted.toISOString().slice(0, 16);
+}
+
+export function fromDatetimeLocalValue(local: string): string {
+  // A date-time string with no timezone designator is parsed as local time by the Date
+  // constructor per the ECMAScript spec -- this direction needs no manual offset math.
+  return new Date(local).toISOString();
+}</code></pre>
+<pre><code>// client/tests/lab-04/datetimeLocal.test.ts
+import { describe, it, expect } from 'vitest';
+import { toDatetimeLocalValue, fromDatetimeLocalValue } from '../../src/lib/datetimeLocal';
+
+describe('datetimeLocal', () =&gt; {
+  it('round-trips a UTC ISO timestamp through toDatetimeLocalValue -&gt; fromDatetimeLocalValue to the exact same instant, regardless of the runner timezone', () =&gt; {
+    const original = '2026-09-20T10:00:00.000Z';
+    const roundTripped = fromDatetimeLocalValue(toDatetimeLocalValue(original));
+    expect(new Date(roundTripped).getTime()).toBe(new Date(original).getTime());
+  });
+
+  it('the produced value reflects the runner\'s real UTC offset rather than the raw UTC clock digits', () =&gt; {
+    const utcNoon = '2026-09-20T12:00:00.000Z';
+    const localValue = toDatetimeLocalValue(utcNoon);
+    const runnerOffsetMinutes = new Date(utcNoon).getTimezoneOffset();
+    if (runnerOffsetMinutes !== 0) {
+      // The pre-fix bug always produced '2026-09-20T12:00' (the raw UTC digits) no matter what
+      // the runner's offset was -- this assertion fails against that bug on any non-UTC runner.
+      expect(localValue).not.toBe('2026-09-20T12:00');
+    }
+  });
+});</code></pre>
+<p class="note">Run: <code>npm test --prefix client -- lab-04/datetimeLocal.test.ts</code></p>
+<p class="note">Expected: PASS (both tests, on any runner timezone)</p>
+<p>Now write the component, using these two helpers instead of ad hoc <code>Date</code>/<code>toISOString</code> calls, adding <code>attachmentNotes</code> to the staff-facing list row (missing from the first draft — BR-11 requires the same field detail on both the staff and Requester views), and fixing two related bugs the review caught: <code>saveDisabled</code> didn't account for an empty/invalid <code>actionAt</code>, and the payload was built (calling <code>fromDatetimeLocalValue</code>, which throws on an invalid string) outside the <code>try</code> block, so a bad date would throw uncaught and leave <code>submitting</code> stuck <code>true</code> forever:</p>
 <pre><code>// client/src/components/ActionsTakenSection.tsx
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import {
@@ -1580,6 +1725,7 @@ import {
   type ActionTakenDto, type ActionResult,
 } from '../api/staffActions';
 import { ApiError } from '../api/tickets';
+import { toDatetimeLocalValue, fromDatetimeLocalValue } from '../lib/datetimeLocal';
 
 const RESULT_OPTIONS: { value: ActionResult; label: string }[] = [
   { value: 'RESOLVED', label: 'Resolved' },
@@ -1606,14 +1752,14 @@ interface Draft {
 
 function emptyDraft(): Draft {
   return {
-    actionAt: new Date().toISOString().slice(0, 16),
+    actionAt: toDatetimeLocalValue(new Date().toISOString()),
     description: '', result: 'RESOLVED', followUpRequired: false, followUpNote: '', attachmentNotes: '',
   };
 }
 
 function draftFromAction(action: ActionTakenDto): Draft {
   return {
-    actionAt: action.actionAt.slice(0, 16), description: action.description, result: action.result,
+    actionAt: toDatetimeLocalValue(action.actionAt), description: action.description, result: action.result,
     followUpRequired: action.followUpRequired, followUpNote: action.followUpNote ?? '', attachmentNotes: action.attachmentNotes ?? '',
   };
 }
@@ -1646,7 +1792,12 @@ export function ActionsTakenSection({ ticketId, ticketLocked }: Props) {
   }
 
   const followUpNoteInvalid = draft.followUpRequired &amp;&amp; draft.followUpNote.trim().length === 0;
-  const saveDisabled = submitting || draft.description.trim().length === 0 || followUpNoteInvalid;
+  // draft.actionAt comes straight from the browser's datetime-local input: empty when the user
+  // clears it, and always a value `new Date()` can parse otherwise (the widget itself rejects
+  // free-text). Checked here so an empty field disables Save instead of throwing inside
+  // fromDatetimeLocalValue below.
+  const actionAtInvalid = draft.actionAt.trim().length === 0;
+  const saveDisabled = submitting || draft.description.trim().length === 0 || followUpNoteInvalid || actionAtInvalid;
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -1654,15 +1805,20 @@ export function ActionsTakenSection({ ticketId, ticketLocked }: Props) {
 
     setSubmitting(true);
     setSubmitError('');
-    const payload = {
-      actionAt: new Date(draft.actionAt).toISOString(),
-      description: draft.description.trim(),
-      result: draft.result,
-      followUpRequired: draft.followUpRequired,
-      followUpNote: draft.followUpRequired ? draft.followUpNote.trim() : undefined,
-      attachmentNotes: draft.attachmentNotes.trim() || undefined,
-    };
     try {
+      // Payload construction moved inside the try block: fromDatetimeLocalValue can still throw
+      // on a genuinely malformed value even after the actionAtInvalid empty-check above (e.g. a
+      // browser that lets an incomplete datetime-local value through) -- building it here means
+      // that throw is caught and surfaced as submitError instead of leaving submitting stuck
+      // true with an uncaught exception.
+      const payload = {
+        actionAt: fromDatetimeLocalValue(draft.actionAt),
+        description: draft.description.trim(),
+        result: draft.result,
+        followUpRequired: draft.followUpRequired,
+        followUpNote: draft.followUpRequired ? draft.followUpNote.trim() : undefined,
+        attachmentNotes: draft.attachmentNotes.trim() || undefined,
+      };
       if (formMode === 'create') {
         const created = await postStaffAction(ticketId, payload);
         setActions((prev) =&gt; [...prev, created]);
@@ -1710,6 +1866,7 @@ export function ActionsTakenSection({ ticketId, ticketLocked }: Props) {
           &lt;/div&gt;
           &lt;p className="mb-0" style={{ whiteSpace: 'pre-wrap' }}&gt;{a.description}&lt;/p&gt;
           {a.followUpNote &amp;&amp; &lt;p className="mb-0 text-body-secondary small"&gt;Follow-up: {a.followUpNote}&lt;/p&gt;}
+          {a.attachmentNotes &amp;&amp; &lt;p className="mb-0 text-body-secondary small"&gt;Attachment: {a.attachmentNotes}&lt;/p&gt;}
           {a.lastEditedBy &amp;&amp; &lt;p className="mb-0 text-body-secondary small"&gt;Edited by {a.lastEditedBy.displayName}&lt;/p&gt;}
         &lt;/div&gt;
       ))}
@@ -1778,16 +1935,16 @@ export function ActionsTakenSection({ ticketId, ticketLocked }: Props) {
     &lt;/section&gt;
   );
 }</code></pre>
-<div class="step"><label><input type="checkbox"> <strong>Step 5: Run test to verify it passes</strong></label></div>
+<div class="step"><label><input type="checkbox"> <strong>Step 6: Run test to verify it passes</strong></label></div>
 <p class="note">Run: <code>npm test --prefix client -- lab-04/ActionsTakenSection.test.tsx</code></p>
-<p class="note">Expected: PASS (all 8 tests)</p>
-<div class="step"><label><input type="checkbox"> <strong>Step 6: Commit</strong></label></div>
-<pre><code>git add client/src/api/staffActions.ts client/src/components/ActionsTakenSection.tsx client/tests/lab-04/ActionsTakenSection.test.tsx
+<p class="note">Expected: PASS (all 9 tests — <code>datetimeLocal.test.ts</code> from Step 5 is a separate file with its own 2 tests, already verified there)</p>
+<div class="step"><label><input type="checkbox"> <strong>Step 7: Commit</strong></label></div>
+<pre><code>git add client/src/api/staffActions.ts client/src/components/ActionsTakenSection.tsx client/src/context/AuthContext.tsx client/tests/lab-04/ActionsTakenSection.test.tsx
 git commit -m "feat(lab-04): add staff Actions Taken API client and section component"</code></pre>
 
   <h3>Task 8: Wire <code>ActionsTakenSection</code> into <code>StaffTicketDetailPage</code> and surface the resolution-gate rejection inline</h3>
-  <p class="pathline">Modify: <code>client/src/pages/StaffTicketDetailPage.tsx</code> &middot; Test: <code>client/tests/lab-04/StaffTicketDetailPage.actions.test.tsx</code></p>
-  <div class="card"><ul><li>Consumes: <code>ActionsTakenSection</code> (Task 7).</li></ul></div>
+  <p class="pathline">Modify: <code>client/src/api/tickets.ts</code> (<code>ApiError</code> gains a <code>code</code> field) &middot; Modify: <code>client/src/api/staffTickets.ts</code> (<code>throwApiError</code> passes <code>code</code> through) &middot; Modify: <code>client/src/pages/StaffTicketDetailPage.tsx</code> &middot; Test: <code>client/tests/lab-04/StaffTicketDetailPage.actions.test.tsx</code></p>
+  <div class="card"><ul><li>Consumes: <code>ActionsTakenSection</code> (Task 7).</li><li>Produces: <code>ApiError.code: string | undefined</code> — every other API-client file (<code>comments.ts</code>, <code>actions.ts</code>, <code>staffActions.ts</code>, <code>dashboard.ts</code>) keeps working unchanged, since the new constructor parameter is optional and appended last.</li></ul></div>
   <div class="step"><label><input type="checkbox"> <strong>Step 1: Write the failing test</strong></label></div>
 <pre><code>// client/tests/lab-04/StaffTicketDetailPage.actions.test.tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -1841,10 +1998,10 @@ describe('StaffTicketDetailPage — Actions Taken integration', () =&gt; {
     expect(screen.getByRole('button', { name: /record action taken/i })).toBeDisabled();
   });
 
-  it('shows a directed inline message, not a raw error, when RESOLVED is rejected by the gate (ui-spec.md summary)', async () =&gt; {
+  it('shows a directed inline message, not a raw error, when the server rejects with RESOLUTION_REQUIRES_ACTION_TAKEN (ui-spec.md summary)', async () =&gt; {
     vi.spyOn(staffTicketsApi, 'fetchStaffTicketDetail').mockResolvedValue(ticket());
     vi.spyOn(staffTicketsApi, 'updateTicketStatus').mockRejectedValue(
-      new ApiError('Record at least one Action Taken before resolving this ticket', 409, [], ),
+      new ApiError('Record at least one Action Taken before resolving this ticket', 409, [], 'RESOLUTION_REQUIRES_ACTION_TAKEN'),
     );
     renderPage();
     await waitFor(() =&gt; screen.getByRole('heading', { name: /actions taken/i }));
@@ -1854,6 +2011,20 @@ describe('StaffTicketDetailPage — Actions Taken integration', () =&gt; {
     await waitFor(() =&gt; {
       expect(screen.getByText(/record an action taken first/i)).toBeInTheDocument();
     });
+  });
+
+  it('does NOT show the directed message for a different 409 whose text happens to mention "action" (branches on code, not a message regex)', async () =&gt; {
+    vi.spyOn(staffTicketsApi, 'fetchStaffTicketDetail').mockResolvedValue(ticket());
+    vi.spyOn(staffTicketsApi, 'updateTicketStatus').mockRejectedValue(
+      new ApiError('This action is not permitted right now', 409, [], 'TICKET_LOCKED'),
+    );
+    renderPage();
+    await waitFor(() =&gt; screen.getByRole('heading', { name: /actions taken/i }));
+
+    fireEvent.change(screen.getByLabelText(/current status/i), { target: { value: 'RESOLVED' } });
+
+    await waitFor(() =&gt; expect(screen.getByText('This action is not permitted right now')).toBeInTheDocument());
+    expect(screen.queryByText(/record an action taken first/i)).not.toBeInTheDocument();
   });
 
   it('shows the field-level fallback message for an unrelated status-change failure', async () =&gt; {
@@ -1870,15 +2041,38 @@ describe('StaffTicketDetailPage — Actions Taken integration', () =&gt; {
 });</code></pre>
 <div class="step"><label><input type="checkbox"> <strong>Step 2: Run test to verify it fails</strong></label></div>
 <p class="note">Run: <code>npm test --prefix client -- lab-04/StaffTicketDetailPage.actions.test.tsx</code></p>
-<p class="note">Expected: FAIL — no "Actions Taken" heading exists yet, <code>ApiError</code> constructor signature check aside, the directed-message test fails since no such text is ever rendered.</p>
-<div class="step"><label><input type="checkbox"> <strong>Step 3: Wire the section into the page</strong></label></div>
+<p class="note">Expected: FAIL — <code>new ApiError(msg, 409, [], 'RESOLUTION_REQUIRES_ACTION_TAKEN')</code> doesn't type-check yet (4th constructor param doesn't exist), and no "Actions Taken" heading exists yet.</p>
+<div class="step"><label><input type="checkbox"> <strong>Step 3: Add <code>code</code> to <code>ApiError</code> and thread it through <code>staffTickets.ts</code></strong></label></div>
+<p>The review that caught this found <code>ApiError</code> (defined once, in <code>client/src/api/tickets.ts</code>, imported by every other API-client file) discards the server's <code>error.code</code> at every call site today — every <code>throwApiError</code>/<code>throwCommentError</code> helper across the codebase reads <code>body?.error?.message</code> and <code>body?.error?.fieldErrors</code> but never <code>body?.error?.code</code>. Branching on a substring of the message (the first draft of this task did <code>/action taken/i.test(error.message)</code>) is fragile: any small copy change silently breaks the directed message, and a coincidentally similar message from an unrelated error code would wrongly trigger it (the new test above pins exactly that case). Fix it at the source instead.</p>
+<p>In <code>client/src/api/tickets.ts</code>, extend <code>ApiError</code>:</p>
+<pre><code>export class ApiError extends Error {
+  status: number;
+  fieldErrors: FieldError[];
+  code?: string;
+
+  constructor(message: string, status: number, fieldErrors: FieldError[] = [], code?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.fieldErrors = fieldErrors;
+    this.code = code;
+  }
+}</code></pre>
+<p>This is backward compatible — every existing <code>new ApiError(message, status, fieldErrors)</code> call across the codebase (3 positional args) still compiles, <code>code</code> simply stays <code>undefined</code> for them.</p>
+<p>In <code>client/src/api/staffTickets.ts</code>, update <code>throwApiError</code> (the one function <code>updateTicketStatus</code> uses) to pass <code>code</code> through:</p>
+<pre><code>async function throwApiError(response: Response, fallbackMessage: string): Promise&lt;never&gt; {
+  const body = await response.json().catch(() =&gt; null);
+  throw new ApiError(body?.error?.message ?? fallbackMessage, response.status, body?.error?.fieldErrors ?? [], body?.error?.code);
+}</code></pre>
+<p>(Only this one file's helper needs the fix for this task's own correctness — <code>staffTickets.ts</code> is what <code>updateTicketStatus</code> calls through. The identically-shaped <code>throwApiError</code>/<code>throwCommentError</code> helpers in <code>tickets.ts</code>, <code>comments.ts</code>, <code>staffActions.ts</code> [Task 7], <code>actions.ts</code> [Task 9], and <code>dashboard.ts</code> [Task 13] are unaffected either way since nothing in this plan branches on their errors' <code>code</code> — leave them as-is rather than touching files outside this task's scope for no consumer.)</p>
+<div class="step"><label><input type="checkbox"> <strong>Step 4: Wire the section into the page and branch on <code>code</code></strong></label></div>
 <p>In <code>client/src/pages/StaffTicketDetailPage.tsx</code>, add the import next to the existing ones:</p>
 <pre><code>import { ActionsTakenSection } from '../components/ActionsTakenSection';</code></pre>
 <p>Add a <code>RESOLUTION_REQUIRES_ACTION_TAKEN</code>-aware message just above the existing <code>runFieldUpdate</code>/<code>handleStatusChange</code> functions:</p>
 <pre><code>const RESOLUTION_GATE_MESSAGE = 'This ticket cannot be marked Resolved yet — record an Action Taken first.';
 
 function statusErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ApiError &amp;&amp; error.status === 409 &amp;&amp; /action taken/i.test(error.message)) {
+  if (error instanceof ApiError &amp;&amp; error.code === 'RESOLUTION_REQUIRES_ACTION_TAKEN') {
     return RESOLUTION_GATE_MESSAGE;
   }
   return error instanceof ApiError ? error.message : fallback;
@@ -1892,15 +2086,15 @@ function statusErrorMessage(error: unknown, fallback: string): string {
 <pre><code>      &lt;section className="mt-4"&gt;
         &lt;ActionsTakenSection ticketId={ticket.id} ticketLocked={ticketLocked} /&gt;
       &lt;/section&gt;</code></pre>
-<div class="step"><label><input type="checkbox"> <strong>Step 4: Run test to verify it passes</strong></label></div>
+<div class="step"><label><input type="checkbox"> <strong>Step 5: Run test to verify it passes</strong></label></div>
 <p class="note">Run: <code>npm test --prefix client -- lab-04/StaffTicketDetailPage.actions.test.tsx</code></p>
-<p class="note">Expected: PASS (all 4 tests)</p>
-<div class="step"><label><input type="checkbox"> <strong>Step 5: Run the full client suite to confirm no Lab 1-3 regression</strong></label></div>
+<p class="note">Expected: PASS (all 5 tests)</p>
+<div class="step"><label><input type="checkbox"> <strong>Step 6: Run the full client suite to confirm no Lab 1-3 regression</strong></label></div>
 <p class="note">Run: <code>npm test --prefix client</code></p>
-<p class="note">Expected: PASS — <code>StaffTicketDetailPage.test.tsx</code> (Lab 3) still passes since the new section only adds content, it doesn't remove or rename anything the old tests query for.</p>
-<div class="step"><label><input type="checkbox"> <strong>Step 6: Commit</strong></label></div>
-<pre><code>git add client/src/pages/StaffTicketDetailPage.tsx client/tests/lab-04/StaffTicketDetailPage.actions.test.tsx
-git commit -m "feat(lab-04): wire Actions Taken section into staff ticket detail, surface resolution-gate message"</code></pre>
+<p class="note">Expected: PASS — <code>StaffTicketDetailPage.test.tsx</code> (Lab 3) still passes: the new section only adds content, and the widened <code>ApiError</code> constructor is backward compatible with every existing 3-arg call site.</p>
+<div class="step"><label><input type="checkbox"> <strong>Step 7: Commit</strong></label></div>
+<pre><code>git add client/src/api/tickets.ts client/src/api/staffTickets.ts client/src/pages/StaffTicketDetailPage.tsx client/tests/lab-04/StaffTicketDetailPage.actions.test.tsx
+git commit -m "feat(lab-04): wire Actions Taken section into staff ticket detail, surface resolution-gate message by error code"</code></pre>
 
   <h3>Task 9: Client — Requester read-only Action Taken API client and section</h3>
   <p class="pathline">Create: <code>client/src/api/actions.ts</code> &middot; Create: <code>client/src/components/ActionsTakenReadOnlySection.tsx</code> &middot; Test: <code>client/tests/lab-04/ActionsTakenReadOnlySection.test.tsx</code></p>
@@ -1935,9 +2129,12 @@ describe('ActionsTakenReadOnlySection', () =&gt; {
     await waitFor(() =&gt; expect(screen.getByText(/no actions taken yet/i)).toBeInTheDocument());
   });
 
-  it('renders every field with no create/edit control present (FR-03/BR-11)', async () =&gt; {
+  it('renders every field with no create/edit control present, including lastEditedBy (FR-03/BR-11 -- same field detail IT Staff sees)', async () =&gt; {
     vi.spyOn(actionsApi, 'fetchActions').mockResolvedValue([
-      action({ followUpRequired: true, followUpNote: 'We will call you back tomorrow.', attachmentNotes: 'Photo on file.' }),
+      action({
+        followUpRequired: true, followUpNote: 'We will call you back tomorrow.', attachmentNotes: 'Photo on file.',
+        lastEditedBy: { id: 'staff-2', displayName: 'Suda N.' },
+      }),
     ]);
     render(&lt;ActionsTakenReadOnlySection ticketId={TICKET_ID} /&gt;);
     await waitFor(() =&gt; expect(screen.getByText('Replaced the network cable.')).toBeInTheDocument());
@@ -1945,6 +2142,7 @@ describe('ActionsTakenReadOnlySection', () =&gt; {
     expect(within(row).getByText('Pakorn W.')).toBeInTheDocument();
     expect(within(row).getByText(/we will call you back tomorrow/i)).toBeInTheDocument();
     expect(within(row).getByText(/photo on file/i)).toBeInTheDocument();
+    expect(within(row).getByText(/edited by suda n\./i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /edit/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /record action taken/i })).not.toBeInTheDocument();
   });
@@ -2045,6 +2243,7 @@ export function ActionsTakenReadOnlySection({ ticketId }: Props) {
           &lt;p className="mb-0" style={{ whiteSpace: 'pre-wrap' }}&gt;{a.description}&lt;/p&gt;
           {a.followUpNote &amp;&amp; &lt;p className="mb-0 text-body-secondary small"&gt;Follow-up: {a.followUpNote}&lt;/p&gt;}
           {a.attachmentNotes &amp;&amp; &lt;p className="mb-0 text-body-secondary small"&gt;Attachment: {a.attachmentNotes}&lt;/p&gt;}
+          {a.lastEditedBy &amp;&amp; &lt;p className="mb-0 text-body-secondary small"&gt;Edited by {a.lastEditedBy.displayName}&lt;/p&gt;}
         &lt;/div&gt;
       ))}
     &lt;/section&gt;
@@ -2107,14 +2306,11 @@ describe('TicketDetailPage — Actions Taken integration', () =&gt; {
     await waitFor(() =&gt; expect(screen.getByRole('heading', { name: /actions taken/i })).toBeInTheDocument());
   });
 });</code></pre>
-<div class="step"><label><input type="checkbox"> <strong>Step 2: Export <code>AuthContext</code> so the test's <code>&lt;AuthContext.Provider&gt;</code> wrapper compiles</strong></label></div>
-<p><code>client/src/context/AuthContext.tsx</code> currently declares <code>const AuthContext = createContext&lt;AuthContextValue | undefined&gt;(undefined);</code> without exporting it — only <code>AuthProvider</code> and <code>useAuth</code> are exported. Add <code>export</code> to that line:</p>
-<pre><code>export const AuthContext = createContext&lt;AuthContextValue | undefined&gt;(undefined);</code></pre>
-<p>This is a pure addition — <code>useAuth</code> keeps working unchanged since it still reads from the same context object. Note the real <code>AuthContextValue</code> shape while you're in this file: <code>{ currentUser, isLoading, setCurrentUser, logout }</code> — there is no <code>login</code> field, and the test above already mocks <code>setCurrentUser</code>, not <code>login</code>, to match.</p>
-<div class="step"><label><input type="checkbox"> <strong>Step 3: Run test to verify it fails</strong></label></div>
+<p><code>AuthContext</code> is already exported by Task 7 (Batch 3, which fully lands before this Batch 4 task starts), so the import above just works — no export step needed here.</p>
+<div class="step"><label><input type="checkbox"> <strong>Step 2: Run test to verify it fails</strong></label></div>
 <p class="note">Run: <code>npm test --prefix client -- lab-04/TicketDetailPage.actions.test.tsx</code></p>
 <p class="note">Expected: FAIL — no "Actions Taken" heading rendered yet.</p>
-<div class="step"><label><input type="checkbox"> <strong>Step 4: Wire the section into the page</strong></label></div>
+<div class="step"><label><input type="checkbox"> <strong>Step 3: Wire the section into the page</strong></label></div>
 <p>In <code>client/src/pages/TicketDetailPage.tsx</code>, add the import next to the existing component imports:</p>
 <pre><code>import { ActionsTakenReadOnlySection } from '../components/ActionsTakenReadOnlySection';</code></pre>
 <p>Add a new card after the existing Comments card (<code>&lt;CommentSection ticketId={ticket.id} /&gt;</code>'s wrapping <code>&lt;div className="card mt-3"&gt;</code>), before the closing <code>&lt;/&gt;</code>:</p>
@@ -2123,11 +2319,11 @@ describe('TicketDetailPage — Actions Taken integration', () =&gt; {
               &lt;ActionsTakenReadOnlySection ticketId={ticket.id} /&gt;
             &lt;/div&gt;
           &lt;/div&gt;</code></pre>
-<div class="step"><label><input type="checkbox"> <strong>Step 5: Run test to verify it passes</strong></label></div>
+<div class="step"><label><input type="checkbox"> <strong>Step 4: Run test to verify it passes</strong></label></div>
 <p class="note">Run: <code>npm test --prefix client -- lab-04/TicketDetailPage.actions.test.tsx</code></p>
 <p class="note">Expected: PASS</p>
-<div class="step"><label><input type="checkbox"> <strong>Step 6: Commit</strong></label></div>
-<pre><code>git add client/src/pages/TicketDetailPage.tsx client/src/context/AuthContext.tsx client/tests/lab-04/TicketDetailPage.actions.test.tsx
+<div class="step"><label><input type="checkbox"> <strong>Step 5: Commit</strong></label></div>
+<pre><code>git add client/src/pages/TicketDetailPage.tsx client/tests/lab-04/TicketDetailPage.actions.test.tsx
 git commit -m "feat(lab-04): wire read-only Actions Taken section into requester ticket detail"</code></pre>
 
   <h3>Task 11: Dashboard metrics service</h3>
@@ -2192,6 +2388,14 @@ describe('dashboardMetrics service', () =&gt; {
     }
     const result = await getRequesterDashboard(requesterId);
     expect(result.recentTickets).toHaveLength(5);
+  });
+
+  it('FR-08: ownedByMeCount counts every status, including CLOSED and CANCELLED -- unlike unassignedCount, FR-08 states no status qualifier for this metric', async () =&gt; {
+    await createTicket('IN_PROGRESS', { ownerId: staffId });
+    await createTicket('CLOSED', { ownerId: staffId });
+    await createTicket('CANCELLED', { ownerId: staffId });
+    const result = await getStaffDashboard(staffId, false);
+    expect(result.ownedByMeCount).toBe(3);
   });
 
   it('AC-10: unassignedCount matches a direct count of ownerId=null AND non-terminal status', async () =&gt; {
@@ -2299,7 +2503,10 @@ export async function getRequesterDashboard(requesterId: string) {
 export async function getStaffDashboard(currentUserId: string, includeUserCounts: boolean) {
   const [unassignedCount, ownedByMeCount, statusRows, priorityRows, recentTickets, userRoleRows] = await Promise.all([
     prisma.ticket.count({ where: { ownerId: null, status: { in: NON_TERMINAL_STATUSES as never[] } } }),
-    prisma.ticket.count({ where: { ownerId: currentUserId, status: { in: NON_TERMINAL_STATUSES as never[] } } }),
+    // No status filter here (unlike unassignedCount above): FR-08 defines this metric as
+    // "Tickets owned by the authenticated user" with no non-terminal qualifier, and AC-10's
+    // non-terminal requirement is stated only for the unassigned metric.
+    prisma.ticket.count({ where: { ownerId: currentUserId } }),
     prisma.ticket.groupBy({ by: ['status'], _count: { status: true } }),
     prisma.ticket.groupBy({ by: ['itPriority'], _count: { itPriority: true } }),
     prisma.ticket.findMany({ orderBy: { updatedAt: 'desc' }, take: RECENT_LIMIT, select: RECENT_SELECT }),
@@ -2319,7 +2526,7 @@ export async function getStaffDashboard(currentUserId: string, includeUserCounts
 }</code></pre>
 <div class="step"><label><input type="checkbox"> <strong>Step 4: Run test to verify it passes</strong></label></div>
 <p class="note">Run: <code>npm test --prefix server -- lab-04/dashboardMetrics.service.test.ts</code></p>
-<p class="note">Expected: PASS (all 8 tests)</p>
+<p class="note">Expected: PASS (all 9 tests)</p>
 <div class="step"><label><input type="checkbox"> <strong>Step 5: Commit</strong></label></div>
 <pre><code>git add server/src/services/dashboardMetrics.ts server/tests/lab-04/dashboardMetrics.service.test.ts
 git commit -m "feat(lab-04): add dashboard metrics service (groupBy/count only, BR-13)"</code></pre>
@@ -2492,10 +2699,10 @@ staffDashboardRouter.get('/', async (req, res, next) =&gt; {
 <pre><code>git add server/src/routes/v1/dashboard.ts server/src/routes/v1/staff/dashboard.ts server/src/routes/v1/index.ts server/src/routes/v1/staff/index.ts server/tests/lab-04/dashboard.api.test.ts
 git commit -m "feat(lab-04): add Requester and Staff/Administrator dashboard API routes"</code></pre>
 
-  <h3>Task 13: Client dashboard API and <code>RequesterDashboardPage</code></h3>
-  <p class="pathline">Create: <code>client/src/api/dashboard.ts</code> &middot; Create: <code>client/src/pages/RequesterDashboardPage.tsx</code> &middot; Test: <code>client/tests/lab-04/RequesterDashboardPage.test.tsx</code></p>
+  <h3>Task 13: Client dashboard API, <code>RequesterDashboardPage</code>, and <code>MyTicketsPage</code> URL-filter hydration</h3>
+  <p class="pathline">Create: <code>client/src/api/dashboard.ts</code> &middot; Create: <code>client/src/pages/RequesterDashboardPage.tsx</code> &middot; Modify: <code>client/src/pages/MyTicketsPage.tsx</code> (read initial filters from the URL query string) &middot; Test: <code>client/tests/lab-04/RequesterDashboardPage.test.tsx</code> &middot; Test: <code>client/tests/lab-04/MyTicketsPage.hydration.test.tsx</code></p>
   <div class="card"><ul><li>Produces: <code>fetchRequesterDashboard()</code>, <code>fetchStaffDashboard()</code>, types <code>RequesterDashboardDto</code>, <code>StaffDashboardDto</code>. Component <code>&lt;RequesterDashboardPage /&gt;</code> (reads route param-free, uses <code>useAuth</code> for nothing beyond what <code>AppShell</code> already guarantees). Task 14 imports <code>fetchStaffDashboard</code>/<code>StaffDashboardDto</code> from this same file.</li></ul></div>
-  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write the failing test</strong></label></div>
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write the failing tests</strong></label></div>
 <pre><code>// client/tests/lab-04/RequesterDashboardPage.test.tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
@@ -2537,6 +2744,16 @@ describe('RequesterDashboardPage', () =&gt; {
     expect(screen.getByRole('link', { name: /view my tickets/i })).toBeInTheDocument();
   });
 
+  it('FR-10: each metric card links to My Tickets filtered by that exact status', async () =&gt; {
+    vi.spyOn(dashboardApi, 'fetchRequesterDashboard').mockResolvedValue(dashboard({ statusCounts: { ...dashboard().statusCounts, OPEN: 2 } }));
+    render(&lt;MemoryRouter&gt;&lt;RequesterDashboardPage /&gt;&lt;/MemoryRouter&gt;);
+    await waitFor(() =&gt; screen.getByText(/open/i));
+    expect(screen.getByRole('link', { name: /^open$/i })).toHaveAttribute('href', '/tickets?status=OPEN');
+    expect(screen.getByRole('link', { name: /^waiting$/i })).toHaveAttribute('href', '/tickets?status=WAITING_FOR_REQUESTER');
+    expect(screen.getByRole('link', { name: /^resolved$/i })).toHaveAttribute('href', '/tickets?status=RESOLVED');
+    expect(screen.getByRole('link', { name: /^closed$/i })).toHaveAttribute('href', '/tickets?status=CLOSED');
+  });
+
   it('shows an inline error with Retry when the dashboard fetch fails', async () =&gt; {
     const fetchSpy = vi.spyOn(dashboardApi, 'fetchRequesterDashboard')
       .mockRejectedValueOnce(new Error('network error'))
@@ -2548,9 +2765,49 @@ describe('RequesterDashboardPage', () =&gt; {
     expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 });</code></pre>
-<div class="step"><label><input type="checkbox"> <strong>Step 2: Run test to verify it fails</strong></label></div>
-<p class="note">Run: <code>npm test --prefix client -- lab-04/RequesterDashboardPage.test.tsx</code></p>
-<p class="note">Expected: FAIL — both source modules do not exist yet.</p>
+<pre><code>// client/tests/lab-04/MyTicketsPage.hydration.test.tsx
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MyTicketsPage } from '../../src/pages/MyTicketsPage';
+import * as ticketsApi from '../../src/api/tickets';
+import * as lookupsApi from '../../src/api/lookups';
+
+describe('MyTicketsPage — URL filter hydration (FR-10)', () =&gt; {
+  beforeEach(() =&gt; {
+    vi.restoreAllMocks();
+    vi.spyOn(lookupsApi, 'fetchCategories').mockResolvedValue([]);
+  });
+
+  it('reads an initial status filter from the URL query string set by a dashboard link', async () =&gt; {
+    const fetchSpy = vi.spyOn(ticketsApi, 'fetchTickets').mockResolvedValue({
+      data: [], meta: { page: 1, pageSize: 10, total: 0, totalPages: 1 },
+    });
+    render(
+      &lt;MemoryRouter initialEntries={['/tickets?status=OPEN']}&gt;
+        &lt;Routes&gt;&lt;Route path="/tickets" element={&lt;MyTicketsPage /&gt;} /&gt;&lt;/Routes&gt;
+      &lt;/MemoryRouter&gt;,
+    );
+    await waitFor(() =&gt; expect(fetchSpy).toHaveBeenCalled());
+    expect(fetchSpy).toHaveBeenCalledWith(expect.objectContaining({ status: ['OPEN'] }));
+  });
+
+  it('falls back to the unfiltered default when no query string is present (unchanged Lab 1-3 behavior)', async () =&gt; {
+    const fetchSpy = vi.spyOn(ticketsApi, 'fetchTickets').mockResolvedValue({
+      data: [], meta: { page: 1, pageSize: 10, total: 0, totalPages: 1 },
+    });
+    render(
+      &lt;MemoryRouter initialEntries={['/tickets']}&gt;
+        &lt;Routes&gt;&lt;Route path="/tickets" element={&lt;MyTicketsPage /&gt;} /&gt;&lt;/Routes&gt;
+      &lt;/MemoryRouter&gt;,
+    );
+    await waitFor(() =&gt; expect(fetchSpy).toHaveBeenCalled());
+    expect(fetchSpy).toHaveBeenCalledWith(expect.objectContaining({ status: [] }));
+  });
+});</code></pre>
+<div class="step"><label><input type="checkbox"> <strong>Step 2: Run tests to verify they fail</strong></label></div>
+<p class="note">Run: <code>npm test --prefix client -- lab-04/RequesterDashboardPage.test.tsx lab-04/MyTicketsPage.hydration.test.tsx</code></p>
+<p class="note">Expected: FAIL — <code>client/src/api/dashboard.ts</code>/<code>client/src/pages/RequesterDashboardPage.tsx</code> don't exist yet; <code>MyTicketsPage</code> ignores the URL entirely today, so the first hydration test's <code>status: ['OPEN']</code> expectation fails (it's called with <code>status: []</code> instead).</p>
 <div class="step"><label><input type="checkbox"> <strong>Step 3: Write the API client</strong></label></div>
 <pre><code>// client/src/api/dashboard.ts
 import { ApiError } from './tickets';
@@ -2595,7 +2852,7 @@ export async function fetchStaffDashboard(): Promise&lt;StaffDashboardDto&gt; {
   if (!response.ok) return throwApiError(response, 'Failed to load the dashboard');
   return response.json();
 }</code></pre>
-<div class="step"><label><input type="checkbox"> <strong>Step 4: Write the page</strong></label></div>
+<div class="step"><label><input type="checkbox"> <strong>Step 4: Write the page, with real filtered links</strong></label></div>
 <pre><code>// client/src/pages/RequesterDashboardPage.tsx
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -2637,12 +2894,13 @@ export function RequesterDashboardPage() {
       &lt;div className="row g-3 mb-4"&gt;
         {CARD_STATUSES.map((c) =&gt; (
           &lt;div key={c.key} className="col-6 col-md-3"&gt;
-            &lt;div className="card text-center"&gt;
+            {/* FR-10: each card links to the detailed screen filtered to match, not a bare nav link. */}
+            &lt;Link to={`/tickets?status=${c.key}`} className="card text-center text-decoration-none text-reset"&gt;
               &lt;div className="card-body"&gt;
                 &lt;p className="text-body-secondary small mb-1"&gt;{c.label}&lt;/p&gt;
                 &lt;p className="fs-2 mb-0"&gt;{data.statusCounts[c.key] ?? 0}&lt;/p&gt;
               &lt;/div&gt;
-            &lt;/div&gt;
+            &lt;/Link&gt;
           &lt;/div&gt;
         ))}
       &lt;/div&gt;
@@ -2664,17 +2922,32 @@ export function RequesterDashboardPage() {
     &lt;/div&gt;
   );
 }</code></pre>
-<div class="step"><label><input type="checkbox"> <strong>Step 5: Run test to verify it passes</strong></label></div>
-<p class="note">Run: <code>npm test --prefix client -- lab-04/RequesterDashboardPage.test.tsx</code></p>
-<p class="note">Expected: PASS (all 3 tests)</p>
-<div class="step"><label><input type="checkbox"> <strong>Step 6: Commit</strong></label></div>
-<pre><code>git add client/src/api/dashboard.ts client/src/pages/RequesterDashboardPage.tsx client/tests/lab-04/RequesterDashboardPage.test.tsx
-git commit -m "feat(lab-04): add dashboard API client and Requester Dashboard page"</code></pre>
+<div class="step"><label><input type="checkbox"> <strong>Step 5: Hydrate <code>MyTicketsPage</code>'s initial filter from the URL</strong></label></div>
+<p>In <code>client/src/pages/MyTicketsPage.tsx</code>, add <code>useSearchParams</code> to the existing <code>react-router-dom</code> import (currently <code>import { useNavigate, Link } from 'react-router-dom';</code>):</p>
+<pre><code>import { useNavigate, Link, useSearchParams } from 'react-router-dom';</code></pre>
+<p>Replace the <code>query</code> state's initializer. It currently reads:</p>
+<pre><code>  const [query, setQuery] = useState&lt;QueryState&gt;(DEFAULT_QUERY);</code></pre>
+<p>Change to a lazy initializer that reads <code>status</code> from the URL once, on mount only (this is one-directional hydration — URL to initial state — not a full two-way URL sync; the existing in-page filter controls keep working exactly as before once loaded):</p>
+<pre><code>  const [searchParams] = useSearchParams();
+  const [query, setQuery] = useState&lt;QueryState&gt;(() =&gt; {
+    const statusFromUrl = searchParams.getAll('status');
+    return statusFromUrl.length &gt; 0 ? { ...DEFAULT_QUERY, status: statusFromUrl } : DEFAULT_QUERY;
+  });</code></pre>
+<p>Add the <code>const [searchParams] = useSearchParams();</code> line immediately after the existing <code>const navigate = useNavigate();</code> line.</p>
+<div class="step"><label><input type="checkbox"> <strong>Step 6: Run tests to verify they pass</strong></label></div>
+<p class="note">Run: <code>npm test --prefix client -- lab-04/RequesterDashboardPage.test.tsx lab-04/MyTicketsPage.hydration.test.tsx</code></p>
+<p class="note">Expected: PASS (4 + 2 tests)</p>
+<div class="step"><label><input type="checkbox"> <strong>Step 7: Run the full client suite to confirm no Lab 1-3 regression</strong></label></div>
+<p class="note">Run: <code>npm test --prefix client</code></p>
+<p class="note">Expected: PASS — <code>MyTicketsPage</code>'s existing Lab 1-3 tests render it with no query string, which still resolves to <code>DEFAULT_QUERY</code> exactly as before.</p>
+<div class="step"><label><input type="checkbox"> <strong>Step 8: Commit</strong></label></div>
+<pre><code>git add client/src/api/dashboard.ts client/src/pages/RequesterDashboardPage.tsx client/src/pages/MyTicketsPage.tsx client/tests/lab-04/RequesterDashboardPage.test.tsx client/tests/lab-04/MyTicketsPage.hydration.test.tsx
+git commit -m "feat(lab-04): add dashboard API client, Requester Dashboard page, and My Tickets URL-filter hydration"</code></pre>
 
-  <h3>Task 14: <code>StaffDashboardPage</code> (also the Administrator's landing page)</h3>
-  <p class="pathline">Create: <code>client/src/pages/StaffDashboardPage.tsx</code> &middot; Test: <code>client/tests/lab-04/StaffDashboardPage.test.tsx</code></p>
-  <div class="card"><ul><li>Consumes: <code>fetchStaffDashboard</code>, <code>StaffDashboardDto</code> (Task 13).</li><li>Produces: <code>&lt;StaffDashboardPage /&gt;</code>, which needs to know the caller's role only to decide whether to render the <code>userCounts</code> card — read it via <code>useAuth()</code> (<code>client/src/context/AuthContext.tsx</code>, existing).</li></ul></div>
-  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write the failing test</strong></label></div>
+  <h3>Task 14: <code>StaffDashboardPage</code> (also the Administrator's landing page) and <code>StaffTicketQueuePage</code> URL-filter hydration</h3>
+  <p class="pathline">Create: <code>client/src/pages/StaffDashboardPage.tsx</code> &middot; Modify: <code>client/src/pages/StaffTicketQueuePage.tsx</code> (read initial filters from the URL query string) &middot; Test: <code>client/tests/lab-04/StaffDashboardPage.test.tsx</code> &middot; Test: <code>client/tests/lab-04/StaffTicketQueuePage.hydration.test.tsx</code></p>
+  <div class="card"><ul><li>Consumes: <code>fetchStaffDashboard</code>, <code>StaffDashboardDto</code> (Task 13).</li><li>Produces: <code>&lt;StaffDashboardPage /&gt;</code>, which needs the caller's id (for the "assigned to me" card's filtered link) and role (to decide whether to render the <code>userCounts</code> card and IT Priority cards, per FR-08) — read both via <code>useAuth()</code> (<code>client/src/context/AuthContext.tsx</code>, existing). <code>AuthContext</code> is already exported by Task 7 (Batch 3, lands before this Batch 4 task).</li></ul></div>
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write the failing tests</strong></label></div>
 <pre><code>// client/tests/lab-04/StaffDashboardPage.test.tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
@@ -2715,6 +2988,16 @@ describe('StaffDashboardPage', () =&gt; {
     expect(screen.getByText('3')).toBeInTheDocument();
   });
 
+  it('FR-08: renders IT Priority metric cards (Low/Medium/High/Urgent), not just status cards', async () =&gt; {
+    vi.spyOn(dashboardApi, 'fetchStaffDashboard').mockResolvedValue(
+      dashboard({ priorityCounts: { LOW: 1, MEDIUM: 2, HIGH: 0, URGENT: 4 } }),
+    );
+    renderAs('IT_STAFF');
+    await waitFor(() =&gt; screen.getByText(/assigned to me/i));
+    expect(screen.getByText(/^urgent$/i)).toBeInTheDocument();
+    expect(screen.getByText('4')).toBeInTheDocument();
+  });
+
   it('does not render the user-accounts-by-role card for an IT Staff caller (userCounts absent)', async () =&gt; {
     vi.spyOn(dashboardApi, 'fetchStaffDashboard').mockResolvedValue(dashboard());
     renderAs('IT_STAFF');
@@ -2730,13 +3013,73 @@ describe('StaffDashboardPage', () =&gt; {
     await waitFor(() =&gt; expect(screen.getByText(/accounts by role/i)).toBeInTheDocument());
     expect(screen.getByText('5')).toBeInTheDocument();
   });
+
+  it('FR-10: status/priority/assigned-to-me/unassigned cards each link to the Ticket Queue filtered to match', async () =&gt; {
+    vi.spyOn(dashboardApi, 'fetchStaffDashboard').mockResolvedValue(dashboard());
+    renderAs('IT_STAFF');
+    await waitFor(() =&gt; screen.getByText(/assigned to me/i));
+    expect(screen.getByRole('link', { name: /^new$/i })).toHaveAttribute('href', '/staff/tickets?status=NEW');
+    expect(screen.getByRole('link', { name: /^urgent$/i })).toHaveAttribute('href', '/staff/tickets?itPriority=URGENT');
+    expect(screen.getByRole('link', { name: /assigned to me/i })).toHaveAttribute('href', '/staff/tickets?ownerId=staff-1');
+    expect(screen.getByRole('link', { name: /^unassigned$/i })).toHaveAttribute('href', '/staff/tickets?ownerId=unassigned');
+  });
 });</code></pre>
-<div class="step"><label><input type="checkbox"> <strong>Step 2: Check <code>AuthContext</code>'s exported shape before writing the test above</strong></label></div>
-<p>Same note as Task 10 Step 2: this test needs <code>AuthContext</code> exported by name from <code>client/src/context/AuthContext.tsx</code>. If Task 10 already added that export, skip this step.</p>
-<div class="step"><label><input type="checkbox"> <strong>Step 3: Run test to verify it fails</strong></label></div>
-<p class="note">Run: <code>npm test --prefix client -- lab-04/StaffDashboardPage.test.tsx</code></p>
-<p class="note">Expected: FAIL — <code>client/src/pages/StaffDashboardPage.tsx</code> does not exist yet.</p>
-<div class="step"><label><input type="checkbox"> <strong>Step 4: Write the page</strong></label></div>
+<pre><code>// client/tests/lab-04/StaffTicketQueuePage.hydration.test.tsx
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { StaffTicketQueuePage } from '../../src/pages/StaffTicketQueuePage';
+import * as staffTicketsApi from '../../src/api/staffTickets';
+
+describe('StaffTicketQueuePage — URL filter hydration (FR-10)', () =&gt; {
+  beforeEach(() =&gt; {
+    vi.restoreAllMocks();
+    vi.spyOn(staffTicketsApi, 'fetchAssignableOwners').mockResolvedValue([]);
+  });
+
+  it('reads an initial itPriority filter from the URL query string set by a dashboard link', async () =&gt; {
+    const fetchSpy = vi.spyOn(staffTicketsApi, 'fetchStaffTickets').mockResolvedValue({
+      data: [], meta: { page: 1, pageSize: 10, total: 0, totalPages: 1 },
+    });
+    render(
+      &lt;MemoryRouter initialEntries={['/staff/tickets?itPriority=URGENT']}&gt;
+        &lt;Routes&gt;&lt;Route path="/staff/tickets" element={&lt;StaffTicketQueuePage /&gt;} /&gt;&lt;/Routes&gt;
+      &lt;/MemoryRouter&gt;,
+    );
+    await waitFor(() =&gt; expect(fetchSpy).toHaveBeenCalled());
+    expect(fetchSpy).toHaveBeenCalledWith(expect.objectContaining({ itPriority: 'URGENT' }));
+  });
+
+  it('reads an initial ownerId filter (including the literal "unassigned") from the URL', async () =&gt; {
+    const fetchSpy = vi.spyOn(staffTicketsApi, 'fetchStaffTickets').mockResolvedValue({
+      data: [], meta: { page: 1, pageSize: 10, total: 0, totalPages: 1 },
+    });
+    render(
+      &lt;MemoryRouter initialEntries={['/staff/tickets?ownerId=unassigned']}&gt;
+        &lt;Routes&gt;&lt;Route path="/staff/tickets" element={&lt;StaffTicketQueuePage /&gt;} /&gt;&lt;/Routes&gt;
+      &lt;/MemoryRouter&gt;,
+    );
+    await waitFor(() =&gt; expect(fetchSpy).toHaveBeenCalled());
+    expect(fetchSpy).toHaveBeenCalledWith(expect.objectContaining({ ownerId: 'unassigned' }));
+  });
+
+  it('falls back to the unfiltered default when no query string is present (unchanged Lab 1-3 behavior)', async () =&gt; {
+    const fetchSpy = vi.spyOn(staffTicketsApi, 'fetchStaffTickets').mockResolvedValue({
+      data: [], meta: { page: 1, pageSize: 10, total: 0, totalPages: 1 },
+    });
+    render(
+      &lt;MemoryRouter initialEntries={['/staff/tickets']}&gt;
+        &lt;Routes&gt;&lt;Route path="/staff/tickets" element={&lt;StaffTicketQueuePage /&gt;} /&gt;&lt;/Routes&gt;
+      &lt;/MemoryRouter&gt;,
+    );
+    await waitFor(() =&gt; expect(fetchSpy).toHaveBeenCalled());
+    expect(fetchSpy).toHaveBeenCalledWith(expect.objectContaining({ status: [], itPriority: undefined, ownerId: undefined }));
+  });
+});</code></pre>
+<div class="step"><label><input type="checkbox"> <strong>Step 2: Run tests to verify they fail</strong></label></div>
+<p class="note">Run: <code>npm test --prefix client -- lab-04/StaffDashboardPage.test.tsx lab-04/StaffTicketQueuePage.hydration.test.tsx</code></p>
+<p class="note">Expected: FAIL — <code>client/src/pages/StaffDashboardPage.tsx</code> doesn't exist yet; <code>StaffTicketQueuePage</code> ignores the URL entirely today.</p>
+<div class="step"><label><input type="checkbox"> <strong>Step 3: Write the page, with IT Priority cards and real filtered links</strong></label></div>
 <pre><code>// client/src/pages/StaffDashboardPage.tsx
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -2750,6 +3093,13 @@ const CARD_STATUSES: { key: string; label: string }[] = [
   { key: 'OPEN', label: 'Open' },
   { key: 'IN_PROGRESS', label: 'In Progress' },
   { key: 'WAITING_FOR_REQUESTER', label: 'Waiting' },
+];
+
+const CARD_PRIORITIES: { key: string; label: string }[] = [
+  { key: 'LOW', label: 'Low' },
+  { key: 'MEDIUM', label: 'Medium' },
+  { key: 'HIGH', label: 'High' },
+  { key: 'URGENT', label: 'Urgent' },
 ];
 
 const ROLE_LABELS: Record&lt;string, string&gt; = { REQUESTER: 'Requesters', IT_STAFF: 'IT Staff', ADMINISTRATOR: 'Administrators' };
@@ -2767,7 +3117,7 @@ export function StaffDashboardPage() {
   useEffect(() =&gt; { load(); }, [load]);
 
   if (loadState === 'loading') return &lt;p aria-busy="true"&gt;Loading dashboard…&lt;/p&gt;;
-  if (loadState === 'error' || !data) {
+  if (loadState === 'error' || !data || !currentUser) {
     return (
       &lt;div role="alert" className="alert alert-danger"&gt;
         &lt;p&gt;Failed to load dashboard.&lt;/p&gt;
@@ -2778,36 +3128,50 @@ export function StaffDashboardPage() {
 
   return (
     &lt;div&gt;
-      &lt;h1&gt;{currentUser?.role === 'ADMINISTRATOR' ? 'Administrator Dashboard' : 'IT Staff Dashboard'}&lt;/h1&gt;
+      &lt;h1&gt;{currentUser.role === 'ADMINISTRATOR' ? 'Administrator Dashboard' : 'IT Staff Dashboard'}&lt;/h1&gt;
       &lt;div className="row g-3 mb-3"&gt;
         {CARD_STATUSES.map((c) =&gt; (
           &lt;div key={c.key} className="col-6 col-md-3"&gt;
-            &lt;div className="card text-center"&gt;
+            &lt;Link to={`/staff/tickets?status=${c.key}`} className="card text-center text-decoration-none text-reset"&gt;
               &lt;div className="card-body"&gt;
                 &lt;p className="text-body-secondary small mb-1"&gt;{c.label}&lt;/p&gt;
                 &lt;p className="fs-2 mb-0"&gt;{data.statusCounts[c.key] ?? 0}&lt;/p&gt;
               &lt;/div&gt;
-            &lt;/div&gt;
+            &lt;/Link&gt;
           &lt;/div&gt;
         ))}
         &lt;div className="col-6 col-md-3"&gt;
-          &lt;div className="card text-center"&gt;
+          &lt;Link to={`/staff/tickets?ownerId=${currentUser.id}`} className="card text-center text-decoration-none text-reset"&gt;
             &lt;div className="card-body"&gt;
               &lt;p className="text-body-secondary small mb-1"&gt;Assigned to me&lt;/p&gt;
               &lt;p className="fs-2 mb-0"&gt;{data.ownedByMeCount}&lt;/p&gt;
             &lt;/div&gt;
-          &lt;/div&gt;
+          &lt;/Link&gt;
         &lt;/div&gt;
+      &lt;/div&gt;
+
+      {/* FR-08: IT Priority breakdown, not just status -- missing entirely from the first draft. */}
+      &lt;div className="row g-3 mb-3"&gt;
+        {CARD_PRIORITIES.map((p) =&gt; (
+          &lt;div key={p.key} className="col-6 col-md-3"&gt;
+            &lt;Link to={`/staff/tickets?itPriority=${p.key}`} className="card text-center text-decoration-none text-reset"&gt;
+              &lt;div className="card-body"&gt;
+                &lt;p className="text-body-secondary small mb-1"&gt;{p.label}&lt;/p&gt;
+                &lt;p className="fs-2 mb-0"&gt;{data.priorityCounts[p.key] ?? 0}&lt;/p&gt;
+              &lt;/div&gt;
+            &lt;/Link&gt;
+          &lt;/div&gt;
+        ))}
       &lt;/div&gt;
 
       &lt;div className="row g-3 mb-4"&gt;
         &lt;div className="col-6 col-md-3"&gt;
-          &lt;div className="card text-center"&gt;
+          &lt;Link to="/staff/tickets?ownerId=unassigned" className="card text-center text-decoration-none text-reset"&gt;
             &lt;div className="card-body"&gt;
               &lt;p className="text-body-secondary small mb-1"&gt;Unassigned&lt;/p&gt;
               &lt;p className="fs-2 mb-0"&gt;{data.unassignedCount}&lt;/p&gt;
             &lt;/div&gt;
-          &lt;/div&gt;
+          &lt;/Link&gt;
         &lt;/div&gt;
         {data.userCounts &amp;&amp; (
           &lt;div className="col-md-6"&gt;
@@ -2841,24 +3205,46 @@ export function StaffDashboardPage() {
     &lt;/div&gt;
   );
 }</code></pre>
-<div class="step"><label><input type="checkbox"> <strong>Step 5: Run test to verify it passes</strong></label></div>
-<p class="note">Run: <code>npm test --prefix client -- lab-04/StaffDashboardPage.test.tsx</code></p>
-<p class="note">Expected: PASS (all 3 tests)</p>
-<div class="step"><label><input type="checkbox"> <strong>Step 6: Commit</strong></label></div>
-<pre><code>git add client/src/pages/StaffDashboardPage.tsx client/tests/lab-04/StaffDashboardPage.test.tsx
-git commit -m "feat(lab-04): add IT Staff/Administrator Dashboard page"</code></pre>
+<div class="step"><label><input type="checkbox"> <strong>Step 4: Hydrate <code>StaffTicketQueuePage</code>'s initial filters from the URL</strong></label></div>
+<p>In <code>client/src/pages/StaffTicketQueuePage.tsx</code>, add <code>useSearchParams</code> to the existing import (currently <code>import { useNavigate } from 'react-router-dom';</code>):</p>
+<pre><code>import { useNavigate, useSearchParams } from 'react-router-dom';</code></pre>
+<p>Replace the <code>query</code> state's initializer. It currently reads:</p>
+<pre><code>  const [query, setQuery] = useState&lt;QueryState&gt;(DEFAULT_QUERY);</code></pre>
+<p>Change to:</p>
+<pre><code>  const [searchParams] = useSearchParams();
+  const [query, setQuery] = useState&lt;QueryState&gt;(() =&gt; {
+    const statusFromUrl = searchParams.getAll('status');
+    const itPriorityFromUrl = searchParams.get('itPriority');
+    const ownerIdFromUrl = searchParams.get('ownerId');
+    return {
+      ...DEFAULT_QUERY,
+      status: statusFromUrl.length &gt; 0 ? statusFromUrl : DEFAULT_QUERY.status,
+      itPriority: itPriorityFromUrl ?? DEFAULT_QUERY.itPriority,
+      ownerId: ownerIdFromUrl ?? DEFAULT_QUERY.ownerId,
+    };
+  });</code></pre>
+<p>Add the <code>const [searchParams] = useSearchParams();</code> line immediately after the existing <code>const navigate = useNavigate();</code> line.</p>
+<div class="step"><label><input type="checkbox"> <strong>Step 5: Run tests to verify they pass</strong></label></div>
+<p class="note">Run: <code>npm test --prefix client -- lab-04/StaffDashboardPage.test.tsx lab-04/StaffTicketQueuePage.hydration.test.tsx</code></p>
+<p class="note">Expected: PASS (5 + 3 tests)</p>
+<div class="step"><label><input type="checkbox"> <strong>Step 6: Run the full client suite to confirm no Lab 1-3 regression</strong></label></div>
+<p class="note">Run: <code>npm test --prefix client</code></p>
+<p class="note">Expected: PASS — <code>StaffTicketQueuePage</code>'s existing Lab 1-3 tests render it with no query string, which still resolves to <code>DEFAULT_QUERY</code> exactly as before.</p>
+<div class="step"><label><input type="checkbox"> <strong>Step 7: Commit</strong></label></div>
+<pre><code>git add client/src/pages/StaffDashboardPage.tsx client/src/pages/StaffTicketQueuePage.tsx client/tests/lab-04/StaffDashboardPage.test.tsx client/tests/lab-04/StaffTicketQueuePage.hydration.test.tsx
+git commit -m "feat(lab-04): add IT Staff/Administrator Dashboard page with IT Priority cards and filtered links"</code></pre>
 
-  <h3>Task 15: Routing and navigation — dashboards as landing pages</h3>
-  <p class="pathline">Modify: <code>client/src/App.tsx</code> &middot; Modify: <code>client/src/components/AppShell.tsx</code> &middot; Test: <code>client/tests/lab-04/AppShell.dashboards.test.tsx</code></p>
-  <div class="card"><ul><li>Consumes: <code>RequesterDashboardPage</code> (Task 13), <code>StaffDashboardPage</code> (Task 14).</li><li>Produces: routes <code>/dashboard</code> (Requester) and <code>/staff/dashboard</code> (IT Staff + Administrator); <code>HOME_ROUTE</code> now points every role at its dashboard; <code>/staff/*</code> becomes reachable by both <code>IT_STAFF</code> and <code>ADMINISTRATOR</code>.</li></ul></div>
-  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write the failing test</strong></label></div>
+  <h3>Task 15: Routing and navigation — dashboards as landing pages, everywhere the app decides where "home" is</h3>
+  <p class="pathline">Create: <code>client/src/lib/homeRoute.ts</code> (single source of truth for <code>HOME_ROUTE</code>) &middot; Modify: <code>client/src/App.tsx</code> &middot; Modify: <code>client/src/components/AppShell.tsx</code> &middot; Modify: <code>client/src/pages/LoginPage.tsx</code> &middot; Modify: <code>client/src/pages/ChangePasswordPage.tsx</code> &middot; Test: <code>client/tests/lab-04/AppShell.dashboards.test.tsx</code> &middot; Test: <code>client/tests/lab-04/LoginPage.dashboardRedirect.test.tsx</code> &middot; Test: <code>client/tests/lab-04/ChangePasswordPage.dashboardRedirect.test.tsx</code></p>
+  <div class="card"><ul><li>Consumes: <code>RequesterDashboardPage</code> (Task 13), <code>StaffDashboardPage</code> (Task 14).</li><li>Produces: <code>HOME_ROUTE</code> exported from <code>client/src/lib/homeRoute.ts</code>; routes <code>/dashboard</code> (Requester) and <code>/staff/dashboard</code> (IT Staff + Administrator); <code>/staff/*</code> becomes reachable by both <code>IT_STAFF</code> and <code>ADMINISTRATOR</code>.</li></ul></div>
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write the failing tests</strong></label></div>
+<pre><code>// client/src/lib/homeRoute.ts (referenced by the tests below before it's written -- see Step 3)</code></pre>
 <pre><code>// client/tests/lab-04/AppShell.dashboards.test.tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AppShell } from '../../src/components/AppShell';
 import { AuthContext } from '../../src/context/AuthContext';
-import * as dashboardApi from '../../src/api/dashboard';
 
 function renderShellAt(role: 'REQUESTER' | 'IT_STAFF' | 'ADMINISTRATOR', path: string) {
   render(
@@ -2901,7 +3287,7 @@ describe('AppShell — Lab 4 dashboard routing and nav', () =&gt; {
     await waitFor(() =&gt; expect(screen.getByText('Staff Dashboard Page')).toBeInTheDocument());
   });
 
-  it('an Administrator is still gated out of /staff/tickets is FALSE -- Administrator may also reach staff-only screens the same as IT Staff', async () =&gt; {
+  it('an Administrator may also reach staff-only screens the same as IT Staff (not just the dashboard)', async () =&gt; {
     renderShellAt('ADMINISTRATOR', '/staff/tickets');
     await waitFor(() =&gt; expect(screen.getByText('Staff Queue Page')).toBeInTheDocument());
   });
@@ -2916,16 +3302,132 @@ describe('AppShell — Lab 4 dashboard routing and nav', () =&gt; {
     await waitFor(() =&gt; expect(screen.getByText('Requester Dashboard Page')).toBeInTheDocument());
   });
 });</code></pre>
-<div class="step"><label><input type="checkbox"> <strong>Step 2: Run test to verify it fails</strong></label></div>
-<p class="note">Run: <code>npm test --prefix client -- lab-04/AppShell.dashboards.test.tsx</code></p>
-<p class="note">Expected: FAIL — no "Dashboard" nav link exists yet, <code>/staff/dashboard</code> redirects an Administrator away (current <code>requiredRoleFor</code> only admits <code>IT_STAFF</code> under <code>/staff</code>), <code>HOME_ROUTE.REQUESTER</code> is still <code>/tickets</code> not <code>/dashboard</code>.</p>
-<div class="step"><label><input type="checkbox"> <strong>Step 3: Update <code>AppShell.tsx</code></strong></label></div>
-<p>Replace <code>HOME_ROUTE</code>:</p>
-<pre><code>const HOME_ROUTE: Record&lt;string, string&gt; = {
+<pre><code>// client/tests/lab-04/LoginPage.dashboardRedirect.test.tsx
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { LoginPage } from '../../src/pages/LoginPage';
+import { AuthContext } from '../../src/context/AuthContext';
+import * as authApi from '../../src/api/auth';
+
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async () =&gt; {
+  const actual = await vi.importActual('react-router-dom');
+  return { ...actual, useNavigate: () =&gt; mockNavigate };
+});
+
+function renderPage() {
+  render(
+    &lt;AuthContext.Provider value={{ currentUser: null, isLoading: false, setCurrentUser: vi.fn(), logout: vi.fn() }}&gt;
+      &lt;MemoryRouter&gt;&lt;LoginPage /&gt;&lt;/MemoryRouter&gt;
+    &lt;/AuthContext.Provider&gt;,
+  );
+}
+
+describe('LoginPage — post-login destination (real navigate() target, not just AppShell HOME_ROUTE)', () =&gt; {
+  beforeEach(() =&gt; { vi.restoreAllMocks(); mockNavigate.mockClear(); });
+
+  it('navigates a Requester to /dashboard after login, not /tickets', async () =&gt; {
+    vi.spyOn(authApi, 'login').mockResolvedValue({
+      id: 'u-1', displayName: 'Ariya', email: 'requester@toktickit.local', role: 'REQUESTER', mustChangePassword: false,
+    });
+    renderPage();
+    fireEvent.change(screen.getByLabelText(/email address/i), { target: { value: 'requester@toktickit.local' } });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'DevPass123!' } });
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+    await waitFor(() =&gt; expect(mockNavigate).toHaveBeenCalledWith('/dashboard'));
+  });
+
+  it('navigates an IT Staff user to /staff/dashboard after login, not /staff/tickets', async () =&gt; {
+    vi.spyOn(authApi, 'login').mockResolvedValue({
+      id: 'u-2', displayName: 'Pakorn W.', email: 'itstaff2@toktickit.local', role: 'IT_STAFF', mustChangePassword: false,
+    });
+    renderPage();
+    fireEvent.change(screen.getByLabelText(/email address/i), { target: { value: 'itstaff2@toktickit.local' } });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'DevPass123!' } });
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+    await waitFor(() =&gt; expect(mockNavigate).toHaveBeenCalledWith('/staff/dashboard'));
+  });
+
+  it('navigates an Administrator to /staff/dashboard after login, not /admin/users', async () =&gt; {
+    vi.spyOn(authApi, 'login').mockResolvedValue({
+      id: 'u-3', displayName: 'System Admin', email: 'admin@toktickit.local', role: 'ADMINISTRATOR', mustChangePassword: false,
+    });
+    renderPage();
+    fireEvent.change(screen.getByLabelText(/email address/i), { target: { value: 'admin@toktickit.local' } });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'DevPass123!' } });
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+    await waitFor(() =&gt; expect(mockNavigate).toHaveBeenCalledWith('/staff/dashboard'));
+  });
+
+  it('still navigates a must-change-password user to /change-password, unaffected by the HOME_ROUTE change', async () =&gt; {
+    vi.spyOn(authApi, 'login').mockResolvedValue({
+      id: 'u-4', displayName: 'New Hire', email: 'onboarding@toktickit.local', role: 'IT_STAFF', mustChangePassword: true,
+    });
+    renderPage();
+    fireEvent.change(screen.getByLabelText(/email address/i), { target: { value: 'onboarding@toktickit.local' } });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'DevPass123!' } });
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+    await waitFor(() =&gt; expect(mockNavigate).toHaveBeenCalledWith('/change-password'));
+  });
+});</code></pre>
+<pre><code>// client/tests/lab-04/ChangePasswordPage.dashboardRedirect.test.tsx
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { ChangePasswordPage } from '../../src/pages/ChangePasswordPage';
+import { AuthContext } from '../../src/context/AuthContext';
+import * as authApi from '../../src/api/auth';
+
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async () =&gt; {
+  const actual = await vi.importActual('react-router-dom');
+  return { ...actual, useNavigate: () =&gt; mockNavigate };
+});
+
+function renderPage() {
+  render(
+    &lt;AuthContext.Provider value={{
+      currentUser: { id: 'u-4', displayName: 'New Hire', email: 'onboarding@toktickit.local', role: 'IT_STAFF', mustChangePassword: true },
+      isLoading: false, setCurrentUser: vi.fn(), logout: vi.fn(),
+    }}&gt;
+      &lt;MemoryRouter&gt;&lt;ChangePasswordPage /&gt;&lt;/MemoryRouter&gt;
+    &lt;/AuthContext.Provider&gt;,
+  );
+}
+
+describe('ChangePasswordPage — post-change destination (real navigate() target)', () =&gt; {
+  beforeEach(() =&gt; { vi.restoreAllMocks(); mockNavigate.mockClear(); });
+
+  it('navigates the now-IT_STAFF user to /staff/dashboard after a successful change, not /staff/tickets', async () =&gt; {
+    vi.spyOn(authApi, 'changePassword').mockResolvedValue({
+      id: 'u-4', displayName: 'New Hire', email: 'onboarding@toktickit.local', role: 'IT_STAFF', mustChangePassword: false,
+    });
+    renderPage();
+    fireEvent.change(screen.getByLabelText(/current \(temporary\) password/i), { target: { value: 'DevPass123!' } });
+    fireEvent.change(screen.getByLabelText(/^new password$/i), { target: { value: 'NewSecurePass456!' } });
+    fireEvent.change(screen.getByLabelText(/confirm new password/i), { target: { value: 'NewSecurePass456!' } });
+    fireEvent.click(screen.getByRole('button', { name: /continue/i }));
+    await waitFor(() =&gt; expect(mockNavigate).toHaveBeenCalledWith('/staff/dashboard'));
+  });
+});</code></pre>
+<div class="step"><label><input type="checkbox"> <strong>Step 2: Run tests to verify they fail</strong></label></div>
+<p class="note">Run: <code>npm test --prefix client -- lab-04/AppShell.dashboards.test.tsx lab-04/LoginPage.dashboardRedirect.test.tsx lab-04/ChangePasswordPage.dashboardRedirect.test.tsx</code></p>
+<p class="note">Expected: FAIL — no "Dashboard" nav link exists yet; <code>/staff/dashboard</code> redirects an Administrator away; the Login/ChangePassword tests fail because both pages' own local <code>HOME_ROUTE</code> copies still send every role to its old Lab 1-3 destination.</p>
+<div class="step"><label><input type="checkbox"> <strong>Step 3: Create the shared <code>HOME_ROUTE</code> module</strong></label></div>
+<pre><code>// client/src/lib/homeRoute.ts
+// Single source of truth for where each role lands: after login (LoginPage), after a mandatory
+// password change (ChangePasswordPage), and as the redirect target when a role tries a route it
+// isn't allowed on (AppShell). All three call sites import this -- do not let any of them
+// redeclare their own copy again, that's exactly the duplication this module fixes.
+export const HOME_ROUTE: Record&lt;string, string&gt; = {
   REQUESTER: '/dashboard',
   IT_STAFF: '/staff/dashboard',
   ADMINISTRATOR: '/staff/dashboard',
 };</code></pre>
+<div class="step"><label><input type="checkbox"> <strong>Step 4: Update <code>AppShell.tsx</code></strong></label></div>
+<p>Delete its local <code>HOME_ROUTE</code> declaration and import the shared one instead:</p>
+<pre><code>import { HOME_ROUTE } from '../lib/homeRoute';</code></pre>
 <p>Replace <code>requiredRoleFor</code> with a multi-role version and update its call site:</p>
 <pre><code>function requiredRolesFor(pathname: string): string[] | null {
   if (pathname.startsWith('/staff')) return ['IT_STAFF', 'ADMINISTRATOR'];
@@ -2985,21 +3487,29 @@ describe('AppShell — Lab 4 dashboard routing and nav', () =&gt; {
                     &lt;/li&gt;
                   &lt;/&gt;
                 )}</code></pre>
-<div class="step"><label><input type="checkbox"> <strong>Step 4: Update <code>App.tsx</code></strong></label></div>
+<div class="step"><label><input type="checkbox"> <strong>Step 5: Update <code>LoginPage.tsx</code> to import the shared <code>HOME_ROUTE</code></strong></label></div>
+<p>Delete its local <code>const HOME_ROUTE: Record&lt;string, string&gt; = {...}</code> declaration entirely and replace it with an import:</p>
+<pre><code>import { HOME_ROUTE } from '../lib/homeRoute';</code></pre>
+<p>Nothing else in the file changes — <code>navigate(user.mustChangePassword ? '/change-password' : HOME_ROUTE[user.role])</code> now resolves against the shared, dashboard-aware map.</p>
+<div class="step"><label><input type="checkbox"> <strong>Step 6: Update <code>ChangePasswordPage.tsx</code> to import the shared <code>HOME_ROUTE</code></strong></label></div>
+<p>Same change: delete its local <code>const HOME_ROUTE: Record&lt;string, string&gt; = {...}</code> declaration, replace with:</p>
+<pre><code>import { HOME_ROUTE } from '../lib/homeRoute';</code></pre>
+<p>Both of its own <code>HOME_ROUTE[...]</code> usages (the <code>!currentUser.mustChangePassword</code> early-return guard, and <code>navigate(HOME_ROUTE[user.role])</code> after a successful change) now resolve against the shared map.</p>
+<div class="step"><label><input type="checkbox"> <strong>Step 7: Update <code>App.tsx</code></strong></label></div>
 <p>Add the two imports next to the existing page imports and the two routes inside the existing <code>&lt;Route element={&lt;AppShell /&gt;}&gt;</code> block:</p>
 <pre><code>import { RequesterDashboardPage } from './pages/RequesterDashboardPage';
 import { StaffDashboardPage } from './pages/StaffDashboardPage';</code></pre>
 <pre><code>          &lt;Route path="/dashboard" element={&lt;RequesterDashboardPage /&gt;} /&gt;
           &lt;Route path="/staff/dashboard" element={&lt;StaffDashboardPage /&gt;} /&gt;</code></pre>
-<div class="step"><label><input type="checkbox"> <strong>Step 5: Run test to verify it passes</strong></label></div>
-<p class="note">Run: <code>npm test --prefix client -- lab-04/AppShell.dashboards.test.tsx</code></p>
-<p class="note">Expected: PASS (all 6 tests)</p>
-<div class="step"><label><input type="checkbox"> <strong>Step 6: Run the full client suite to confirm no Lab 1-3 regression</strong></label></div>
+<div class="step"><label><input type="checkbox"> <strong>Step 8: Run tests to verify they pass</strong></label></div>
+<p class="note">Run: <code>npm test --prefix client -- lab-04/AppShell.dashboards.test.tsx lab-04/LoginPage.dashboardRedirect.test.tsx lab-04/ChangePasswordPage.dashboardRedirect.test.tsx</code></p>
+<p class="note">Expected: PASS (6 + 4 + 1 tests)</p>
+<div class="step"><label><input type="checkbox"> <strong>Step 9: Run the full client suite to confirm no Lab 1-3 regression</strong></label></div>
 <p class="note">Run: <code>npm test --prefix client</code></p>
-<p class="note">Expected: PASS — check any existing <code>AppShell.test.tsx</code>/login-redirect test that hardcoded <code>HOME_ROUTE.REQUESTER === '/tickets'</code> or <code>HOME_ROUTE.ADMINISTRATOR === '/admin/users'</code>; if one exists and asserts the old destination, update its expected path to <code>/dashboard</code> / <code>/staff/dashboard</code> respectively — this is a deliberate, spec-required behavior change (§8's "IT Staff Dashboard... also the Administrator's landing page"), not a regression to work around.</p>
-<div class="step"><label><input type="checkbox"> <strong>Step 7: Commit</strong></label></div>
-<pre><code>git add client/src/App.tsx client/src/components/AppShell.tsx client/tests/lab-04/AppShell.dashboards.test.tsx
-git commit -m "feat(lab-04): route dashboards as landing pages, admit Administrator to /staff/*"</code></pre>
+<p class="note">Expected: PASS — any pre-existing Lab 1-3 <code>LoginPage.test.tsx</code>/<code>ChangePasswordPage.test.tsx</code>/<code>AppShell.test.tsx</code> that asserted the OLD destinations (<code>/tickets</code>, <code>/staff/tickets</code>, <code>/admin/users</code>) needs its expected path updated to the new dashboard routes — this is a deliberate, spec-required behavior change (§8's "IT Staff Dashboard... also the Administrator's landing page"), not a regression to work around. Update those assertions in place rather than skipping or deleting the tests.</p>
+<div class="step"><label><input type="checkbox"> <strong>Step 10: Commit</strong></label></div>
+<pre><code>git add client/src/lib/homeRoute.ts client/src/App.tsx client/src/components/AppShell.tsx client/src/pages/LoginPage.tsx client/src/pages/ChangePasswordPage.tsx client/tests/lab-04/AppShell.dashboards.test.tsx client/tests/lab-04/LoginPage.dashboardRedirect.test.tsx client/tests/lab-04/ChangePasswordPage.dashboardRedirect.test.tsx
+git commit -m "feat(lab-04): route dashboards as landing pages everywhere HOME_ROUTE is consulted, admit Administrator to /staff/*"</code></pre>
 
   <h3>Task 16: Final hardening and regression (Issue 6)</h3>
   <p class="pathline">No new source files. Touches whatever Steps 2-4 below surface as genuine regressions or visual gaps — there is no way to name those paths in advance; if a real bug is found, fix it in its own file with its own commit, not folded into this task's commit. &middot; Create: <code>docs/lab-04/test-run-2026-09-XX.md</code> (or update <code>docs/lab-04/tests.md</code> if that companion doc already exists by the time this task runs) recording the Playwright run's pass count and configuration, per the Definition of Done in specification.md §12.</p>
@@ -3023,6 +3533,188 @@ git commit -m "feat(lab-04): route dashboards as landing pages, admit Administra
 <div class="step"><label><input type="checkbox"> <strong>Step 6: Final commit</strong></label></div>
 <pre><code>git add docs/lab-04/test-run-2026-09-XX.md e2e/lab-04
 git commit -m "test(lab-04): document full regression pass and Playwright e2e run"</code></pre>
+
+  <h3>Task 17: Author the remaining Lab 4 companion docs required by the Definition of Done</h3>
+  <p class="pathline">Create: <code>docs/lab-04/api-spec.md</code> &middot; Create: <code>docs/lab-04/ui-spec.md</code> &middot; Create: <code>docs/lab-04/tests.md</code></p>
+  
+  <div class="step"><label><input type="checkbox"> <strong>Step 1: Write <code>docs/lab-04/api-spec.md</code></strong></label></div>
+<pre><code># TokTickIT REST API Contract (Lab 4)
+
+Mirrors `docs/lab-03/api-spec.md`'s structure and conventions exactly (error envelope, correlation
+id, role middleware — all unchanged from Lab 2-3, see that document for the shared baseline). This
+file covers only what Lab 4 adds or changes.
+
+## 1. Endpoints
+
+### 1.1 Requester
+
+| Method + path | Role | Success | Key errors |
+|---|---|---|---|
+| `GET /api/v1/tickets/:id/actions` | Requester, own Ticket | 200, list | 404 `TICKET_NOT_ACCESSIBLE` |
+| `GET /api/v1/dashboard` | Requester | 200, always (zeros when empty) | 401, 403 |
+
+### 1.2 IT Staff / Administrator
+
+| Method + path | Role | Success | Key errors |
+|---|---|---|---|
+| `GET /api/v1/staff/tickets/:id/actions` | IT Staff/Administrator | 200, list | 404 `TICKET_NOT_FOUND` |
+| `POST /api/v1/staff/tickets/:id/actions` | IT Staff/Administrator | 201, created record | 422 validation, 404, 409 `TICKET_LOCKED` |
+| `PATCH /api/v1/staff/tickets/:id/actions/:actionId` | IT Staff/Administrator | 200, updated record | 422 validation, 404 `TICKET_NOT_FOUND`/`ACTION_NOT_FOUND`, 409 `TICKET_LOCKED` |
+| `GET /api/v1/staff/dashboard` | IT Staff/Administrator | 200, always (zeros when empty); `userCounts` present only for Administrator | 401, 403 |
+
+### 1.3 Extended (existing Lab 3 endpoint, new failure mode)
+
+`PATCH /api/v1/staff/tickets/:id/status` gains 409 `RESOLUTION_REQUIRES_ACTION_TAKEN`, returned only
+when the target status is `RESOLVED` and the Ticket has zero `ActionTaken` records, checked after
+the existing transition-matrix and terminal-status checks (implemented in Task 6 of the Lab 4
+implementation plan). All prior Lab 1-3 responses from this endpoint are unchanged.
+
+### 1.4 Removed
+
+None. There is no delete endpoint for Action Taken (specification.md §10), and no write route exists
+in the Requester namespace for Action Taken at all.
+
+## 2. Request/Response DTOs
+</code></pre>
+<p>interface ActionTakenDto { id: string; ticketId: string; performedBy: { id: string; displayName: string }; lastEditedBy: { id: string; displayName: string } | null; actionAt: string;       // ISO 8601 UTC description: string; result: 'RESOLVED' | 'ESCALATED' | 'NO_ACTION_NEEDED' | 'PENDING_FOLLOW_UP'; followUpRequired: boolean; followUpNote: string | null; attachmentNotes: string | null; createdAt: string; updatedAt: string; }</p>
+<p>interface CreateOrUpdateActionTakenRequest { actionAt: string;        // ISO 8601, must not be in the future description: string;     // 1-2000 chars result: ActionTakenDto['result']; followUpRequired: boolean; followUpNote?: string;   // required, 1-1000 chars, when followUpRequired is true; ignored/cleared otherwise attachmentNotes?: string; // optional, up to 500 chars }</p>
+<p>interface RequesterDashboardResponse { statusCounts: Record&lt;TicketStatus, number&gt;; // all 8 keys, zero-filled recentTickets: { id: string; ticketNo: string; summary: string; status: string; updatedAt: string }[]; // up to 5 }</p>
+<p>interface StaffDashboardResponse { unassignedCount: number; ownedByMeCount: number; statusCounts: Record&lt;TicketStatus, number&gt;; priorityCounts: Record&lt;Priority, number&gt;; recentTickets: RequesterDashboardResponse['recentTickets']; userCounts?: Record&lt;'REQUESTER' | 'IT_STAFF' | 'ADMINISTRATOR', number&gt;; // Administrator caller only }</p>
+<pre><code>
+## 3. Endpoint notes a coding agent will otherwise get wrong
+
+- `performedBy` is set once, from the session, at create time, and never changes on edit — only
+  `lastEditedBy` changes (BR-03/BR-04). Never accept either from the request body.
+- The `RESOLUTION_REQUIRES_ACTION_TAKEN` gate counts `ActionTaken` rows regardless of `Result` value
+  — never filter by `result: 'RESOLVED'` (D-02).
+- `unassignedCount` is scoped to `ownerId = null AND status NOT IN (CLOSED, CANCELLED)`.
+  `ownedByMeCount` has no status qualifier at all — every status, including `CLOSED`/`CANCELLED`,
+  counts (FR-08 states no non-terminal restriction for this metric, unlike `unassignedCount`).
+- Neither dashboard endpoint accepts any query parameter; both are scoped entirely from the session
+  (BR-12).</code></pre>
+<div class="step"><label><input type="checkbox"> <strong>Step 2: Write <code>docs/lab-04/ui-spec.md</code></strong></label></div>
+<pre><code># TokTickIT — Lab 4 UI Specification
+
+Extends `docs/lab-03/ui-spec.md` — carried-over tokens, responsive breakpoints, and WCAG 2.2 AA rules
+are unchanged (see that document §1/§10). This file covers only what Lab 4 adds or changes.
+
+## 1. Requester Ticket Detail — Actions Taken addition (extends `docs/lab-03/ui-spec.md` §6)
+
+Read-only Actions Taken section below Public Comments: one row per record (performer, result badge,
+date/time, follow-up badge when applicable, description, follow-up note, attachment note,
+last-edited-by line), same field detail IT Staff sees (BR-11) — no create/edit control anywhere on
+this screen (`ActionsTakenReadOnlySection`, Lab 4 plan Task 9/10).
+
+## 2. IT Staff Ticket Detail — Actions Taken addition (extends `docs/lab-03/ui-spec.md` §8)
+
+Actions Taken section: list of existing records (same row layout as the Requester view, plus an Edit
+button per row), a "Record Action Taken" button opening a create form (Action Date/Time,
+Description, Result, Follow-Up Required checkbox revealing a Follow-up Note field, optional
+Attachment Notes), and the same form reused inline for editing a selected record. Both the create
+button and every row's Edit button are disabled when the ticket is Closed or Cancelled (BR-08).
+Save is disabled while the request is in flight, when Description is empty, when Follow-Up Required
+is checked with an empty note, or when Action Date/Time is empty (`ActionsTakenSection`, Lab 4 plan
+Task 7/8).
+
+The status-change control's rejection surfaces as a directed inline message — "This ticket cannot be
+marked Resolved yet — record an Action Taken first." — rather than a raw server error, whenever the
+server rejects with `RESOLUTION_REQUIRES_ACTION_TAKEN` (Lab 4 plan Task 8).
+
+## 3. Requester Dashboard (new route `/dashboard`, reached from primary navigation)
+
+Metric cards for Open, Waiting, Resolved, and Closed Ticket counts (each a zero-filled count, never
+omitted — FR-10), each linking into My Tickets pre-filtered to that status
+(`/tickets?status=&lt;STATUS&gt;`). A short recent-Tickets list (up to 5, most recently updated first).
+Quick actions: Create Ticket, View My Tickets. Matches labsheet §8.2 (`RequesterDashboardPage`, Lab
+4 plan Task 13).
+
+## 4. IT Staff Dashboard (new route `/staff/dashboard`, reached from primary navigation, also the
+   Administrator's landing page)
+
+Metric cards for New, Open, In Progress, Waiting Ticket counts, an Assigned-to-me count, an
+Unassigned count, and four IT Priority cards (Low/Medium/High/Urgent) — every card links into the
+Ticket Queue pre-filtered to match (`/staff/tickets?status=...`, `?itPriority=...`,
+`?ownerId=&lt;userId&gt;`, `?ownerId=unassigned`). A recent-Tickets list across all Requesters. Quick
+action: Go to Ticket Queue. The Administrator variant additionally shows a compact "User accounts by
+role" card. Matches labsheet §8.1 (`StaffDashboardPage`, Lab 4 plan Task 14).
+
+## 5. Primary Navigation (extends `docs/lab-02/ui-spec.md` §2 / `docs/lab-03/ui-spec.md` §5)
+
+Every role's nav gains a "Dashboard" link as the first item in its section, pointing at its own
+dashboard route. `HOME_ROUTE` (post-login landing, post-password-change landing, and the
+wrong-role redirect target) now points every role at its dashboard instead of its Lab 1-3 screen
+(`client/src/lib/homeRoute.ts`, Lab 4 plan Task 15).
+
+## 6. Responsive and Accessibility Rules
+
+Unchanged from Lab 2-3 (`docs/lab-03/ui-spec.md` §10) — applies to every new screen and section
+listed above, verified in Task 16's regression pass.</code></pre>
+<div class="step"><label><input type="checkbox"> <strong>Step 3: Write <code>docs/lab-04/tests.md</code></strong></label></div>
+<pre><code># Lab 4 Test Plan
+
+## 1. Test Strategy
+
+Same layering as Lab 2-3: Vitest+Supertest for server routes and services, Vitest+Testing Library
+for client components/pages, Playwright for end-to-end flows across all three roles. Every new
+server route and service function, and every new/modified client component, has its own dedicated
+test file under `server/tests/lab-04/` or `client/tests/lab-04/`, mirroring the existing
+`lab-02/`/`lab-03/` directory convention.
+
+## 2. Planned Tests (by file)
+
+| File | Covers |
+|---|---|
+| `server/tests/lab-04/actionTakenModel.test.ts` | Prisma schema round-trip: create/edit ActionTaken, `Ticket.updatedAt` untouched, `TicketEvent` accepts the new enum values |
+| `server/tests/lab-04/actionTakenRequest.validator.test.ts` | Create/edit request validation: result enum, description length, BR-05 follow-up-note rules, BR-07 future-date rejection, attachment-notes length |
+| `server/tests/lab-04/staffActions.api.test.ts` | Staff create/edit/list routes: AC-01, FR-04, BR-02/03/04, BR-06, BR-08, BR-14 on both create and edit, TicketEvent writes |
+| `server/tests/lab-04/requesterActions.api.test.ts` | Requester read-only route: AC-09, D-24-style 404 scoping, no write route exists |
+| `server/tests/lab-04/resolutionGate.api.test.ts` | AC-04/AC-05, D-02 (Result value never filtered), the RESOLVED-&gt;REOPENED-&gt;OPEN-&gt;IN_PROGRESS cycle, an Administrator caller satisfying the gate |
+| `server/tests/lab-04/dashboardMetrics.service.test.ts` | AC-02, AC-10, AC-12, BR-12, BR-13 (aggregate-only queries), FR-08's no-status-qualifier `ownedByMeCount` |
+| `server/tests/lab-04/dashboard.api.test.ts` | AC-02, AC-10, AC-11, AC-12, role gating on both dashboard routes, the widened `staffRouter` gate's effect on an existing Lab 3 route |
+| `client/tests/lab-04/datetimeLocal.test.ts` | Timezone-safe round-trip for the Action Date/Time picker |
+| `client/tests/lab-04/ActionsTakenSection.test.tsx` | Staff create/edit UI, BR-05 form validation, BR-11 field parity (attachmentNotes), locked-ticket disabling, empty-date-disables-Save regression guard |
+| `client/tests/lab-04/ActionsTakenReadOnlySection.test.tsx` | Requester read-only UI, BR-11 field parity (lastEditedBy) |
+| `client/tests/lab-04/StaffTicketDetailPage.actions.test.tsx` | Integration wiring, directed resolution-gate message keyed on `error.code` not message text |
+| `client/tests/lab-04/TicketDetailPage.actions.test.tsx` | Integration wiring for the Requester-facing read-only section |
+| `client/tests/lab-04/RequesterDashboardPage.test.tsx` | AC-12 zero-state, FR-10 filtered links |
+| `client/tests/lab-04/MyTicketsPage.hydration.test.tsx` | FR-10: My Tickets reads its initial filter from the dashboard link's URL |
+| `client/tests/lab-04/StaffDashboardPage.test.tsx` | FR-08 IT Priority cards, FR-09 Administrator-only userCounts card, FR-10 filtered links |
+| `client/tests/lab-04/StaffTicketQueuePage.hydration.test.tsx` | FR-10: Ticket Queue reads its initial filter (including the `ownerId=unassigned` special case) from the URL |
+| `client/tests/lab-04/AppShell.dashboards.test.tsx` | Nav links, widened `/staff/*` role gate, wrong-role redirect targets |
+| `client/tests/lab-04/LoginPage.dashboardRedirect.test.tsx` | Real post-login `navigate()` target per role, must-change-password path unaffected |
+| `client/tests/lab-04/ChangePasswordPage.dashboardRedirect.test.tsx` | Real post-password-change `navigate()` target |
+| `e2e/lab-04/lab4-flows.spec.ts` | End-to-end: record an Action Taken then resolve; reject a resolve attempt with zero records; both dashboards render after login |
+
+## 3. Acceptance-Criterion Traceability
+
+Every AC-01..AC-13 from specification.md §11 maps to at least one test above (AC-01/AC-03/AC-04
+through AC-11 each named explicitly in the table; AC-02 and AC-12 appear twice, once server-side and
+once client-side; AC-13, the full Lab 1-3 regression, is Task 16's own full-suite run, not a single
+new test file).
+
+## 4. Responsive and Visual Checklist
+
+See specification.md §12's Definition of Done and Task 16 Step 4 of the Lab 4 implementation plan:
+desktop/tablet/mobile pass on both new dashboard pages and both new Actions Taken sections, no
+console errors, no placeholder text, no clipped or overlapping controls, every dashboard link
+verified to navigate to its correctly-filtered detailed screen.
+
+## 5. Test Commands
+</code></pre>
+<p>npm test --prefix server npm test --prefix client npm run test:e2e -- --workers=1 --timeout=60000</p>
+<pre><code>
+## 6. Known Limitations or Deferred Tests
+
+- The e2e flakiness noted in Lab 3's close-out (never a clean 36/36 on this machine, all failures
+  `page.goto` timeouts not assertions) is re-run under Lab 4 per Task 16 Step 3; its documented
+  result lives in `docs/lab-04/test-run-*.md` once that task executes, not in this file.
+- No test exercises concurrent Action Taken edits from two IT Staff members racing on the same
+  record — out of scope per D-04 (no optimistic-concurrency headers on any Lab 4 endpoint).</code></pre>
+<div class="step"><label><input type="checkbox"> <strong>Step 4: Verify internal consistency</strong></label></div>
+<p>Cross-check: every endpoint in <code>api-spec.md</code> §1 matches a route Task 4/5/6/12 actually creates; every screen in <code>ui-spec.md</code> matches a component Task 7-10/13-15 actually creates; every test file in <code>tests.md</code> §2 matches a file some earlier task actually creates. Fix any drift found (there should be none, since this task only transcribes facts already fixed by Tasks 1-16 — but the check itself, run by hand against the plan's own task list, is what "internally consistent with the shipped code" in specification.md §12's Definition of Done actually requires).</p>
+<div class="step"><label><input type="checkbox"> <strong>Step 5: Commit</strong></label></div>
+<pre><code>git add docs/lab-04/api-spec.md docs/lab-04/ui-spec.md docs/lab-04/tests.md
+git commit -m "docs(lab-04): author api-spec, ui-spec, and tests companion docs per Definition of Done"</code></pre>
 
 
 </div>
