@@ -441,11 +441,15 @@ tests,reviewer,ai-use}.md` are all committed and internally consistent with the 
 - **D-06** Creating or editing an Action Taken does not update the parent Ticket's `updatedAt`, for
   consistency with how Comments and Internal Notes already behave in Lab 3; "recently updated" on
   both dashboards is defined as a change to the Ticket's own status, owner, or IT Priority fields.
-- **D-07 (UNRESOLVED, needs instructor confirmation)** Append-only reading for the Lab 4 answer
-  sheet, Part 7. This is the team's working interpretation, not an approved rule: Public Comments,
-  Internal Notes and the `TicketEvent` audit trail are append-only, while Action Taken stays editable
-  because labsheet 8.3 requires an edit mode. Its protection is that `performedBy` is frozen,
-  `lastEditedBy` is recorded, every create and edit writes a `TicketEvent`, and nothing is deleted.
-  No approved source exists yet: Issue #52 has no clarification. Until the instructor confirms or
-  corrects the reading, treat it as open. API-06, API-10 and API-45 are planned tests for the
-  reading, not evidence that it was approved.
+- **D-07** Append-only reading for the Lab 4 answer sheet, Part 7. The Lab 4 handout uses the word
+  once, in the grading row for Answer Part 7, "Working Ticket Workflow": "Demonstrate permitted Ticket
+  transitions, stable ordering, append-only behavior, and role-appropriate visibility." The row sits
+  under Ticket Workflow, not under Actions Taken, and the same handout requires Actions Taken to have
+  a "view/edit mode" (section 8.3). Read together, the append-only record is the Ticket's workflow
+  trail: the `TicketEvent` entries written for every status change and for every Action Taken create
+  and edit, together with the append-only Public Comments and Internal Notes inherited from Lab 3.
+  Action Taken rows stay editable, with `performedBy` frozen, `lastEditedBy` recorded, a
+  `TicketEvent` per create and edit, and no delete. Source: Lab 4 handout, section 8.3 and the Answer
+  Part 7 row. The handout does not define the term further and Issue #52 adds nothing, so this is a
+  reading grounded in the handout text, not an instructor ruling. If the instructor says otherwise,
+  D-07, API-45 and API-10 change together.
