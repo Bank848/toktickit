@@ -52,6 +52,7 @@ There is no delete endpoint for Action Taken. The Requester namespace has no wri
   "followUpRequired": true,
   "followUpNote": "Check the link again on Monday.",
   "attachmentNotes": "Photo shared on the team LINE group.",
+  "etag": "\"2026-09-22T09:41:12.000Z\"",
   "createdAt": "2026-09-22T09:41:12.000Z",
   "updatedAt": "2026-09-22T09:41:12.000Z"
 }
@@ -92,7 +93,7 @@ There is no delete endpoint for Action Taken. The Requester namespace has no wri
 }
 ```
 
-- `userCounts` is present **only** for an Administrator caller. For an IT Staff caller the field is
+- `userCounts` counts only accounts with `isActive = true`, per role. It is present **only** for an Administrator caller. For an IT Staff caller the field is
   absent entirely, not `null` (AC-11).
 - Every key in `statusCounts` (all 8 statuses), `priorityCounts` (all 4 priorities) and `userCounts`
   (all 3 roles) is always present and zero-filled, never omitted (FR-10, AC-12).
@@ -169,8 +170,12 @@ passes on its earlier records. Transitions that do not target `RESOLVED` never r
 
 ### 4.4 Stale-write protection (`If-Match`)
 
-Every `ActionTakenDto` and the staff Ticket detail response carry an `ETag` header whose value is the
-record's `updatedAt` as a quoted ISO-8601 string, for example `"2026-09-22T09:41:12.000Z"`.
+The validator is a body field, not only a header, because one list response holds many records and
+a single `ETag` header cannot carry a different value for each. Every `ActionTakenDto` has an `etag`
+field and the staff Ticket detail response has one for the Ticket. The value is the record's `updatedAt`
+as a quoted ISO-8601 string, for example `"2026-09-22T09:41:12.000Z"` (the quotes are part of the
+value). The client copies the record's own `etag` into the `If-Match` request header. The single-record
+responses (`POST`, `PATCH`) also send the same value as an `ETag` header.
 
 - `PATCH .../actions/:actionId` **requires** `If-Match`. Missing header: 428 `PRECONDITION_REQUIRED`.
   Value different from the stored `updatedAt`: 409 `STALE_UPDATE`, nothing written. The check and the
@@ -178,7 +183,11 @@ record's `updatedAt` as a quoted ISO-8601 string, for example `"2026-09-22T09:41
   match; zero rows changed means stale), so two editors cannot both win.
 - `PATCH .../status` **honors** `If-Match` against `Ticket.updatedAt` when sent (Lab 3 callers that
   omit it keep working, AC-13); the Lab 4 client always sends it. Mismatch: 409 `STALE_UPDATE`,
-  Ticket unchanged. The existing transition-matrix check still runs on the current state.
+  Ticket unchanged. The existing transition-matrix check still runs on the current state. The
+  compare and the write are atomic: the transition is one conditional update on the Ticket
+  (`updateMany` where `id`, the current status and `updatedAt` match) inside the same transaction that
+  inserts the `TicketEvent`; zero rows changed means 409 `STALE_UPDATE`. Two requests carrying the
+  same `If-Match` therefore cannot both succeed.
 - On `STALE_UPDATE` the client reloads the record and shows it to the user instead of overwriting.
 - Creating an Action Taken needs no `If-Match`: it never overwrites existing state.
 

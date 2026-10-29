@@ -11,14 +11,18 @@ contract is documentation only.
 
 - `server/tests/lab-04/actionTakenModel.test.ts` — schema and audit-event behavior
 - `server/tests/lab-04/actionTakenRequest.validator.test.ts` — request validator, pure unit tests
-- `server/tests/lab-04/staffActions.api.test.ts` — staff create, edit, list
-- `server/tests/lab-04/requesterActions.api.test.ts` — Requester read-only route
-- `server/tests/lab-04/resolutionGate.api.test.ts` — FR-06/BR-09 gate on the status endpoint
+- `server/tests/lab-04/actions-taken.api.test.ts` — staff create, edit, list and the Requester
+  read-only route (handout path)
+- `server/tests/lab-04/ticket-workflow.api.test.ts` — FR-06/BR-09 gate and `If-Match` on the status
+  endpoint (handout path)
+- `server/tests/lab-04/requester-dashboard.api.test.ts` — `GET /dashboard` and scoping (handout path)
+- `server/tests/lab-04/staff-dashboard.api.test.ts` — `GET /staff/dashboard`, `userCounts` (handout path)
 - `server/tests/lab-04/dashboardMetrics.service.test.ts` — metric queries, service level
-- `server/tests/lab-04/dashboard.api.test.ts` — dashboard routes and scoping
 - `client/tests/lab-04/*.test.tsx` — Actions Taken sections, both dashboards, URL filter hydration,
   detail-page integration, datetime helper
-- `e2e/lab-04/*.spec.ts` — Playwright flows (Issue #57)
+- `e2e/lab-04/actions-taken-flow.spec.ts` and `e2e/lab-04/ticket-resolution.spec.ts` — the handout's
+  required Playwright files; `e2e/lab-04/dashboards.spec.ts` and `visual-states.spec.ts` are added
+  beside them (Issue #57)
 
 **Regression rule.** AC-13 is proven by running the complete Lab 1-3 suites (`server/tests/lab-0[1-3]`,
 `client/tests/lab-0[1-3]`, `e2e/lab-0[1-3]`) unchanged against the Lab 4 codebase. One Lab 3 test is
@@ -59,13 +63,13 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | UNIT-17 | FR-08 | Owned-by-me count | Counts every status including `CLOSED` and `CANCELLED` | same | Issue #56 |
 | UNIT-18 | BR-12 | Two staff users | Each sees their own owned-by-me count | same | Issue #56 |
 | UNIT-19 | FR-08 | Status and priority counts | Span all Requesters, zero-filled | same | Issue #56 |
-| UNIT-20 | FR-09, AC-11 | `userCounts` flag | Present only when requested, all 3 roles zero-filled | same | Issue #56 |
+| UNIT-20 | FR-09, AC-11 | `userCounts` flag | Present only when requested, all 3 roles zero-filled, an inactive user of each role never counted | same | Issue #56 |
 
 ### 2.2 API
 
 | ID | Requirement / AC | What it tests | Expected result | File | Status |
 |---|---|---|---|---|---|
-| API-01 | FR-01, FR-04, AC-01 | IT Staff creates an Action Taken | 201; `performedBy` is the session user | `staffActions.api.test.ts` | Issue #53 |
+| API-01 | FR-01, FR-04, AC-01 | IT Staff creates an Action Taken | 201; `performedBy` is the session user | `actions-taken.api.test.ts` | Issue #53 |
 | API-02 | FR-04 | Body carries a foreign `performedById` | Ignored; session user stored | same | Issue #53 |
 | API-03 | FR-01 | Invalid body | 422, nothing created | same | Issue #53 |
 | API-04 | BR-01 | Create on an unknown Ticket | 404 `TICKET_NOT_FOUND` | same | Issue #53 |
@@ -79,10 +83,10 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | API-12 | BR-06 | Create with `attachmentNotes` | No `Attachment` row created | same | Issue #53 |
 | API-13 | §10 #2 | List on a Ticket | Oldest first | same | Issue #53 |
 | API-14 | §7 | Requester calls a staff actions route | 403 `FORBIDDEN_ROLE` | same | Issue #53 |
-| API-15 | FR-03, BR-11, AC-09 | Requester lists an owned Ticket's actions | Every field of every record visible | `requesterActions.api.test.ts` | Issue #53 |
+| API-15 | FR-03, BR-11, AC-09 | Requester lists an owned Ticket's actions | Every field of every record visible | `actions-taken.api.test.ts` | Issue #53 |
 | API-16 | D-24 | Requester reads another user's Ticket | 404 `TICKET_NOT_ACCESSIBLE`, same body as unknown id | same | Issue #53 |
 | API-17 | AC-09 | Requester `POST` and `PATCH` on their actions path | 404, not 403 or 405 | same | Issue #53 |
-| API-18 | FR-06, BR-09, AC-04 | `RESOLVED` with zero actions | 409 `RESOLUTION_REQUIRES_ACTION_TAKEN`, status unchanged | `resolutionGate.api.test.ts` | Issue #55 |
+| API-18 | FR-06, BR-09, AC-04 | `RESOLVED` with zero actions | 409 `RESOLUTION_REQUIRES_ACTION_TAKEN`, status unchanged | `ticket-workflow.api.test.ts` | Issue #55 |
 | API-19 | AC-05 | `RESOLVED` from `IN_PROGRESS` with one action | 200 | same | Issue #55 |
 | API-20 | AC-05 | `RESOLVED` from `WAITING_FOR_REQUESTER` with one action | 200 | same | Issue #55 |
 | API-21 | D-02 | Only action has `result` `ESCALATED` | 200; gate ignores `result` | same | Issue #55 |
@@ -90,26 +94,27 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | API-23 | §5 | Any transition not targeting `RESOLVED`, zero actions | Unaffected | same | Issue #55 |
 | API-24 | §5 | `RESOLVED` → `REOPENED` → `OPEN` → `IN_PROGRESS` → `RESOLVED` | Second pass satisfied by the earlier record | same | Issue #55 |
 | API-25 | FR-01, §7 | Administrator creates an action and resolves a Ticket | Same behavior as IT Staff | same | Issue #55 |
-| API-26 | AC-12, FR-10 | New Requester calls `GET /dashboard` | Every count 0, `recentTickets` is `[]` | `dashboard.api.test.ts` | Issue #56 |
-| API-27 | AC-02, FR-07 | Requester dashboard with mixed data | Only own Tickets counted and listed | same | Issue #56 |
-| API-28 | §7 | IT Staff on `/dashboard`; Requester on `/staff/dashboard` | 403 both | same | Issue #56 |
-| API-29 | AC-10, FR-08 | IT Staff dashboard unassigned count | Matches direct count | same | Issue #56 |
-| API-30 | AC-11 | IT Staff caller | No `userCounts` key | same | Issue #56 |
-| API-31 | AC-11, FR-09 | Administrator caller | `userCounts` with 3 roles | same | Issue #56 |
-| API-32 | BR-12 | `?requesterId=` and `?userId=` query overrides | Ignored on both routes | same | Issue #56 |
+| API-26 | AC-12, FR-10 | New Requester calls `GET /dashboard` | Every count 0, `recentTickets` is `[]` | `requester-dashboard.api.test.ts` | Issue #56 |
+| API-27 | AC-02, FR-07 | Requester dashboard with mixed data | Only own Tickets counted and listed | `requester-dashboard.api.test.ts` | Issue #56 |
+| API-28 | §7 | IT Staff on `/dashboard`; Requester on `/staff/dashboard` | 403 both | `requester-dashboard.api.test.ts`, `staff-dashboard.api.test.ts` | Issue #56 |
+| API-29 | AC-10, FR-08 | IT Staff dashboard unassigned count | Matches direct count | `staff-dashboard.api.test.ts` | Issue #56 |
+| API-30 | AC-11 | IT Staff caller | No `userCounts` key | `staff-dashboard.api.test.ts` | Issue #56 |
+| API-31 | AC-11, FR-09 | Administrator caller, with one inactive account seeded per role | `userCounts` with 3 roles counting `isActive = true` accounts only | `staff-dashboard.api.test.ts` | Issue #56 |
+| API-32 | BR-12 | `?requesterId=` and `?userId=` query overrides | Ignored on both routes | `requester-dashboard.api.test.ts`, `staff-dashboard.api.test.ts` | Issue #56 |
 | API-33 | §7 | Administrator reaches existing staff write routes | Allowed after the gate widened to `IT_STAFF` or `ADMINISTRATOR` | same | Issue #56 |
 | API-34 | AC-13 | Lab 3 valid-transition table with the gate in place | Every row still passes (RESOLVED rows seed one action) | `server/tests/lab-03/staffTicketStatus.api.test.ts` | Issue #55 |
 | API-35 | §9.5 | Lab 4 migration over Lab 3 seeded data | Every Lab 3 row and id intact; Tickets have zero actions | `server/tests/lab-04/migration.test.ts` | Issue #53 |
-| API-37 | 6.1, api-spec 4.4 | `PATCH` an action with an `If-Match` older than the stored `updatedAt` | 409 `STALE_UPDATE`, record unchanged | `staffActions.api.test.ts` | Issue #53 |
+| API-37 | 6.1, api-spec 4.4 | List response carries a distinct `etag` per record; `PATCH` an action with an `If-Match` older than the stored `updatedAt` | 409 `STALE_UPDATE`, record unchanged | `actions-taken.api.test.ts` | Issue #53 |
 | API-38 | 6.1 | Two editors `PATCH` the same action with the same `If-Match`, sent together | Exactly one 200 and one 409; the stored record equals the 200 body | same | Issue #53 |
 | API-39 | 6.1 | `PATCH` an action with no `If-Match` | 428 `PRECONDITION_REQUIRED`, record unchanged | same | Issue #53 |
-| API-40 | 6.1 | Status change to `IN_PROGRESS` with a stale `If-Match`, after another user changed the Ticket | 409 `STALE_UPDATE`, status unchanged; the same call without the header still follows Lab 3 rules | `resolutionGate.api.test.ts` | Issue #55 |
-| API-41 | 8.5, api-spec 4.5 | `POST` the same body twice with the same `Idempotency-Key` (second call simulates a retry after a lost response) | 201 then 200 with `Idempotent-Replayed: true`; one row, one `ACTION_TAKEN_ADDED` event | `staffActions.api.test.ts` | Issue #53 |
+| API-40 | 6.1 | Status change to `IN_PROGRESS` with a stale `If-Match`, after another user changed the Ticket | 409 `STALE_UPDATE`, status unchanged; the same call without the header still follows Lab 3 rules | `ticket-workflow.api.test.ts` | Issue #55 |
+| API-41 | 8.5, api-spec 4.5 | `POST` the same body twice with the same `Idempotency-Key` (second call simulates a retry after a lost response) | 201 then 200 with `Idempotent-Replayed: true`; one row, one `ACTION_TAKEN_ADDED` event | `actions-taken.api.test.ts` | Issue #53 |
 | API-42 | 8.5 | `POST` twice at the same time with one key | One row; both calls return the same record id | same | Issue #53 |
 | API-43 | 8.5 | Same key with a different body; `POST` with no key | 409 `IDEMPOTENCY_KEY_REUSED`; 428 `PRECONDITION_REQUIRED`; nothing written | same | Issue #53 |
-| API-44 | 5.2, spec 9.5.1 | Apply the migration, add records, run `down.sql`, then re-apply | After rollback Lab 3 rows are intact and `ActionTaken` is gone; after re-apply the schema equals the original and a `pg_dump` restore brings the records back | `server/tests/lab-04/migration.recovery.test.ts` | Issue #53 |
-| API-45 | Part 7, D-07 | Edit an action twice | `performedBy` never changes, `lastEditedBy` is the latest editor, two `ACTION_TAKEN_UPDATED` events exist, no delete route | `staffActions.api.test.ts` | Issue #53 |
-| API-46 | Part 7 | Two actions and two Tickets inserted with identical `createdAt` / `updatedAt` | Action list order is stable by `id` ascending; `recentTickets` is stable by `id` descending over repeated calls | `staffActions.api.test.ts`, `dashboard.api.test.ts` | Issue #53, #56 |
+| API-44 | 5.2, spec 9.5.1 | Failed apply: run the migration with a deliberately broken last statement in a disposable schema; then apply, add records, run `down.sql`, and re-apply | After the failed apply no new table, enum or index remains and a clean retry succeeds; after rollback Lab 3 rows are intact and `ActionTaken` is gone; after re-apply the schema equals the original and a `pg_dump` restore brings the records back | `server/tests/lab-04/migration.recovery.test.ts` | Issue #53 |
+| API-47 | 6.1, api-spec 4.4 | Two `PATCH ../status` requests sent together with the same `If-Match` and valid transitions | Exactly one 200 and one 409 `STALE_UPDATE`; one `TicketEvent`; the Ticket equals the 200 body | `ticket-workflow.api.test.ts` | Issue #55 |
+| API-45 | Part 7, D-07 | Edit an action twice | `performedBy` never changes, `lastEditedBy` is the latest editor, two `ACTION_TAKEN_UPDATED` events exist, no delete route | `actions-taken.api.test.ts` | Issue #53 |
+| API-46 | Part 7 | Two actions and two Tickets inserted with identical `createdAt` / `updatedAt` | Action list order is stable by `id` ascending; `recentTickets` is stable by `id` descending over repeated calls | `actions-taken.api.test.ts`, `requester-dashboard.api.test.ts`, `staff-dashboard.api.test.ts` | Issue #53, #56 |
 | PERF-01 | 10 | Seed 2,000 Tickets and 5,000 Action Taken records in `toktickit_test`; call `GET /dashboard`, `GET /staff/dashboard` and the staff actions list 30 times each | 95th percentile under 500 ms on the dev machine; query count per dashboard call is constant (no per-Ticket query) | `server/tests/lab-04/performance.smoke.test.ts` | Issue #57 |
 | API-36 | §9.6 | Seed verification script | Required seed Tickets present (zero, one, many actions; follow-up; every status and priority) | `server/prisma/verify-seed-lab4.ts` | Issue #53 |
 
@@ -155,9 +160,9 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 
 | ID | Requirement / AC | Flow | Expected result | File | Status |
 |---|---|---|---|---|---|
-| E2E-01 | AC-01, AC-03 | IT Staff records an Action Taken; a second IT Staff edits it | Both visible; performer unchanged, editor shown | `e2e/lab-04/action-taken.spec.ts` | Issue #54 |
-| E2E-02 | AC-04, AC-05 | Resolve with no action → rejection message → record action → resolve | Message first, then success | `e2e/lab-04/resolution-gate.spec.ts` | Issue #55 |
-| E2E-03 | AC-09 | Requester opens an owned Ticket | Actions visible, no create or edit control | `e2e/lab-04/requester-actions.spec.ts` | Issue #54 |
+| E2E-01 | AC-01, AC-03 | IT Staff records an Action Taken; a second IT Staff edits it | Both visible; performer unchanged, editor shown | `e2e/lab-04/actions-taken-flow.spec.ts` | Issue #54 |
+| E2E-02 | AC-04, AC-05 | Resolve with no action → rejection message → record action → resolve | Message first, then success | `e2e/lab-04/ticket-resolution.spec.ts` | Issue #55 |
+| E2E-03 | AC-09 | Requester opens an owned Ticket | Actions visible, no create or edit control | `e2e/lab-04/actions-taken-flow.spec.ts` | Issue #54 |
 | E2E-04 | AC-02, FR-10 | Requester signs in, lands on dashboard, clicks a card | Filtered My Tickets | `e2e/lab-04/dashboards.spec.ts` | Issue #56 |
 | E2E-05 | AC-10, AC-11, FR-09 | IT Staff and Administrator dashboards | Counts match seed; only Administrator sees user counts | same | Issue #56 |
 | E2E-06 | AC-13 | Full Lab 1-3 Playwright suite | Same pass count as before Lab 4 | `e2e/lab-0[1-3]/*` | Issue #57 |
@@ -191,7 +196,7 @@ Every requirement appears in at least one row above.
 | BR-11 | API-15, CMP-08, CMP-12 |
 | BR-12, BR-13 | UNIT-14, UNIT-18, API-32 |
 | BR-14, D-06 | UNIT-11, API-11 |
-| Stale update (6.1) | API-37 to API-40 |
+| Stale update (6.1) | API-37 to API-40, API-47 |
 | Retry safety (8.5) | API-41 to API-43 |
 | Migration recovery (5.2) | API-44 |
 | Append-only reading, ordering (Part 7) | API-45, API-46 |

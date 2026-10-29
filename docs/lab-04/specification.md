@@ -326,9 +326,13 @@ is required.
 
 ### 9.5.1 Recovery from a failed or rolled-back migration
 
-- **Failed apply.** Prisma runs the migration in one transaction on PostgreSQL, so a failure leaves
-  no partial table. Fix the cause and re-run `prisma migrate deploy`; if `_prisma_migrations` shows the
-  row as failed, mark it with `prisma migrate resolve --rolled-back <name>` first.
+- **Failed apply.** Prisma Migrate does not add a transaction around a PostgreSQL migration by
+  itself, so the Lab 4 `migration.sql` starts with `BEGIN;` and ends with `COMMIT;`. A failing
+  statement then rolls back every earlier statement and leaves no partial object. Fix the cause, run
+  `prisma migrate resolve --rolled-back <name>` if `_prisma_migrations` shows the row as failed, then
+  re-run `prisma migrate deploy`. If a partial schema is ever found anyway (for example a migration
+  edited later without the wrapper), inspect it with `\d "ActionTaken"` and `\dT`, drop the leftover
+  objects by hand, and only then resolve and retry; the retry must never run against a partial schema.
 - **Deliberate rollback.** `server/prisma/migrations/<name>/down.sql` (kept beside the migration)
   drops `ActionTaken` and the `ActionResult` enum, then removes the two Lab 4 indexes on `Ticket`. The
   three `TicketEventType` values stay, because PostgreSQL cannot drop an enum value in place; they are
@@ -336,7 +340,7 @@ is required.
 - **New Action Taken records.** A rollback deletes them with the table. Before running `down.sql`,
   export them with `pg_dump --data-only --table="ActionTaken"`; re-applying the migration and
   restoring that file brings them back. Lab 1-3 rows are never touched in either direction.
-- Proved by API-44 (tests.md): apply, add records, roll back, check Lab 3 data, re-apply.
+- Proved by API-44 (tests.md): failed apply with a deliberately broken last statement leaves no object; apply, add records, roll back, check Lab 3 data, re-apply.
 
 ### 9.6 Seed data
 
@@ -377,8 +381,8 @@ write route exists there at all for a Requester to be rejected from.
 Both dashboard endpoints accept no query parameters. Neither accepts a user id, date range, or
 filter from the client; `GET /api/v1/dashboard` is always scoped to the caller's own session, and
 `GET /api/v1/staff/dashboard`'s `ownedByMe` count is always scoped the same way. An Administrator
-calling `GET /api/v1/staff/dashboard` additionally receives a `userCounts` object; an IT Staff caller
-does not.
+calling `GET /api/v1/staff/dashboard` additionally receives a `userCounts` object counting only
+accounts with `isActive = true`; an IT Staff caller does not.
 
 ## 11. Acceptance Criteria
 
@@ -437,9 +441,11 @@ tests,reviewer,ai-use}.md` are all committed and internally consistent with the 
 - **D-06** Creating or editing an Action Taken does not update the parent Ticket's `updatedAt`, for
   consistency with how Comments and Internal Notes already behave in Lab 3; "recently updated" on
   both dashboards is defined as a change to the Ticket's own status, owner, or IT Priority fields.
-- **D-07** Append-only reading for the Lab 4 answer sheet, Part 7: Public Comments, Internal Notes and
-  the `TicketEvent` audit trail are append-only (no edit, no delete). Action Taken is not append-only,
-  because labsheet §8.3 requires an edit mode; its protection is that `performedBy` is frozen, `lastEditedBy`
-  is recorded, every create and edit writes a `TicketEvent`, and nothing is deleted. Evidence: API-06,
-  API-10, API-45. No Lab 4 clarification exists in Issue #52, so this reading is stated here for the
-  reviewer and instructor to confirm.
+- **D-07 (UNRESOLVED, needs instructor confirmation)** Append-only reading for the Lab 4 answer
+  sheet, Part 7. This is the team's working interpretation, not an approved rule: Public Comments,
+  Internal Notes and the `TicketEvent` audit trail are append-only, while Action Taken stays editable
+  because labsheet 8.3 requires an edit mode. Its protection is that `performedBy` is frozen,
+  `lastEditedBy` is recorded, every create and edit writes a `TicketEvent`, and nothing is deleted.
+  No approved source exists yet: Issue #52 has no clarification. Until the instructor confirms or
+  corrects the reading, treat it as open. API-06, API-10 and API-45 are planned tests for the
+  reading, not evidence that it was approved.
