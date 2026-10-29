@@ -84,13 +84,14 @@ detailed screens; both dashboards link out to them.
 - Real file upload behind an Action Taken's Attachment Notes; the field is a text hint only, and the
   existing Attachment model is untouched
 - Follow-up due dates, reminders, or assignment of a follow-up to a specific user
-- Optimistic-concurrency (`If-Match`/version) headers on any Lab 4 endpoint; `Ticket.version` remains
-  the unused column it already was in Lab 1-3, and duplicate-submit protection stays a client-side
-  concern (disable the submit control while a request is in flight), matching the existing Comment
-  and Attachment forms
+- A Ticket-wide revision counter: `Ticket.version` remains the unused column it already was in
+  Lab 1-3. Stale-write protection uses an `If-Match` precondition built from `updatedAt` instead
+  (api-spec.md §4.4 and §4.5)
 - Writing `Ticket.resolutionSummary` or `Ticket.requesterResolutionConfirmedAt`; both remain the
   unused columns they already were before Lab 4 (see §10)
-- Edit history, revision diffing, or soft delete for Action Taken records
+- Edit history, revision diffing, or soft delete for Action Taken records. Append-only in the Lab 4
+  answer sheet is read as in D-07: Action Taken is editable by design (labsheet §8.3 edit mode), and
+  the append-only guarantee applies to Comments, Internal Notes and the `TicketEvent` trail
 - Restricting who may edit an Action Taken beyond role (any IT Staff or Administrator may edit any
   record on an accessible Ticket, not only the record's original author)
 
@@ -250,11 +251,13 @@ model ActionTaken {
   followUpRequired Boolean      @default(false)
   followUpNote     String?      @db.VarChar(1000)
   attachmentNotes  String?      @db.VarChar(500)
+  idempotencyKey   String?      @db.VarChar(64)
 
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
   @@index([ticketId, actionAt])
+  @@unique([ticketId, performedById, idempotencyKey])
 }
 ```
 
@@ -312,11 +315,28 @@ Lab 4 record types.
 
 ### 9.5 Migration and backfill
 
-The migration is additive only: one new table, one new enum, four new indexes, one extended enum.
+The migration is additive only: one new table, one new enum, one extended enum, and four new
+indexes: `ActionTaken(ticketId, actionAt)`, the unique `ActionTaken(ticketId, performedById,
+idempotencyKey)`, `Ticket(ownerId, status)` and `Ticket(updatedAt)`. The `Ticket` indexes on
+`requesterId, createdAt`, `status` and `categoryId` already exist from Lab 3 and are not counted.
 No existing column changes type or nullability, and no existing row is rewritten. A Ticket created
 before Lab 4 simply has zero Action Taken records until one is added, which is exactly the state
 FR-06/BR-09 already expect for any Ticket that has never been worked; no legacy-record special case
 is required.
+
+### 9.5.1 Recovery from a failed or rolled-back migration
+
+- **Failed apply.** Prisma runs the migration in one transaction on PostgreSQL, so a failure leaves
+  no partial table. Fix the cause and re-run `prisma migrate deploy`; if `_prisma_migrations` shows the
+  row as failed, mark it with `prisma migrate resolve --rolled-back <name>` first.
+- **Deliberate rollback.** `server/prisma/migrations/<name>/down.sql` (kept beside the migration)
+  drops `ActionTaken` and the `ActionResult` enum, then removes the two Lab 4 indexes on `Ticket`. The
+  three `TicketEventType` values stay, because PostgreSQL cannot drop an enum value in place; they are
+  unused once the table is gone.
+- **New Action Taken records.** A rollback deletes them with the table. Before running `down.sql`,
+  export them with `pg_dump --data-only --table="ActionTaken"`; re-applying the migration and
+  restoring that file brings them back. Lab 1-3 rows are never touched in either direction.
+- Proved by API-44 (tests.md): apply, add records, roll back, check Lab 3 data, re-apply.
 
 ### 9.6 Seed data
 
@@ -407,13 +427,19 @@ tests,reviewer,ai-use}.md` are all committed and internally consistent with the 
 - **D-03** Result is a four-value enum rather than free text specifically so dashboard metrics could
   aggregate it if a later lab needs to; Lab 4 itself does not surface a Result breakdown on either
   dashboard, since the handout's dashboard examples do not ask for one.
-- **D-04** Duplicate-click and network-retry protection for Action Taken submission is a client-side
-  concern (disable the submit control while the request is in flight), consistent with how the
-  existing Comment and Attachment forms already handle it; no server-side idempotency key or
-  optimistic-concurrency header is introduced.
+- **D-04** Duplicate-click protection stays client-side (disable the submit control while the request
+  is in flight). Network-retry safety is server-side: `POST` carries an `Idempotency-Key` and a replay
+  returns the stored record (labsheet §8.5). Stale writes are refused through an `If-Match`
+  precondition on `updatedAt` (labsheet §6.1). `Ticket.version` stays unused (D-01).
 - **D-05** Attachment Notes is a plain text field with no relationship to the `Attachment` model;
   it exists to let IT Staff point a reader at a file that lives outside the system (for example, a
   photo shared through another channel), not to accept an upload.
 - **D-06** Creating or editing an Action Taken does not update the parent Ticket's `updatedAt`, for
   consistency with how Comments and Internal Notes already behave in Lab 3; "recently updated" on
   both dashboards is defined as a change to the Ticket's own status, owner, or IT Priority fields.
+- **D-07** Append-only reading for the Lab 4 answer sheet, Part 7: Public Comments, Internal Notes and
+  the `TicketEvent` audit trail are append-only (no edit, no delete). Action Taken is not append-only,
+  because labsheet §8.3 requires an edit mode; its protection is that `performedBy` is frozen, `lastEditedBy`
+  is recorded, every create and edit writes a `TicketEvent`, and nothing is deleted. Evidence: API-06,
+  API-10, API-45. No Lab 4 clarification exists in Issue #52, so this reading is stated here for the
+  reviewer and instructor to confirm.

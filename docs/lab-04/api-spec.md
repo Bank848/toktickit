@@ -21,8 +21,8 @@ The mandatory password-change gate (`PASSWORD_CHANGE_REQUIRED`) applies to all o
 |---|---|---|---|---|---|
 | 1 | `GET /api/v1/tickets/:id/actions` | Requester | Actions Taken on an owned Ticket, read only | 200 `ActionTakenDto[]` | 401, 404 `TICKET_NOT_ACCESSIBLE` |
 | 2 | `GET /api/v1/staff/tickets/:id/actions` | IT Staff, Administrator | Actions Taken on any Ticket | 200 `ActionTakenDto[]` | 401, 403, 404 `TICKET_NOT_FOUND` |
-| 3 | `POST /api/v1/staff/tickets/:id/actions` | IT Staff, Administrator | Record an Action Taken | **201** `ActionTakenDto` | 401, 403, 404 `TICKET_NOT_FOUND`, 409 `TICKET_LOCKED`, 422 |
-| 4 | `PATCH /api/v1/staff/tickets/:id/actions/:actionId` | IT Staff, Administrator | Edit an Action Taken | 200 `ActionTakenDto` | 401, 403, 404 `TICKET_NOT_FOUND` / `ACTION_NOT_FOUND`, 409 `TICKET_LOCKED`, 422 |
+| 3 | `POST /api/v1/staff/tickets/:id/actions` | IT Staff, Administrator | Record an Action Taken (requires `Idempotency-Key`) | **201** `ActionTakenDto`; **200** on a replay | 401, 403, 404 `TICKET_NOT_FOUND`, 409 `TICKET_LOCKED`, 422, 428 `PRECONDITION_REQUIRED` |
+| 4 | `PATCH /api/v1/staff/tickets/:id/actions/:actionId` | IT Staff, Administrator | Edit an Action Taken (requires `If-Match`) | 200 `ActionTakenDto` | 401, 403, 404 `TICKET_NOT_FOUND` / `ACTION_NOT_FOUND`, 409 `TICKET_LOCKED` / `STALE_UPDATE`, 422, 428 `PRECONDITION_REQUIRED` |
 | 5 | `GET /api/v1/dashboard` | Requester | Requester Dashboard metrics | 200 `RequesterDashboardDto` | 401, 403 |
 | 6 | `GET /api/v1/staff/dashboard` | IT Staff, Administrator | IT Staff Dashboard metrics | 200 `StaffDashboardDto` | 401, 403 |
 
@@ -33,7 +33,7 @@ There is no delete endpoint for Action Taken. The Requester namespace has no wri
 
 | Endpoint | Change |
 |---|---|
-| `PATCH /api/v1/staff/tickets/:id/status` | New failure mode: **409 `RESOLUTION_REQUIRES_ACTION_TAKEN`** when the target status is `RESOLVED` and the Ticket has zero Action Taken records. |
+| `PATCH /api/v1/staff/tickets/:id/status` | Honors an optional `If-Match` (409 `STALE_UPDATE`, section 4.4). New failure mode: **409 `RESOLUTION_REQUIRES_ACTION_TAKEN`** when the target status is `RESOLVED` and the Ticket has zero Action Taken records. |
 | Every `/api/v1/staff/*` route | Role gate widened from `IT_STAFF` to `IT_STAFF` or `ADMINISTRATOR`, so an Administrator can reach the IT Staff Dashboard and perform every IT Staff action (specification.md §7). A `REQUESTER` still receives 403 `FORBIDDEN_ROLE`. No IT Staff behavior is removed. |
 
 ## 2. DTOs
@@ -62,7 +62,7 @@ There is no delete endpoint for Action Taken. The Requester namespace has no wri
 - `result` is one of `RESOLVED`, `ESCALATED`, `NO_ACTION_NEEDED`, `PENDING_FOLLOW_UP`.
 - The Requester endpoint (#1) returns the same fields as the staff endpoint (#2); Action Taken is
   not treated as IT-Staff-private (BR-11).
-- Lists are ordered oldest first by `createdAt`. Neither list endpoint is paginated; a Ticket is
+- Lists are ordered oldest first by `createdAt`, then `id` ascending, so ties on `createdAt` still give a deterministic order. Neither list endpoint is paginated; a Ticket is
   expected to carry a handful of records.
 
 ### 2.2 `RequesterDashboardDto`
@@ -96,7 +96,7 @@ There is no delete endpoint for Action Taken. The Requester namespace has no wri
   absent entirely, not `null` (AC-11).
 - Every key in `statusCounts` (all 8 statuses), `priorityCounts` (all 4 priorities) and `userCounts`
   (all 3 roles) is always present and zero-filled, never omitted (FR-10, AC-12).
-- `recentTickets` holds at most 5 entries, newest `updatedAt` first; an empty array when there are
+- `recentTickets` holds at most 5 entries, newest `updatedAt` first (ties break on `id` descending); an empty array when there are
   none.
 
 ## 3. Request Bodies
@@ -167,6 +167,34 @@ passes on its earlier records. Transitions that do not target `RESOLVED` never r
 - Every metric is a database `count` or `groupBy`; none is derived by loading Tickets into application
   memory (BR-13).
 
+### 4.4 Stale-write protection (`If-Match`)
+
+Every `ActionTakenDto` and the staff Ticket detail response carry an `ETag` header whose value is the
+record's `updatedAt` as a quoted ISO-8601 string, for example `"2026-09-22T09:41:12.000Z"`.
+
+- `PATCH .../actions/:actionId` **requires** `If-Match`. Missing header: 428 `PRECONDITION_REQUIRED`.
+  Value different from the stored `updatedAt`: 409 `STALE_UPDATE`, nothing written. The check and the
+  write happen in one transaction as a conditional update (`updateMany` where `id` and `updatedAt`
+  match; zero rows changed means stale), so two editors cannot both win.
+- `PATCH .../status` **honors** `If-Match` against `Ticket.updatedAt` when sent (Lab 3 callers that
+  omit it keep working, AC-13); the Lab 4 client always sends it. Mismatch: 409 `STALE_UPDATE`,
+  Ticket unchanged. The existing transition-matrix check still runs on the current state.
+- On `STALE_UPDATE` the client reloads the record and shows it to the user instead of overwriting.
+- Creating an Action Taken needs no `If-Match`: it never overwrites existing state.
+
+### 4.5 Replay-safe create (`Idempotency-Key`)
+
+`POST .../actions` requires `Idempotency-Key`, a client-generated UUID created once per open form and
+reused on every retry of that submission. Missing or malformed: 428 `PRECONDITION_REQUIRED`.
+
+- Scope is `(ticketId, performedById, key)`, enforced by a unique constraint (specification.md
+  section 9.1), so a duplicate that races the first request fails on the constraint and is resolved to
+  the stored record rather than creating a second row.
+- Same key and same body as the stored record: **200** with the stored `ActionTakenDto` and header
+  `Idempotent-Replayed: true`; no new row and no new `TicketEvent`.
+- Same key but a different body: 409 `IDEMPOTENCY_KEY_REUSED`, nothing written.
+- A new form submission gets a new key, so two genuine records are never merged.
+
 ## 5. Authorization Summary
 
 | Endpoint | Requester | IT Staff | Administrator |
@@ -187,6 +215,9 @@ Lab 2 D-24 pattern).
 | `RESOLUTION_REQUIRES_ACTION_TAKEN` | 409 | Status change to `RESOLVED` on a Ticket with zero Action Taken records |
 | `ACTION_NOT_FOUND` | 404 | `PATCH` on an action id that does not exist or belongs to another Ticket |
 | `TICKET_LOCKED` | 409 | Create or edit an Action Taken on a `CLOSED` or `CANCELLED` Ticket |
+| `STALE_UPDATE` | 409 | `If-Match` does not equal the stored `updatedAt` (section 4.4) |
+| `IDEMPOTENCY_KEY_REUSED` | 409 | Known `Idempotency-Key` sent with a different body (section 4.5) |
+| `PRECONDITION_REQUIRED` | 428 | Missing `If-Match` on an Action Taken `PATCH`, or missing or malformed `Idempotency-Key` on `POST` |
 
 `TICKET_NOT_FOUND`, `TICKET_NOT_ACCESSIBLE`, `FORBIDDEN_ROLE`, `VALIDATION_FAILED`, and
 `INVALID_STATUS_TRANSITION` are unchanged from Lab 2-3.
