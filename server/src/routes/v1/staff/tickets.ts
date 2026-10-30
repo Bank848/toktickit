@@ -8,12 +8,14 @@ import { STAFF_TICKET_INCLUDE, serializeStaffTicketDetail, findTicketOrThrow } f
 import { staffCommentsRouter } from './comments';
 import { staffNotesRouter } from './notes';
 import { staffAttachmentsRouter } from './attachments';
+import { staffActionsRouter } from './actions';
 
 export const staffTicketsRouter = Router();
 
 staffTicketsRouter.use('/:id/comments', staffCommentsRouter);
 staffTicketsRouter.use('/:id/notes', staffNotesRouter);
 staffTicketsRouter.use('/:id/attachments', staffAttachmentsRouter);
+staffTicketsRouter.use('/:id/actions', staffActionsRouter);
 
 staffTicketsRouter.get('/', async (req, res, next) => {
   try {

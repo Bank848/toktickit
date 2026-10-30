@@ -4,8 +4,8 @@ Extends `docs/lab-03/tests.md`. Every Functional Requirement, Business Rule, and
 in `specification.md` has at least one automated test below. Tooling is unchanged: Vitest (client:
 jsdom and Testing Library; server: Supertest) and Playwright for end-to-end. The **Status** column
 names the owning issue (`Issue #N`) until the test file exists in the repository and has passed on
-the commit that ships it; only then is the row changed to `Done`. No row is `Done` while this
-contract is documentation only.
+the commit that ships it; only then is the row changed to `Done`. Rows for Issue #53 are `Done`; the
+other rows stay on their issue until their tests exist and pass.
 
 ## 1. Test Strategy and File Layout
 
@@ -52,18 +52,18 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 
 | ID | Requirement | What it tests | Expected result | File | Status |
 |---|---|---|---|---|---|
-| UNIT-01 | FR-01, BR-05 | Validator accepts a minimal valid body | `ok`, `followUpNote` and `attachmentNotes` null | `actionTakenRequest.validator.test.ts` | Issue #53 |
-| UNIT-02 | FR-01 | Result outside the four enum values | Rejected, field `result` | same | Issue #53 |
-| UNIT-03 | FR-01 | Description empty, then 2001 characters | Rejected both; 1 and 2000 accepted | same | Issue #53 |
-| UNIT-04 | BR-05, AC-06 | `followUpRequired` true with empty note | Rejected, field `followUpNote` | same | Issue #53 |
-| UNIT-05 | BR-05 | `followUpRequired` true with a note | Accepted, note trimmed | same | Issue #53 |
-| UNIT-06 | BR-05, AC-07 | `followUpRequired` false with note text in body | Accepted, stored note `null` | same | Issue #53 |
-| UNIT-07 | BR-07 | `actionAt` one instant in the future | Rejected, field `actionAt` | same | Issue #53 |
-| UNIT-08 | BR-07 | `actionAt` exactly now | Accepted (boundary inclusive) | same | Issue #53 |
-| UNIT-09 | FR-01 | Unparseable `actionAt` | Rejected | same | Issue #53 |
-| UNIT-10 | BR-06 | `attachmentNotes` 501 characters; omitted | Rejected; omitted accepted as null | same | Issue #53 |
-| UNIT-11 | D-06, BR-14 | Creating an ActionTaken row | `Ticket.updatedAt` unchanged | `actionTakenModel.test.ts` | Issue #53 |
-| UNIT-12 | BR-03, BR-04 | `lastEditedById` may differ from `performedById` | Both persist independently | same | Issue #53 |
+| UNIT-01 | FR-01, BR-05 | Validator accepts a minimal valid body | `ok`, `followUpNote` and `attachmentNotes` null | `actionTakenRequest.validator.test.ts` | Done |
+| UNIT-02 | FR-01 | Result outside the four enum values | Rejected, field `result` | same | Done |
+| UNIT-03 | FR-01 | Description empty, then 2001 characters | Rejected both; 1 and 2000 accepted | same | Done |
+| UNIT-04 | BR-05, AC-06 | `followUpRequired` true with empty note | Rejected, field `followUpNote` | same | Done |
+| UNIT-05 | BR-05 | `followUpRequired` true with a note | Accepted, note trimmed | same | Done |
+| UNIT-06 | BR-05, AC-07 | `followUpRequired` false with note text in body | Accepted, stored note `null` | same | Done |
+| UNIT-07 | BR-07 | `actionAt` one instant in the future | Rejected, field `actionAt` | same | Done |
+| UNIT-08 | BR-07 | `actionAt` exactly now | Accepted (boundary inclusive) | same | Done |
+| UNIT-09 | FR-01 | Unparseable `actionAt` | Rejected | same | Done |
+| UNIT-10 | BR-06 | `attachmentNotes` 501 characters; omitted | Rejected; omitted accepted as null | same | Done |
+| UNIT-11 | D-06, BR-14 | Creating an ActionTaken row | `Ticket.updatedAt` unchanged | `actionTakenModel.test.ts` | Done |
+| UNIT-12 | BR-03, BR-04 | `lastEditedById` may differ from `performedById` | Both persist independently | same | Done |
 | UNIT-13 | FR-10, AC-12 | New Requester, zero Tickets | All 8 status counts `0`, empty list | `dashboardMetrics.service.test.ts` | Issue #56 |
 | UNIT-14 | AC-02, BR-12 | Two Requesters' Tickets | Each sees only their own counts and list | same | Issue #56 |
 | UNIT-15 | FR-07 | More than 5 Tickets | `recentTickets` holds 5, newest `updatedAt` first | same | Issue #56 |
@@ -77,23 +77,23 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 
 | ID | Requirement / AC | What it tests | Expected result | File | Status |
 |---|---|---|---|---|---|
-| API-01 | FR-01, FR-04, AC-01 | IT Staff creates an Action Taken | 201; `performedBy` is the session user | `actions-taken.api.test.ts` | Issue #53 |
-| API-02 | FR-04 | Body carries a foreign `performedById` | Ignored; session user stored | same | Issue #53 |
-| API-03 | FR-01 | Invalid body | 422, nothing created | same | Issue #53 |
-| API-04 | BR-01 | Create on an unknown Ticket | 404 `TICKET_NOT_FOUND` | same | Issue #53 |
-| API-05 | BR-08, AC-08 | Create on `CLOSED`, then on `CANCELLED` | 409 `TICKET_LOCKED`, nothing created | same | Issue #53 |
-| API-06 | FR-02, FR-05, AC-03, BR-02, BR-03, BR-04 | User B edits a record by user A | `performedBy` still A, `lastEditedBy` is B | same | Issue #53 |
-| API-07 | AC-07 | Edit flips follow-up true to false | Stored `followUpNote` cleared | same | Issue #53 |
-| API-08 | FR-02 | Edit an unknown action id | 404 `ACTION_NOT_FOUND` | same | Issue #53 |
-| API-09 | BR-08 | Edit after the Ticket is `CLOSED` | 409, record unchanged | same | Issue #53 |
-| API-10 | §9.4 | Create, then edit | `ACTION_TAKEN_ADDED` then `ACTION_TAKEN_UPDATED` TicketEvent | same | Issue #53 |
-| API-11 | BR-14, D-06 | Create and edit | Parent `updatedAt` unchanged | same | Issue #53 |
-| API-12 | BR-06 | Create with `attachmentNotes` | No `Attachment` row created | same | Issue #53 |
-| API-13 | §10 #2 | List on a Ticket | Oldest first | same | Issue #53 |
-| API-14 | §7 | Requester calls a staff actions route | 403 `FORBIDDEN_ROLE` | same | Issue #53 |
-| API-15 | FR-03, BR-11, AC-09 | Requester lists an owned Ticket's actions | Every field of every record visible | `actions-taken.api.test.ts` | Issue #53 |
-| API-16 | D-24 | Requester reads another user's Ticket | 404 `TICKET_NOT_ACCESSIBLE`, same body as unknown id | same | Issue #53 |
-| API-17 | AC-09 | Requester `POST` and `PATCH` on their actions path | 404, not 403 or 405 | same | Issue #53 |
+| API-01 | FR-01, FR-04, AC-01 | IT Staff creates an Action Taken | 201; `performedBy` is the session user | `actions-taken.api.test.ts` | Done |
+| API-02 | FR-04 | Body carries a foreign `performedById` | Ignored; session user stored | same | Done |
+| API-03 | FR-01 | Invalid body | 422, nothing created | same | Done |
+| API-04 | BR-01 | Create on an unknown Ticket | 404 `TICKET_NOT_FOUND` | same | Done |
+| API-05 | BR-08, AC-08 | Create on `CLOSED`, then on `CANCELLED` | 409 `TICKET_LOCKED`, nothing created | same | Done |
+| API-06 | FR-02, FR-05, AC-03, BR-02, BR-03, BR-04 | User B edits a record by user A | `performedBy` still A, `lastEditedBy` is B | same | Done |
+| API-07 | AC-07 | Edit flips follow-up true to false | Stored `followUpNote` cleared | same | Done |
+| API-08 | FR-02 | Edit an unknown action id | 404 `ACTION_NOT_FOUND` | same | Done |
+| API-09 | BR-08 | Edit after the Ticket is `CLOSED` | 409, record unchanged | same | Done |
+| API-10 | §9.4 | Create, then edit | `ACTION_TAKEN_ADDED` then `ACTION_TAKEN_UPDATED` TicketEvent | same | Done |
+| API-11 | BR-14, D-06 | Create and edit | Parent `updatedAt` unchanged | same | Done |
+| API-12 | BR-06 | Create with `attachmentNotes` | No `Attachment` row created | same | Done |
+| API-13 | §10 #2 | List on a Ticket | Oldest first | same | Done |
+| API-14 | §7 | Requester calls a staff actions route | 403 `FORBIDDEN_ROLE` | same | Done |
+| API-15 | FR-03, BR-11, AC-09 | Requester lists an owned Ticket's actions | Every field of every record visible | `actions-taken.api.test.ts` | Done |
+| API-16 | D-24 | Requester reads another user's Ticket | 404 `TICKET_NOT_ACCESSIBLE`, same body as unknown id | same | Done |
+| API-17 | AC-09 | Requester `POST` and `PATCH` on their actions path | 404, not 403 or 405 | same | Done |
 | API-18 | FR-06, BR-09, AC-04 | `RESOLVED` with zero actions | 409 `RESOLUTION_REQUIRES_ACTION_TAKEN`, status unchanged | `ticket-workflow.api.test.ts` | Issue #55 |
 | API-19 | AC-05 | `RESOLVED` from `IN_PROGRESS` with one action | 200 | same | Issue #55 |
 | API-20 | AC-05 | `RESOLVED` from `WAITING_FOR_REQUESTER` with one action | 200 | same | Issue #55 |
@@ -111,20 +111,25 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | API-32 | BR-12 | `?requesterId=` and `?userId=` query overrides | Ignored on both routes | `requester-dashboard.api.test.ts`, `staff-dashboard.api.test.ts` | Issue #56 |
 | API-33 | §7 | Administrator reaches existing staff write routes | Allowed after the gate widened to `IT_STAFF` or `ADMINISTRATOR` | same | Issue #56 |
 | API-34 | AC-13 | Lab 3 valid-transition table with the gate in place | Every row still passes with `If-Match` sent (RESOLVED rows seed one action) | `server/tests/lab-03/staffTicketStatus.api.test.ts` | Issue #55 |
-| API-35 | §9.5 | Lab 4 migration over Lab 3 seeded data | Every Lab 3 row and id intact; Tickets have zero actions | `server/tests/lab-04/migration.test.ts` | Issue #53 |
-| API-37 | 6.1, api-spec 4.4 | List response carries a distinct `etag` per record; `PATCH` an action with an `If-Match` older than the stored `updatedAt` | 409 `STALE_UPDATE`, record unchanged | `actions-taken.api.test.ts` | Issue #53 |
-| API-38 | 6.1 | Two editors `PATCH` the same action with the same `If-Match`, sent together | Exactly one 200 and one 409; the stored record equals the 200 body | same | Issue #53 |
-| API-39 | 6.1 | `PATCH` an action with no `If-Match` | 428 `PRECONDITION_REQUIRED`, record unchanged | same | Issue #53 |
+| API-35 | §9.5 | Lab 4 migration over Lab 3 seeded data | Every Lab 3 row and id intact, including Attachment rows with every metadata field (filename, mime type, size, storage key, ticket, uploader, createdAt, soft-delete fields); Tickets have zero actions | `server/tests/lab-04/migration.test.ts` | Done |
+| API-37 | 6.1, api-spec 4.4 | List response carries a distinct `etag` per record; `PATCH` an action with an `If-Match` older than the stored `updatedAt` | 409 `STALE_UPDATE`, record unchanged | `actions-taken.api.test.ts` | Done |
+| API-38 | 6.1 | Two editors `PATCH` the same action with the same `If-Match`, sent together | Exactly one 200 and one 409; the stored record equals the 200 body | same | Done |
+| API-39 | 6.1 | `PATCH` an action with no `If-Match` | 428 `PRECONDITION_REQUIRED`, record unchanged | same | Done |
 | API-40 | 6.1 | Status change to `IN_PROGRESS` after another user changed the Ticket: once with the stale `If-Match`, once with no header | Stale header: 409 `STALE_UPDATE`. No header: 428 `PRECONDITION_REQUIRED`. Status unchanged and no `TicketEvent` in both cases | `ticket-workflow.api.test.ts` | Issue #55 |
-| API-41 | 8.5, api-spec 4.5 | `POST` the same body twice with the same `Idempotency-Key` (second call simulates a retry after a lost response) | 201 then 200 with `Idempotent-Replayed: true`; one row, one `ACTION_TAKEN_ADDED` event | `actions-taken.api.test.ts` | Issue #53 |
-| API-42 | 8.5 | `POST` twice at the same time with one key | One row; both calls return the same record id | same | Issue #53 |
-| API-43 | 8.5 | Same key with a different body; `POST` with no key | 409 `IDEMPOTENCY_KEY_REUSED`; 428 `PRECONDITION_REQUIRED`; nothing written | same | Issue #53 |
-| API-44 | 5.2, spec 9.5.1 | Failed apply: run the migration with a deliberately broken last statement in a disposable schema; then apply, add records, run `down.sql`, and re-apply | After the failed apply no new table, enum or index remains and a clean retry succeeds; after rollback Lab 3 rows are intact and `ActionTaken` is gone; after re-apply the schema equals the original and a `pg_dump` restore brings the records back | `server/tests/lab-04/migration.recovery.test.ts` | Issue #53 |
+| API-41 | 8.5, api-spec 4.5 | `POST` the same body twice with the same `Idempotency-Key` (second call simulates a retry after a lost response) | 201 then 200 with `Idempotent-Replayed: true`; one row, one `ACTION_TAKEN_ADDED` event | `actions-taken.api.test.ts` | Done |
+| API-42 | 8.5 | `POST` twice at the same time with one key | One row; both calls return the same record id | same | Done |
+| API-43 | 8.5 | Same key with a different body; `POST` with no key | 409 `IDEMPOTENCY_KEY_REUSED`; 428 `PRECONDITION_REQUIRED`; nothing written | same | Done |
+| API-44 | 5.2, spec 9.5.1 | Failed apply: run the migration with a deliberately broken last statement in a disposable schema; then apply, add records, run `down.sql`, and re-apply | After the failed apply no new table, enum or index remains and a clean retry succeeds; after rollback Lab 3 rows are intact and `ActionTaken` is gone; after re-apply the schema equals the original and a real `pg_dump --data-only --table="ActionTaken"` export restored with `psql -f` brings the same records back (ids, text, timestamps, `idempotencyKey`, `performedById`, `createdAt` order); the test fails if `pg_dump`/`psql` cannot be found (set `PG_BIN_DIR`) | `server/tests/lab-04/migration.recovery.test.ts` | Done |
 | API-47 | 6.1, api-spec 4.4 | Two `PATCH ../status` requests sent together with the same `If-Match` and valid transitions | Exactly one 200 and one 409 `STALE_UPDATE`; one `TicketEvent`; the Ticket equals the 200 body | `ticket-workflow.api.test.ts` | Issue #55 |
-| API-45 | Part 7, D-07 | Edit an action twice | `performedBy` never changes, `lastEditedBy` is the latest editor, two `ACTION_TAKEN_UPDATED` events exist, no delete route | `actions-taken.api.test.ts` | Issue #53 |
+| API-45 | Part 7, D-07 | Edit an action twice | `performedBy` never changes, `lastEditedBy` is the latest editor, two `ACTION_TAKEN_UPDATED` events exist, no delete route | `actions-taken.api.test.ts` | Done |
 | API-46 | Part 7 | Two actions and two Tickets inserted with identical `createdAt` / `updatedAt` | Action list order is stable by `id` ascending; `recentTickets` is stable by `id` descending over repeated calls | `actions-taken.api.test.ts`, `requester-dashboard.api.test.ts`, `staff-dashboard.api.test.ts` | Issue #53, #56 |
+| API-48 | BR-08, 6.1 | `POST` an action while a concurrent request is changing the Ticket to `CLOSED` (change held uncommitted until a second connection sees the request blocked on the `Ticket` `FOR UPDATE` lock in `pg_stat_activity`, then committed) | 409 `TICKET_LOCKED`; no `ActionTaken` row and no `ACTION_TAKEN_ADDED` event | `actions-taken.api.test.ts` | Done |
+| API-49 | BR-08, 6.1 | `PATCH` an action under the same race | 409 `TICKET_LOCKED`; record unchanged and no `ACTION_TAKEN_UPDATED` event | same | Done |
+| API-50 | §7, api-spec 1.2 | Administrator lists, creates (with `Idempotency-Key`) and edits (with `If-Match`) Action Taken | 200 / 201 / 200; `performedBy` is the Administrator; a later IT Staff edit changes only `lastEditedBy` | `actions-taken.api.test.ts` | Done |
+| API-51 | §7, api-spec 1.2 | Requester calls list, create and edit on the staff action routes | 403 `FORBIDDEN_ROLE` each; no row written | same | Done |
+| API-52 | api-spec 3.1 | `POST` with `actionAt` `2026-09-20T17:00:00+07:00`, then `PATCH` with `-05:00` | Accepted; stored and returned as the same UTC instant with `Z` | same | Done |
 | PERF-01 | 10 | Seed 2,000 Tickets and 5,000 Action Taken records in `toktickit_test`; call `GET /dashboard`, `GET /staff/dashboard` and the staff actions list 30 times each | 95th percentile under 500 ms on the dev machine; query count per dashboard call is constant (no per-Ticket query) | `server/tests/lab-04/performance.smoke.test.ts` | Issue #57 |
-| API-36 | §9.6 | Seed verification script | Required seed Tickets present (zero, one, many actions; follow-up; every status and priority) | `server/prisma/verify-seed-lab4.ts` | Issue #53 |
+| API-36 | §9.6 | Seed verification script | Required seed Tickets present (zero, one, many actions; follow-up; every status and priority) | `server/prisma/verify-seed-lab4.ts` | Done |
 
 ### 2.3 Component (client)
 
@@ -208,6 +213,8 @@ Every requirement appears in at least one row above.
 | Retry safety (8.5) | API-41 to API-43 |
 | Migration recovery (5.2) | API-44 |
 | Append-only reading, ordering (Part 7) | API-45, API-46 |
+| Ticket lock race (BR-08) | API-48, API-49 |
+| Administrator access, `actionAt` offsets | API-50 to API-52 |
 | Performance smoke (10) | PERF-01 |
 | AC-01 to AC-12 | see the AC column above |
 | AC-13 | API-34, E2E-06 |

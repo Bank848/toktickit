@@ -7,6 +7,7 @@ import { generateTicketNumber } from '../../services/ticketNumber';
 import { HttpError, ValidationHttpError } from '../../middleware/errorEnvelope';
 import { ticketAttachmentsRouter } from './attachments';
 import { ticketCommentsRouter } from './comments';
+import { ticketActionsRouter } from './actions';
 
 export const ticketsRouter = Router();
 
@@ -171,6 +172,7 @@ ticketsRouter.get('/', async (req, res, next) => {
 
 ticketsRouter.use('/:id/attachments', ticketAttachmentsRouter);
 ticketsRouter.use('/:id/comments', ticketCommentsRouter);
+ticketsRouter.use('/:id/actions', ticketActionsRouter);
 
 // Registered after GET / and POST / on this router (Express matches by method+path, so order
 // between GET / and POST / doesn't matter, but /:id must stay below any future literal-path
