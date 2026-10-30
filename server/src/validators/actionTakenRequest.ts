@@ -18,6 +18,24 @@ type ValidationResult =
   | { ok: true; value: ValidatedActionTakenRequest }
   | { ok: false; errors: FieldError[] };
 
+// Strict ISO 8601 date-time with an explicit zone (Z or +hh:mm / -hh:mm). Anything else, such as
+// 11/30/2025, a bare date, or a zone-less timestamp (which Date would read in server local time),
+// is rejected.
+const ISO_DATE_TIME_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(Z|[+-](\d{2}):(\d{2}))$/;
+
+function parseStrictIso(value: string): Date | null {
+  const m = ISO_DATE_TIME_RE.exec(value);
+  if (!m) return null;
+  const [year, month, day, hour, minute, second] = m.slice(1, 7).map(Number);
+  if (hour > 23 || minute > 59 || second > 59) return null;
+  if (m[8] !== undefined && (Number(m[8]) > 23 || Number(m[9]) > 59)) return null;
+  // Reject impossible calendar dates (2025-02-30 would otherwise roll over to March).
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  if (probe.getUTCFullYear() !== year || probe.getUTCMonth() !== month - 1 || probe.getUTCDate() !== day) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function validate(body: Record<string, unknown>): ValidationResult {
   const errors: FieldError[] = [];
 
@@ -25,8 +43,8 @@ function validate(body: Record<string, unknown>): ValidationResult {
   if (typeof body.actionAt !== 'string') {
     errors.push({ field: 'actionAt', message: 'actionAt is required and must be an ISO 8601 timestamp' });
   } else {
-    const parsed = new Date(body.actionAt);
-    if (Number.isNaN(parsed.getTime())) {
+    const parsed = parseStrictIso(body.actionAt);
+    if (parsed === null) {
       errors.push({ field: 'actionAt', message: 'actionAt must be a valid ISO 8601 timestamp' });
     } else if (parsed.getTime() > Date.now()) {
       // BR-07: may not be set in the future. A same-instant value is allowed (boundary is

@@ -76,6 +76,32 @@ describe('validateCreateActionTakenRequest', () => {
     expect(result.ok).toBe(false);
   });
 
+  it.each([
+    ['a US-style date', '11/30/2025'],
+    ['a timestamp with no zone', '2025-11-30T10:00:00'],
+    ['a date with no time', '2025-11-30'],
+    ['an impossible calendar date', '2025-02-30T10:00:00Z'],
+    ['an out-of-range hour', '2025-11-30T25:00:00Z'],
+    ['an out-of-range offset', '2025-11-30T10:00:00+24:00'],
+  ])('rejects %s as actionAt with the same field error', (_label, actionAt) => {
+    const result = validateCreateActionTakenRequest({ ...VALID, actionAt });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors).toContainEqual({ field: 'actionAt', message: 'actionAt must be a valid ISO 8601 timestamp' });
+    }
+  });
+
+  it('accepts a strict ISO 8601 UTC value and an explicit offset, converting both to the same instant', () => {
+    const utc = validateCreateActionTakenRequest({ ...VALID, actionAt: '2025-11-30T10:00:00Z' });
+    const offset = validateCreateActionTakenRequest({ ...VALID, actionAt: '2025-11-30T17:00:00+07:00' });
+    expect(utc.ok).toBe(true);
+    expect(offset.ok).toBe(true);
+    if (utc.ok && offset.ok) {
+      expect(utc.value.actionAt.toISOString()).toBe('2025-11-30T10:00:00.000Z');
+      expect(offset.value.actionAt.getTime()).toBe(utc.value.actionAt.getTime());
+    }
+  });
+
   it('rejects attachmentNotes longer than 500 chars', () => {
     const result = validateCreateActionTakenRequest({ ...VALID, attachmentNotes: 'x'.repeat(501) });
     expect(result.ok).toBe(false);

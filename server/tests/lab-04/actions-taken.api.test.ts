@@ -312,6 +312,56 @@ describe('Action Taken API (staff routes and Requester read-only route)', () => 
     expect(stored.lastEditedById).toBeNull();
   });
 
+  // ---- lock race against a concurrent status change (BR-08) ----
+
+  /** Holds an uncommitted CLOSED update on the Ticket row; call release() to commit it. */
+  async function holdTicketClosed(ticketId: string) {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let ready!: () => void;
+    const readyP = new Promise<void>((resolve) => { ready = resolve; });
+    const done = prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`UPDATE "Ticket" SET "status" = 'CLOSED' WHERE "id" = ${ticketId}`;
+      ready();
+      await gate;
+    });
+    await readyP;
+    return { release, done };
+  }
+
+  const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  it('API-48: a create that races a status change to CLOSED is 409 TICKET_LOCKED and writes nothing', async () => {
+    const ticket = await createTicket();
+    const hold = await holdTicketClosed(ticket.id);
+    const pending = post(ticket.id, staff1Cookie).then((r) => r); // passes the early check: CLOSED is not committed yet
+    await settle(500);
+    hold.release();
+    await hold.done;
+    const response = await pending;
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe('TICKET_LOCKED');
+    expect(await prisma.actionTaken.count({ where: { ticketId: ticket.id } })).toBe(0);
+    expect(await prisma.ticketEvent.count({ where: { ticketId: ticket.id, eventType: 'ACTION_TAKEN_ADDED' } })).toBe(0);
+  });
+
+  it('API-49: an edit that races a status change to CLOSED is 409 TICKET_LOCKED; record and events unchanged', async () => {
+    const ticket = await createTicket();
+    const action = await createAction(ticket.id);
+    const hold = await holdTicketClosed(ticket.id);
+    const pending = patch(ticket.id, action.id, staff1Cookie, { ...VALID_BODY, description: 'Edited during the race.' }, action.etag).then((r) => r);
+    await settle(500);
+    hold.release();
+    await hold.done;
+    const response = await pending;
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe('TICKET_LOCKED');
+    const stored = await prisma.actionTaken.findUniqueOrThrow({ where: { id: action.id } });
+    expect(stored.description).toBe(VALID_BODY.description);
+    expect(stored.lastEditedById).toBeNull();
+    expect(await prisma.ticketEvent.count({ where: { ticketId: ticket.id, eventType: 'ACTION_TAKEN_UPDATED' } })).toBe(0);
+  });
+
   // ---- idempotent create (API-41..43) ----
 
   it('API-41: the same body and key twice gives 201 then 200 with Idempotent-Replayed, one row, one event', async () => {

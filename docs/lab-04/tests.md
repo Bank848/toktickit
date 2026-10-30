@@ -119,10 +119,12 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | API-41 | 8.5, api-spec 4.5 | `POST` the same body twice with the same `Idempotency-Key` (second call simulates a retry after a lost response) | 201 then 200 with `Idempotent-Replayed: true`; one row, one `ACTION_TAKEN_ADDED` event | `actions-taken.api.test.ts` | Issue #53 |
 | API-42 | 8.5 | `POST` twice at the same time with one key | One row; both calls return the same record id | same | Issue #53 |
 | API-43 | 8.5 | Same key with a different body; `POST` with no key | 409 `IDEMPOTENCY_KEY_REUSED`; 428 `PRECONDITION_REQUIRED`; nothing written | same | Issue #53 |
-| API-44 | 5.2, spec 9.5.1 | Failed apply: run the migration with a deliberately broken last statement in a disposable schema; then apply, add records, run `down.sql`, and re-apply | After the failed apply no new table, enum or index remains and a clean retry succeeds; after rollback Lab 3 rows are intact and `ActionTaken` is gone; after re-apply the schema equals the original and a `pg_dump` restore brings the records back | `server/tests/lab-04/migration.recovery.test.ts` | Issue #53 |
+| API-44 | 5.2, spec 9.5.1 | Failed apply: run the migration with a deliberately broken last statement in a disposable schema; then apply, add records, run `down.sql`, and re-apply | After the failed apply no new table, enum or index remains and a clean retry succeeds; after rollback Lab 3 rows are intact and `ActionTaken` is gone; after re-apply the schema equals the original and a real `pg_dump --data-only --table="ActionTaken"` export restored with `psql -f` brings the same records back (ids, text, timestamps, `idempotencyKey`, `performedById`, `createdAt` order); the test fails if `pg_dump`/`psql` cannot be found (set `PG_BIN_DIR`) | `server/tests/lab-04/migration.recovery.test.ts` | Issue #53 |
 | API-47 | 6.1, api-spec 4.4 | Two `PATCH ../status` requests sent together with the same `If-Match` and valid transitions | Exactly one 200 and one 409 `STALE_UPDATE`; one `TicketEvent`; the Ticket equals the 200 body | `ticket-workflow.api.test.ts` | Issue #55 |
 | API-45 | Part 7, D-07 | Edit an action twice | `performedBy` never changes, `lastEditedBy` is the latest editor, two `ACTION_TAKEN_UPDATED` events exist, no delete route | `actions-taken.api.test.ts` | Issue #53 |
 | API-46 | Part 7 | Two actions and two Tickets inserted with identical `createdAt` / `updatedAt` | Action list order is stable by `id` ascending; `recentTickets` is stable by `id` descending over repeated calls | `actions-taken.api.test.ts`, `requester-dashboard.api.test.ts`, `staff-dashboard.api.test.ts` | Issue #53, #56 |
+| API-48 | BR-08, 6.1 | `POST` an action while a concurrent request is changing the Ticket to `CLOSED` (change held uncommitted, then committed) | 409 `TICKET_LOCKED`; no `ActionTaken` row and no `ACTION_TAKEN_ADDED` event | `actions-taken.api.test.ts` | Issue #53 |
+| API-49 | BR-08, 6.1 | `PATCH` an action under the same race | 409 `TICKET_LOCKED`; record unchanged and no `ACTION_TAKEN_UPDATED` event | same | Issue #53 |
 | PERF-01 | 10 | Seed 2,000 Tickets and 5,000 Action Taken records in `toktickit_test`; call `GET /dashboard`, `GET /staff/dashboard` and the staff actions list 30 times each | 95th percentile under 500 ms on the dev machine; query count per dashboard call is constant (no per-Ticket query) | `server/tests/lab-04/performance.smoke.test.ts` | Issue #57 |
 | API-36 | §9.6 | Seed verification script | Required seed Tickets present (zero, one, many actions; follow-up; every status and priority) | `server/prisma/verify-seed-lab4.ts` | Issue #53 |
 
@@ -208,6 +210,7 @@ Every requirement appears in at least one row above.
 | Retry safety (8.5) | API-41 to API-43 |
 | Migration recovery (5.2) | API-44 |
 | Append-only reading, ordering (Part 7) | API-45, API-46 |
+| Ticket lock race (BR-08) | API-48, API-49 |
 | Performance smoke (10) | PERF-01 |
 | AC-01 to AC-12 | see the AC column above |
 | AC-13 | API-34, E2E-06 |

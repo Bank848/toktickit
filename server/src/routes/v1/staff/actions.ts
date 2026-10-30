@@ -13,6 +13,25 @@ export const staffActionsRouter = Router({ mergeParams: true }); // mounted at /
 const TERMINAL_STATUSES = ['CLOSED', 'CANCELLED'] as const;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+type Tx = Prisma.TransactionClient;
+
+/**
+ * Locks the Ticket row (FOR UPDATE) and re-checks that it is not Closed or Cancelled. This is the
+ * authority for BR-08; the early check before the transaction is only a fast path. The status
+ * endpoint (tickets.ts PATCH /:id/status) moves a Ticket with prisma.ticket.update, an UPDATE on the
+ * same "Ticket" row, and an UPDATE takes a row lock that conflicts with FOR UPDATE. So the two
+ * writes are serialised: if the status change commits first, this lock sees CLOSED/CANCELLED (read
+ * committed re-reads the row after the wait) and we refuse; if we hold the lock first, the status
+ * change waits until our ActionTaken + TicketEvent commit.
+ */
+async function lockTicketOrThrow(tx: Tx, ticketId: string, message: string): Promise<void> {
+  const rows = await tx.$queryRaw<{ status: string }[]>`
+    SELECT "status"::text AS "status" FROM "Ticket" WHERE "id" = ${ticketId} FOR UPDATE`;
+  if (rows.length === 0 || TERMINAL_STATUSES.includes(rows[0].status as never)) {
+    throw new HttpError(409, 'TICKET_LOCKED', message);
+  }
+}
+
 type StoredAction = Prisma.ActionTakenGetPayload<{ include: typeof ACTION_INCLUDE }>;
 
 function requireIdempotencyKey(req: Request): string {
@@ -93,7 +112,11 @@ staffActionsRouter.post<{ id: string }>('/', async (req, res, next) => {
     const { actionAt, description, result, followUpRequired, followUpNote, attachmentNotes } = validated.value;
     let created: StoredAction;
     try {
-      created = await prisma.$transaction(async (tx) => {
+      const outcome = await prisma.$transaction(async (tx) => {
+        // A key that was stored while we waited on the lock is a replay, answered before the lock check.
+        const stored = await tx.actionTaken.findUnique({ where: keyWhere, include: ACTION_INCLUDE });
+        if (stored) return { action: stored, replay: true };
+        await lockTicketOrThrow(tx, ticket.id, 'Cannot record an Action Taken on a Closed or Cancelled ticket');
         const action = await tx.actionTaken.create({
           data: {
             ticketId: ticket.id, performedById: userId, actionAt, description, result,
@@ -104,8 +127,13 @@ staffActionsRouter.post<{ id: string }>('/', async (req, res, next) => {
         await tx.ticketEvent.create({
           data: { ticketId: ticket.id, actorId: userId, eventType: 'ACTION_TAKEN_ADDED', payload: { actionId: action.id } },
         });
-        return action;
+        return { action, replay: false };
       });
+      if (outcome.replay) {
+        replayOrThrow(res, outcome.action, validated.value);
+        return;
+      }
+      created = outcome.action;
     } catch (error) {
       // A concurrent duplicate lost the unique-constraint race: resolve to the stored record.
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -146,6 +174,7 @@ staffActionsRouter.patch<{ id: string; actionId: string }>('/:actionId', async (
 
     const { actionAt, description, result, followUpRequired, followUpNote, attachmentNotes } = validated.value;
     const updated = await prisma.$transaction(async (tx) => {
+      await lockTicketOrThrow(tx, ticket.id, 'Cannot edit an Action Taken on a Closed or Cancelled ticket');
       // One atomic conditional update: zero rows means the If-Match no longer matches (api-spec 4.4).
       // BR-03: performedById is never part of this write -- only lastEditedById changes.
       const { count } = await tx.actionTaken.updateMany({
