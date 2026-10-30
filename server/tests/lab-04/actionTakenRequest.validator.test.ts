@@ -17,6 +17,7 @@ describe('validateCreateActionTakenRequest', () => {
     if (result.ok) {
       expect(result.value.result).toBe('RESOLVED');
       expect(result.value.followUpNote).toBeNull();
+      expect(result.value.attachmentNotes).toBeNull();
     }
   });
 
@@ -29,6 +30,8 @@ describe('validateCreateActionTakenRequest', () => {
   it('rejects description shorter than 1 char or longer than 2000 (BR field length)', () => {
     expect(validateCreateActionTakenRequest({ ...VALID, description: '' }).ok).toBe(false);
     expect(validateCreateActionTakenRequest({ ...VALID, description: 'x'.repeat(2001) }).ok).toBe(false);
+    expect(validateCreateActionTakenRequest({ ...VALID, description: 'x' }).ok).toBe(true);
+    expect(validateCreateActionTakenRequest({ ...VALID, description: 'x'.repeat(2000) }).ok).toBe(true);
   });
 
   it('requires a non-empty followUpNote when followUpRequired is true (BR-05/AC-06)', () => {

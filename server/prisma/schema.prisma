@@ -208,11 +208,13 @@ model ActionTaken {
   followUpRequired Boolean      @default(false)
   followUpNote     String?      @db.VarChar(1000)
   attachmentNotes  String?      @db.VarChar(500)
+  idempotencyKey   String?      @db.VarChar(64)
 
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
   @@index([ticketId, actionAt])
+  @@unique([ticketId, performedById, idempotencyKey])
 }
 
 model TicketCounter {

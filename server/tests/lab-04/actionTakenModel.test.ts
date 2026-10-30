@@ -88,4 +88,18 @@ describe('ActionTaken model (Lab 4 schema)', () => {
     expect(events).toHaveLength(1);
     expect(events[0].eventType).toBe('ACTION_TAKEN_ADDED');
   });
+
+  it('enforces uniqueness of (ticketId, performedById, idempotencyKey) but allows repeated null keys', async () => {
+    const ticket = await createTicket();
+    const base = {
+      ticketId: ticket.id, performedById: staffId, actionAt: new Date(),
+      description: 'Key check.', result: 'NO_ACTION_NEEDED' as const,
+    };
+    await prisma.actionTaken.create({ data: { ...base, idempotencyKey: 'k-1' } });
+    await expect(prisma.actionTaken.create({ data: { ...base, idempotencyKey: 'k-1' } })).rejects.toMatchObject({ code: 'P2002' });
+    await prisma.actionTaken.create({ data: { ...base, performedById: staff2Id, idempotencyKey: 'k-1' } });
+    await prisma.actionTaken.create({ data: base });
+    await prisma.actionTaken.create({ data: base });
+    expect(await prisma.actionTaken.count({ where: { ticketId: ticket.id } })).toBe(4);
+  });
 });

@@ -1,3 +1,5 @@
+BEGIN;
+
 -- CreateEnum
 CREATE TYPE "ActionResult" AS ENUM ('RESOLVED', 'ESCALATED', 'NO_ACTION_NEEDED', 'PENDING_FOLLOW_UP');
 
@@ -9,8 +11,8 @@ CREATE TYPE "ActionResult" AS ENUM ('RESOLVED', 'ESCALATED', 'NO_ACTION_NEEDED',
 -- the enum.
 
 
-ALTER TYPE "TicketEventType" ADD VALUE 'ACTION_TAKEN_ADDED';
-ALTER TYPE "TicketEventType" ADD VALUE 'ACTION_TAKEN_UPDATED';
+ALTER TYPE "TicketEventType" ADD VALUE IF NOT EXISTS 'ACTION_TAKEN_ADDED';
+ALTER TYPE "TicketEventType" ADD VALUE IF NOT EXISTS 'ACTION_TAKEN_UPDATED';
 
 -- CreateTable
 CREATE TABLE "ActionTaken" (
@@ -24,6 +26,7 @@ CREATE TABLE "ActionTaken" (
     "followUpRequired" BOOLEAN NOT NULL DEFAULT false,
     "followUpNote" VARCHAR(1000),
     "attachmentNotes" VARCHAR(500),
+    "idempotencyKey" VARCHAR(64),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -32,6 +35,9 @@ CREATE TABLE "ActionTaken" (
 
 -- CreateIndex
 CREATE INDEX "ActionTaken_ticketId_actionAt_idx" ON "ActionTaken"("ticketId", "actionAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ActionTaken_ticketId_performedById_idempotencyKey_key" ON "ActionTaken"("ticketId", "performedById", "idempotencyKey");
 
 -- CreateIndex
 CREATE INDEX "Ticket_ownerId_status_idx" ON "Ticket"("ownerId", "status");
@@ -47,3 +53,5 @@ ALTER TABLE "ActionTaken" ADD CONSTRAINT "ActionTaken_performedById_fkey" FOREIG
 
 -- AddForeignKey
 ALTER TABLE "ActionTaken" ADD CONSTRAINT "ActionTaken_lastEditedById_fkey" FOREIGN KEY ("lastEditedById") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+COMMIT;
