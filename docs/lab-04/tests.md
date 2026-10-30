@@ -18,8 +18,14 @@ contract is documentation only.
 - `server/tests/lab-04/requester-dashboard.api.test.ts` — `GET /dashboard` and scoping (handout path)
 - `server/tests/lab-04/staff-dashboard.api.test.ts` — `GET /staff/dashboard`, `userCounts` (handout path)
 - `server/tests/lab-04/dashboardMetrics.service.test.ts` — metric queries, service level
-- `client/tests/lab-04/*.test.tsx` — Actions Taken sections, both dashboards, URL filter hydration,
-  detail-page integration, datetime helper
+- `client/tests/lab-04/ActionsTaken.test.tsx` — staff and Requester Actions Taken sections and the
+  detail-page integration (handout path)
+- `client/tests/lab-04/TicketWorkflow.test.tsx` — resolution-gate messages on the status control
+  (handout path)
+- `client/tests/lab-04/RequesterDashboard.test.tsx` and `client/tests/lab-04/StaffDashboard.test.tsx`
+  — the two dashboards (handout paths)
+- `client/tests/lab-04/*.test.tsx` beside them — URL filter hydration, navigation, datetime helper
+  and accessibility, which the handout does not name
 - `e2e/lab-04/actions-taken-flow.spec.ts` and `e2e/lab-04/ticket-resolution.spec.ts` — the handout's
   required Playwright files; `e2e/lab-04/dashboards.spec.ts` and `visual-states.spec.ts` are added
   beside them (Issue #57)
@@ -28,7 +34,9 @@ contract is documentation only.
 `client/tests/lab-0[1-3]`, `e2e/lab-0[1-3]`) unchanged against the Lab 4 codebase. One Lab 3 test is
 deliberately extended, not weakened: the "allows each valid direct transition" table in
 `server/tests/lab-03/staffTicketStatus.api.test.ts` now seeds one Action Taken before any transition
-that targets `RESOLVED`, because FR-06 changes the precondition for exactly those rows.
+that targets `RESOLVED`, because FR-06 changes the precondition for exactly those rows. Every Lab 3
+status request in `server/tests/lab-03` also gains the `If-Match` header through its request helper,
+because the status endpoint now requires it (api-spec.md section 4.4); no assertion changes.
 
 **Harness note.** Server tests run against the isolated `toktickit_test` database with migration and
 seed in global setup; Playwright runs against `toktickit_e2e` on the dedicated E2E port, both as in
@@ -102,12 +110,12 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | API-31 | AC-11, FR-09 | Administrator caller, with one inactive account seeded per role | `userCounts` with 3 roles counting `isActive = true` accounts only | `staff-dashboard.api.test.ts` | Issue #56 |
 | API-32 | BR-12 | `?requesterId=` and `?userId=` query overrides | Ignored on both routes | `requester-dashboard.api.test.ts`, `staff-dashboard.api.test.ts` | Issue #56 |
 | API-33 | §7 | Administrator reaches existing staff write routes | Allowed after the gate widened to `IT_STAFF` or `ADMINISTRATOR` | same | Issue #56 |
-| API-34 | AC-13 | Lab 3 valid-transition table with the gate in place | Every row still passes (RESOLVED rows seed one action) | `server/tests/lab-03/staffTicketStatus.api.test.ts` | Issue #55 |
+| API-34 | AC-13 | Lab 3 valid-transition table with the gate in place | Every row still passes with `If-Match` sent (RESOLVED rows seed one action) | `server/tests/lab-03/staffTicketStatus.api.test.ts` | Issue #55 |
 | API-35 | §9.5 | Lab 4 migration over Lab 3 seeded data | Every Lab 3 row and id intact; Tickets have zero actions | `server/tests/lab-04/migration.test.ts` | Issue #53 |
 | API-37 | 6.1, api-spec 4.4 | List response carries a distinct `etag` per record; `PATCH` an action with an `If-Match` older than the stored `updatedAt` | 409 `STALE_UPDATE`, record unchanged | `actions-taken.api.test.ts` | Issue #53 |
 | API-38 | 6.1 | Two editors `PATCH` the same action with the same `If-Match`, sent together | Exactly one 200 and one 409; the stored record equals the 200 body | same | Issue #53 |
 | API-39 | 6.1 | `PATCH` an action with no `If-Match` | 428 `PRECONDITION_REQUIRED`, record unchanged | same | Issue #53 |
-| API-40 | 6.1 | Status change to `IN_PROGRESS` with a stale `If-Match`, after another user changed the Ticket | 409 `STALE_UPDATE`, status unchanged; the same call without the header still follows Lab 3 rules | `ticket-workflow.api.test.ts` | Issue #55 |
+| API-40 | 6.1 | Status change to `IN_PROGRESS` after another user changed the Ticket: once with the stale `If-Match`, once with no header | Stale header: 409 `STALE_UPDATE`. No header: 428 `PRECONDITION_REQUIRED`. Status unchanged and no `TicketEvent` in both cases | `ticket-workflow.api.test.ts` | Issue #55 |
 | API-41 | 8.5, api-spec 4.5 | `POST` the same body twice with the same `Idempotency-Key` (second call simulates a retry after a lost response) | 201 then 200 with `Idempotent-Replayed: true`; one row, one `ACTION_TAKEN_ADDED` event | `actions-taken.api.test.ts` | Issue #53 |
 | API-42 | 8.5 | `POST` twice at the same time with one key | One row; both calls return the same record id | same | Issue #53 |
 | API-43 | 8.5 | Same key with a different body; `POST` with no key | 409 `IDEMPOTENCY_KEY_REUSED`; 428 `PRECONDITION_REQUIRED`; nothing written | same | Issue #53 |
@@ -122,7 +130,7 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 
 | ID | Requirement | What it tests | Expected result | File | Status |
 |---|---|---|---|---|---|
-| CMP-01 | FR-01 | Staff section, no records | `No Actions Taken yet.` | `ActionsTakenSection.test.tsx` | Issue #54 |
+| CMP-01 | FR-01 | Staff section, no records | `No Actions Taken yet.` | `ActionsTaken.test.tsx` | Issue #54 |
 | CMP-02 | FR-01 | Staff section lists records | Performer, Result badge, Follow-Up badge shown | same | Issue #54 |
 | CMP-03 | FR-01 | Create | New record appended without reload | same | Issue #54 |
 | CMP-04 | BR-05 | Follow-Up Required checked, note empty | Save disabled | same | Issue #54 |
@@ -132,20 +140,20 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | CMP-08 | BR-11 | Attachment notes | Shown on the staff row | same | Issue #54 |
 | CMP-09 | §3 | Action Date/Time cleared | Save disabled; `postStaffAction` never called | same | Issue #54 |
 | CMP-10 | §3 | Datetime round trip | Same instant in any timezone | `datetimeLocal.test.ts` | Issue #54 |
-| CMP-11 | FR-03 | Requester section, no records | Empty text | `ActionsTakenReadOnlySection.test.tsx` | Issue #54 |
+| CMP-11 | FR-03 | Requester section, no records | Empty text | `ActionsTaken.test.tsx` | Issue #54 |
 | CMP-12 | FR-03, BR-11 | Requester section with records | All fields shown, no create or edit control | same | Issue #54 |
 | CMP-13 | §5 | Requester list fetch fails | Error alert with Retry | same | Issue #54 |
-| CMP-14 | §3 | Staff detail page | Actions Taken section rendered | `StaffTicketDetailPage.actions.test.tsx` | Issue #54 |
+| CMP-14 | §3 | Staff detail page | Actions Taken section rendered | `ActionsTaken.test.tsx` | Issue #54 |
 | CMP-15 | BR-08 | Closed or Cancelled Ticket on detail page | Record button disabled | same | Issue #54 |
-| CMP-16 | FR-06, §4 | Server returns `RESOLUTION_REQUIRES_ACTION_TAKEN` | Directed message shown, not the raw error | same | Issue #55 |
+| CMP-16 | FR-06, §4 | Server returns `RESOLUTION_REQUIRES_ACTION_TAKEN` | Directed message shown, not the raw error | `TicketWorkflow.test.tsx` | Issue #55 |
 | CMP-17 | §4 | Different 409 mentioning "action" | Directed message not shown (branches on code) | same | Issue #55 |
 | CMP-18 | §4 | Unrelated status failure | Existing fallback message | same | Issue #55 |
-| CMP-19 | §5 | Requester detail page | Read-only section below Comments | `TicketDetailPage.actions.test.tsx` | Issue #54 |
-| CMP-20 | AC-12, FR-10 | Requester Dashboard, fresh account | Zero-valued cards, not omitted | `RequesterDashboardPage.test.tsx` | Issue #56 |
+| CMP-19 | §5 | Requester detail page | Read-only section below Comments | `ActionsTaken.test.tsx` | Issue #54 |
+| CMP-20 | AC-12, FR-10 | Requester Dashboard, fresh account | Zero-valued cards, not omitted | `RequesterDashboard.test.tsx` | Issue #56 |
 | CMP-21 | FR-07 | Requester Dashboard with data | Four cards with counts, recent list | same | Issue #56 |
 | CMP-22 | FR-10 | Requester card links | Each links to `/tickets?status=<STATUS>` | same | Issue #56 |
 | CMP-23 | §6 | Requester Dashboard load error | Alert with Retry | same | Issue #56 |
-| CMP-24 | FR-08 | Staff Dashboard status cards | New, Open, In Progress, Waiting, Assigned to me | `StaffDashboardPage.test.tsx` | Issue #56 |
+| CMP-24 | FR-08 | Staff Dashboard status cards | New, Open, In Progress, Waiting, Assigned to me | `StaffDashboard.test.tsx` | Issue #56 |
 | CMP-25 | FR-08 | Staff Dashboard priority cards | Low, Medium, High, Urgent | same | Issue #56 |
 | CMP-26 | AC-11 | IT Staff, no `userCounts` | Role card not rendered | same | Issue #56 |
 | CMP-27 | FR-09 | Administrator with `userCounts` | Role card rendered | same | Issue #56 |

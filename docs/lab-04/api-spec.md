@@ -33,7 +33,7 @@ There is no delete endpoint for Action Taken. The Requester namespace has no wri
 
 | Endpoint | Change |
 |---|---|
-| `PATCH /api/v1/staff/tickets/:id/status` | Honors an optional `If-Match` (409 `STALE_UPDATE`, section 4.4). New failure mode: **409 `RESOLUTION_REQUIRES_ACTION_TAKEN`** when the target status is `RESOLVED` and the Ticket has zero Action Taken records. |
+| `PATCH /api/v1/staff/tickets/:id/status` | **Requires** `If-Match` (428 `PRECONDITION_REQUIRED` when missing, 409 `STALE_UPDATE` on mismatch, section 4.4). New failure mode: **409 `RESOLUTION_REQUIRES_ACTION_TAKEN`** when the target status is `RESOLVED` and the Ticket has zero Action Taken records. |
 | Every `/api/v1/staff/*` route | Role gate widened from `IT_STAFF` to `IT_STAFF` or `ADMINISTRATOR`, so an Administrator can reach the IT Staff Dashboard and perform every IT Staff action (specification.md §7). A `REQUESTER` still receives 403 `FORBIDDEN_ROLE`. No IT Staff behavior is removed. |
 
 ## 2. DTOs
@@ -181,14 +181,21 @@ responses (`POST`, `PATCH`) also send the same value as an `ETag` header.
   Value different from the stored `updatedAt`: 409 `STALE_UPDATE`, nothing written. The check and the
   write happen in one transaction as a conditional update (`updateMany` where `id` and `updatedAt`
   match; zero rows changed means stale), so two editors cannot both win.
-- `PATCH .../status` **honors** `If-Match` against `Ticket.updatedAt` when sent (Lab 3 callers that
-  omit it keep working, AC-13); the Lab 4 client always sends it. Mismatch: 409 `STALE_UPDATE`,
-  Ticket unchanged. The existing transition-matrix check still runs on the current state. The
+- `PATCH .../status` **requires** `If-Match` against `Ticket.updatedAt`. Missing header: 428
+  `PRECONDITION_REQUIRED`, Ticket unchanged. There is no header-less path, because a delayed request
+  from an old screen could otherwise be accepted whenever its target is legal from the newer status
+  and the user would never learn the Ticket had changed. Mismatch: 409 `STALE_UPDATE`, Ticket
+  unchanged. AC-13 is kept by updating the Lab 3 status tests to send the header (api-spec.md
+  section 4.4 note below), not by leaving a bypass. The existing transition-matrix check still runs on the current state. The
   compare and the write are atomic: the transition is one conditional update on the Ticket
   (`updateMany` where `id`, the current status and `updatedAt` match) inside the same transaction that
   inserts the `TicketEvent`; zero rows changed means 409 `STALE_UPDATE`. Two requests carrying the
   same `If-Match` therefore cannot both succeed.
 - On `STALE_UPDATE` the client reloads the record and shows it to the user instead of overwriting.
+- AC-13 note: Lab 3 callers of the status endpoint (the Lab 3 web client and `server/tests/lab-03`)
+  gain the header. The Lab 3 client already holds the Ticket from its detail load, so it sends that
+  Ticket's `etag`; the Lab 3 API tests add the header in their request helper. No Lab 3 assertion is
+  removed or loosened.
 - Creating an Action Taken needs no `If-Match`: it never overwrites existing state.
 
 ### 4.5 Replay-safe create (`Idempotency-Key`)
@@ -226,7 +233,7 @@ Lab 2 D-24 pattern).
 | `TICKET_LOCKED` | 409 | Create or edit an Action Taken on a `CLOSED` or `CANCELLED` Ticket |
 | `STALE_UPDATE` | 409 | `If-Match` does not equal the stored `updatedAt` (section 4.4) |
 | `IDEMPOTENCY_KEY_REUSED` | 409 | Known `Idempotency-Key` sent with a different body (section 4.5) |
-| `PRECONDITION_REQUIRED` | 428 | Missing `If-Match` on an Action Taken `PATCH`, or missing or malformed `Idempotency-Key` on `POST` |
+| `PRECONDITION_REQUIRED` | 428 | Missing `If-Match` on an Action Taken `PATCH` or on a Ticket status `PATCH`, or missing or malformed `Idempotency-Key` on `POST` |
 
 `TICKET_NOT_FOUND`, `TICKET_NOT_ACCESSIBLE`, `FORBIDDEN_ROLE`, `VALIDATION_FAILED`, and
 `INVALID_STATUS_TRANSITION` are unchanged from Lab 2-3.
