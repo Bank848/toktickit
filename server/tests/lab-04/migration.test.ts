@@ -7,6 +7,7 @@ import { applyPreLab4, createDisposableDb, lab4MigrationDir, runSqlFile } from '
 describe('Lab 4 migration over Lab 3 data', () => {
   let db: Awaited<ReturnType<typeof createDisposableDb>>;
   const ids: Record<string, string> = {};
+  let attachmentBefore: Record<string, unknown>;
 
   beforeAll(async () => {
     db = await createDisposableDb();
@@ -25,6 +26,21 @@ describe('Lab 4 migration over Lab 3 data', () => {
     const comment = await c.comment.create({ data: { ticketId: ticket.id, authorId: requester.id, body: 'Hello' } });
     const note = await c.internalNote.create({ data: { ticketId: ticket.id, authorId: staff.id, body: 'Internal' } });
     const event = await c.ticketEvent.create({ data: { ticketId: ticket.id, actorId: staff.id, eventType: 'COMMENT_ADDED' } });
+    const attachment = await c.attachment.create({
+      data: {
+        ticketId: ticket.id, uploadedById: requester.id, originalFilename: 'screenshot.png', mimeType: 'image/png',
+        sizeBytes: 2048, storageKey: 'lab3/2026/09/screenshot-abc123.png',
+        createdAt: new Date('2026-09-01T08:30:00.000Z'),
+      },
+    });
+    const removed = await c.attachment.create({
+      data: {
+        ticketId: ticket.id, uploadedById: requester.id, originalFilename: 'old.pdf', mimeType: 'application/pdf',
+        sizeBytes: 4096, storageKey: 'lab3/2026/09/old-def456.pdf', createdAt: new Date('2026-09-02T09:00:00.000Z'),
+        deletedAt: new Date('2026-09-03T10:00:00.000Z'), deletedById: staff.id, deletedReason: 'Wrong file',
+      },
+    });
+    attachmentBefore = { live: attachment, removed };
     Object.assign(ids, {
       requester: requester.id, staff: staff.id, category: String(category.id), ticket: ticket.id,
       comment: comment.id, note: note.id, event: event.id,
@@ -48,6 +64,18 @@ describe('Lab 4 migration over Lab 3 data', () => {
     expect(await c.comment.count({ where: { id: ids.comment } })).toBe(1);
     expect(await c.internalNote.count({ where: { id: ids.note } })).toBe(1);
     expect(await c.ticketEvent.count({ where: { id: ids.event } })).toBe(1);
+  });
+
+  it('keeps every Lab 3 Attachment row, id and metadata field unchanged', async () => {
+    const c = db.client;
+    const live = attachmentBefore.live as { id: string };
+    const removed = attachmentBefore.removed as { id: string };
+    expect((await c.attachment.findMany({ select: { id: true } })).map((a) => a.id).sort()).toEqual([live.id, removed.id].sort());
+    expect(await c.attachment.findUniqueOrThrow({ where: { id: live.id } })).toEqual(attachmentBefore.live);
+    expect(await c.attachment.findUniqueOrThrow({ where: { id: removed.id } })).toEqual(attachmentBefore.removed);
+    const after = await c.attachment.findUniqueOrThrow({ where: { id: removed.id } });
+    expect(after.deletedById).toBe(ids.staff);
+    expect(after.deletedReason).toBe('Wrong file');
   });
 
   it('gives every existing Ticket zero actions and accepts new ones', async () => {

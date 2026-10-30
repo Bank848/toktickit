@@ -1,7 +1,7 @@
 # TokTickIT REST API Contract (Lab 4)
 
 Extends `docs/lab-03/api-spec.md`. Conventions are unchanged: root `/api/v1`, JSON, camelCase,
-ISO-8601 UTC timestamps, DTOs only (never a Prisma model), 201 create / 401 unauthenticated /
+ISO-8601 UTC timestamps (input may carry `Z` or a `+hh:mm` / `-hh:mm` offset; stored and returned as UTC), DTOs only (never a Prisma model), 201 create / 401 unauthenticated /
 403 authorization / 404 missing-or-not-yours / 409 conflict / 422 validation. Every Lab 1-3 endpoint
 keeps its documented shape; this document lists only what is new or changed.
 
@@ -106,7 +106,7 @@ There is no delete endpoint for Action Taken. The Requester namespace has no wri
 
 | Field | Type | Rule |
 |---|---|---|
-| `actionAt` | string, ISO 8601 | Required. Must parse. Must not be later than the current instant (BR-07); the current instant itself is accepted. |
+| `actionAt` | string, ISO 8601 | Required. Must parse. May carry `Z` or a `+hh:mm` / `-hh:mm` offset; a non-zero offset is normalized to the same UTC instant, stored as UTC and always returned as UTC with `Z`. Must not be later than the current instant (BR-07); the current instant itself is accepted. |
 | `description` | string | Required. Trimmed, 1 to 2000 characters. |
 | `result` | string | Required. One of the four `ActionResult` values. |
 | `followUpRequired` | boolean | Optional, defaults to `false`. Any non-boolean value is 422. |

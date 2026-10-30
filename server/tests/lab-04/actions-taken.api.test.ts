@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import request from 'supertest';
 import { randomUUID } from 'crypto';
 import { app } from '../../src/app';
+import { PrismaClient } from '@prisma/client';
 import { prisma } from '../../src/prisma';
 import { truncateTicketTables } from '../helpers/resetDb';
 import { loginAs } from '../helpers/auth';
@@ -18,6 +19,8 @@ const VALID_BODY = {
 describe('Action Taken API (staff routes and Requester read-only route)', () => {
   let staff1Cookie: string;
   let staff2Cookie: string;
+  let adminCookie: string;
+  let adminId: string;
   let requesterCookie: string;
   let requester2Cookie: string;
   let requesterId: string;
@@ -28,6 +31,8 @@ describe('Action Taken API (staff routes and Requester read-only route)', () => 
   beforeAll(async () => {
     staff1Cookie = await loginAs(SEED_EMAILS.itStaff1);
     staff2Cookie = await loginAs(SEED_EMAILS.itStaff2);
+    adminCookie = await loginAs(SEED_EMAILS.admin);
+    adminId = (await prisma.user.findUniqueOrThrow({ where: { email: SEED_EMAILS.admin } })).id;
     requesterCookie = await loginAs(SEED_EMAILS.requester);
     requester2Cookie = await loginAs(SEED_EMAILS.requester2);
     requesterId = (await prisma.user.findUniqueOrThrow({ where: { email: SEED_EMAILS.requester } })).id;
@@ -312,6 +317,51 @@ describe('Action Taken API (staff routes and Requester read-only route)', () => 
     expect(stored.lastEditedById).toBeNull();
   });
 
+  // ---- Administrator access and actionAt offsets (API-50..52) ----
+
+  it('API-50: an Administrator can list, create and edit Action Taken; performedBy is the Administrator', async () => {
+    const ticket = await createTicket();
+    const created = await post(ticket.id, adminCookie);
+    expect(created.status).toBe(201);
+    expect(created.body.performedBy.id).toBe(adminId);
+    const list = await request(app).get(`/api/v1/staff/tickets/${ticket.id}/actions`).set('Cookie', adminCookie);
+    expect(list.status).toBe(200);
+    expect(list.body.map((a: { id: string }) => a.id)).toEqual([created.body.id]);
+    const edited = await patch(ticket.id, created.body.id, adminCookie, { ...VALID_BODY, description: 'Edited by the admin.' }, created.body.etag);
+    expect(edited.status).toBe(200);
+    expect(edited.body.performedBy.id).toBe(adminId);
+    expect(edited.body.lastEditedBy.id).toBe(adminId);
+    const other = await patch(ticket.id, created.body.id, staff1Cookie, { ...VALID_BODY, description: 'Staff edit.' }, edited.body.etag);
+    expect(other.status).toBe(200);
+    expect(other.body.performedBy.id).toBe(adminId);
+    expect(other.body.lastEditedBy.id).toBe(staff1Id);
+  });
+
+  it('API-51: a Requester gets 403 FORBIDDEN_ROLE on list, create and edit and nothing is written', async () => {
+    const ticket = await createTicket();
+    const action = await createAction(ticket.id);
+    const list = await request(app).get(`/api/v1/staff/tickets/${ticket.id}/actions`).set('Cookie', requesterCookie);
+    const create = await post(ticket.id, requesterCookie);
+    const edit = await patch(ticket.id, action.id, requesterCookie, { ...VALID_BODY, description: 'Nope.' }, action.etag);
+    for (const r of [list, create, edit]) {
+      expect(r.status).toBe(403);
+      expect(r.body.error.code).toBe('FORBIDDEN_ROLE');
+    }
+    expect(await prisma.actionTaken.count({ where: { ticketId: ticket.id } })).toBe(1);
+  });
+
+  it('API-52: a non-zero actionAt offset is accepted and stored and returned as the same UTC instant', async () => {
+    const ticket = await createTicket();
+    const response = await post(ticket.id, staff1Cookie, { ...VALID_BODY, actionAt: '2026-09-20T17:00:00+07:00' });
+    expect(response.status).toBe(201);
+    expect(response.body.actionAt).toBe('2026-09-20T10:00:00.000Z');
+    const stored = await prisma.actionTaken.findUniqueOrThrow({ where: { id: response.body.id } });
+    expect(stored.actionAt.toISOString()).toBe('2026-09-20T10:00:00.000Z');
+    const edited = await patch(ticket.id, response.body.id, staff1Cookie, { ...VALID_BODY, actionAt: '2026-09-20T05:30:00-05:00' }, response.body.etag);
+    expect(edited.status).toBe(200);
+    expect(edited.body.actionAt).toBe('2026-09-20T10:30:00.000Z');
+  });
+
   // ---- lock race against a concurrent status change (BR-08) ----
 
   /** Holds an uncommitted CLOSED update on the Ticket row; call release() to commit it. */
@@ -329,15 +379,40 @@ describe('Action Taken API (staff routes and Requester read-only route)', () => 
     return { release, done };
   }
 
-  const settle = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  /**
+   * Deterministic barrier: polls pg_stat_activity from a separate connection until a backend is blocked
+   * on a lock while running the route's SELECT ... FOR UPDATE on "Ticket". Only then is it certain that
+   * the request got past its early check and is queued behind the held status change.
+   */
+  async function waitUntilBlockedOnTicketLock(timeoutMs = 10_000) {
+    const monitor = new PrismaClient();
+    try {
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        const rows = await monitor.$queryRaw<{ pid: number }[]>`
+          SELECT pid FROM pg_stat_activity
+          WHERE datname = current_database() AND pid <> pg_backend_pid()
+            AND wait_event_type = 'Lock'
+            AND query ILIKE '%FOR UPDATE%' AND query LIKE '%"Ticket"%'`;
+        if (rows.length > 0) return;
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      throw new Error(`No backend was waiting on a Ticket FOR UPDATE row lock after ${timeoutMs} ms: the request never reached the lock`);
+    } finally {
+      await monitor.$disconnect();
+    }
+  }
 
   it('API-48: a create that races a status change to CLOSED is 409 TICKET_LOCKED and writes nothing', async () => {
     const ticket = await createTicket();
     const hold = await holdTicketClosed(ticket.id);
     const pending = post(ticket.id, staff1Cookie).then((r) => r); // passes the early check: CLOSED is not committed yet
-    await settle(500);
-    hold.release();
-    await hold.done;
+    try {
+      await waitUntilBlockedOnTicketLock();
+    } finally {
+      hold.release(); // never leave the holder transaction open, even when the barrier times out
+      await hold.done;
+    }
     const response = await pending;
     expect(response.status).toBe(409);
     expect(response.body.error.code).toBe('TICKET_LOCKED');
@@ -350,9 +425,12 @@ describe('Action Taken API (staff routes and Requester read-only route)', () => 
     const action = await createAction(ticket.id);
     const hold = await holdTicketClosed(ticket.id);
     const pending = patch(ticket.id, action.id, staff1Cookie, { ...VALID_BODY, description: 'Edited during the race.' }, action.etag).then((r) => r);
-    await settle(500);
-    hold.release();
-    await hold.done;
+    try {
+      await waitUntilBlockedOnTicketLock();
+    } finally {
+      hold.release(); // never leave the holder transaction open, even when the barrier times out
+      await hold.done;
+    }
     const response = await pending;
     expect(response.status).toBe(409);
     expect(response.body.error.code).toBe('TICKET_LOCKED');

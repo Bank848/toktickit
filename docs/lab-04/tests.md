@@ -111,7 +111,7 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | API-32 | BR-12 | `?requesterId=` and `?userId=` query overrides | Ignored on both routes | `requester-dashboard.api.test.ts`, `staff-dashboard.api.test.ts` | Issue #56 |
 | API-33 | §7 | Administrator reaches existing staff write routes | Allowed after the gate widened to `IT_STAFF` or `ADMINISTRATOR` | same | Issue #56 |
 | API-34 | AC-13 | Lab 3 valid-transition table with the gate in place | Every row still passes with `If-Match` sent (RESOLVED rows seed one action) | `server/tests/lab-03/staffTicketStatus.api.test.ts` | Issue #55 |
-| API-35 | §9.5 | Lab 4 migration over Lab 3 seeded data | Every Lab 3 row and id intact; Tickets have zero actions | `server/tests/lab-04/migration.test.ts` | Issue #53 |
+| API-35 | §9.5 | Lab 4 migration over Lab 3 seeded data | Every Lab 3 row and id intact, including Attachment rows with every metadata field (filename, mime type, size, storage key, ticket, uploader, createdAt, soft-delete fields); Tickets have zero actions | `server/tests/lab-04/migration.test.ts` | Issue #53 |
 | API-37 | 6.1, api-spec 4.4 | List response carries a distinct `etag` per record; `PATCH` an action with an `If-Match` older than the stored `updatedAt` | 409 `STALE_UPDATE`, record unchanged | `actions-taken.api.test.ts` | Issue #53 |
 | API-38 | 6.1 | Two editors `PATCH` the same action with the same `If-Match`, sent together | Exactly one 200 and one 409; the stored record equals the 200 body | same | Issue #53 |
 | API-39 | 6.1 | `PATCH` an action with no `If-Match` | 428 `PRECONDITION_REQUIRED`, record unchanged | same | Issue #53 |
@@ -123,8 +123,11 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | API-47 | 6.1, api-spec 4.4 | Two `PATCH ../status` requests sent together with the same `If-Match` and valid transitions | Exactly one 200 and one 409 `STALE_UPDATE`; one `TicketEvent`; the Ticket equals the 200 body | `ticket-workflow.api.test.ts` | Issue #55 |
 | API-45 | Part 7, D-07 | Edit an action twice | `performedBy` never changes, `lastEditedBy` is the latest editor, two `ACTION_TAKEN_UPDATED` events exist, no delete route | `actions-taken.api.test.ts` | Issue #53 |
 | API-46 | Part 7 | Two actions and two Tickets inserted with identical `createdAt` / `updatedAt` | Action list order is stable by `id` ascending; `recentTickets` is stable by `id` descending over repeated calls | `actions-taken.api.test.ts`, `requester-dashboard.api.test.ts`, `staff-dashboard.api.test.ts` | Issue #53, #56 |
-| API-48 | BR-08, 6.1 | `POST` an action while a concurrent request is changing the Ticket to `CLOSED` (change held uncommitted, then committed) | 409 `TICKET_LOCKED`; no `ActionTaken` row and no `ACTION_TAKEN_ADDED` event | `actions-taken.api.test.ts` | Issue #53 |
+| API-48 | BR-08, 6.1 | `POST` an action while a concurrent request is changing the Ticket to `CLOSED` (change held uncommitted until a second connection sees the request blocked on the `Ticket` `FOR UPDATE` lock in `pg_stat_activity`, then committed) | 409 `TICKET_LOCKED`; no `ActionTaken` row and no `ACTION_TAKEN_ADDED` event | `actions-taken.api.test.ts` | Issue #53 |
 | API-49 | BR-08, 6.1 | `PATCH` an action under the same race | 409 `TICKET_LOCKED`; record unchanged and no `ACTION_TAKEN_UPDATED` event | same | Issue #53 |
+| API-50 | §7, api-spec 1.2 | Administrator lists, creates (with `Idempotency-Key`) and edits (with `If-Match`) Action Taken | 200 / 201 / 200; `performedBy` is the Administrator; a later IT Staff edit changes only `lastEditedBy` | `actions-taken.api.test.ts` | Issue #53 |
+| API-51 | §7, api-spec 1.2 | Requester calls list, create and edit on the staff action routes | 403 `FORBIDDEN_ROLE` each; no row written | same | Issue #53 |
+| API-52 | api-spec 3.1 | `POST` with `actionAt` `2026-09-20T17:00:00+07:00`, then `PATCH` with `-05:00` | Accepted; stored and returned as the same UTC instant with `Z` | same | Issue #53 |
 | PERF-01 | 10 | Seed 2,000 Tickets and 5,000 Action Taken records in `toktickit_test`; call `GET /dashboard`, `GET /staff/dashboard` and the staff actions list 30 times each | 95th percentile under 500 ms on the dev machine; query count per dashboard call is constant (no per-Ticket query) | `server/tests/lab-04/performance.smoke.test.ts` | Issue #57 |
 | API-36 | §9.6 | Seed verification script | Required seed Tickets present (zero, one, many actions; follow-up; every status and priority) | `server/prisma/verify-seed-lab4.ts` | Issue #53 |
 
@@ -211,6 +214,7 @@ Every requirement appears in at least one row above.
 | Migration recovery (5.2) | API-44 |
 | Append-only reading, ordering (Part 7) | API-45, API-46 |
 | Ticket lock race (BR-08) | API-48, API-49 |
+| Administrator access, `actionAt` offsets | API-50 to API-52 |
 | Performance smoke (10) | PERF-01 |
 | AC-01 to AC-12 | see the AC column above |
 | AC-13 | API-34, E2E-06 |
