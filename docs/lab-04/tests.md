@@ -135,25 +135,25 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 
 | ID | Requirement | What it tests | Expected result | File | Status |
 |---|---|---|---|---|---|
-| CMP-01 | FR-01 | Staff section, no records | `No Actions Taken yet.` | `ActionsTaken.test.tsx` | Issue #54 |
-| CMP-02 | FR-01 | Staff section lists records | Performer, Result badge, Follow-Up badge shown | same | Issue #54 |
-| CMP-03 | FR-01 | Create | New record appended without reload | same | Issue #54 |
-| CMP-04 | BR-05 | Follow-Up Required checked, note empty | Save disabled | same | Issue #54 |
-| CMP-05 | FR-02, FR-05 | Edit | Updated record shows `Edited by` | same | Issue #54 |
-| CMP-06 | BR-08 | Ticket locked | Record button disabled | same | Issue #54 |
-| CMP-07 | §3 | Create fails | Error alert, form open, values kept | same | Issue #54 |
-| CMP-08 | BR-11 | Attachment notes | Shown on the staff row | same | Issue #54 |
-| CMP-09 | §3 | Action Date/Time cleared | Save disabled; `postStaffAction` never called | same | Issue #54 |
-| CMP-10 | §3 | Datetime round trip | Same instant in any timezone | `datetimeLocal.test.ts` | Issue #54 |
-| CMP-11 | FR-03 | Requester section, no records | Empty text | `ActionsTaken.test.tsx` | Issue #54 |
-| CMP-12 | FR-03, BR-11 | Requester section with records | All fields shown, no create or edit control | same | Issue #54 |
-| CMP-13 | §5 | Requester list fetch fails | Error alert with Retry | same | Issue #54 |
-| CMP-14 | §3 | Staff detail page | Actions Taken section rendered | `ActionsTaken.test.tsx` | Issue #54 |
-| CMP-15 | BR-08 | Closed or Cancelled Ticket on detail page | Record button disabled | same | Issue #54 |
+| CMP-01 | FR-01 | Staff section, no records | `No Actions Taken yet.` | `ActionsTaken.test.tsx` | Done |
+| CMP-02 | FR-01 | Staff section lists records | Performer, Result badge, Follow-Up badge shown | same | Done |
+| CMP-03 | FR-01 | Create | New record appended without reload | same | Done |
+| CMP-04 | BR-05 | Follow-Up Required checked, note empty | Save disabled | same | Done |
+| CMP-05 | FR-02, FR-05 | Edit | Updated record shows `Edited by` | same | Done |
+| CMP-06 | BR-08 | Ticket locked | Record button disabled | same | Done |
+| CMP-07 | §3 | Create fails | Error alert, form open, values kept | same | Done |
+| CMP-08 | BR-11 | Attachment notes | Shown on the staff row | same | Done |
+| CMP-09 | §3 | Action Date/Time cleared | Save disabled; `postStaffAction` never called | same | Done |
+| CMP-10 | §3 | Datetime round trip | Same instant in any timezone | `datetimeLocal.test.ts` | Done |
+| CMP-11 | FR-03 | Requester section, no records | Empty text | `ActionsTaken.test.tsx` | Done |
+| CMP-12 | FR-03, BR-11 | Requester section with records | All fields shown, no create or edit control | same | Done |
+| CMP-13 | §5 | Requester list fetch fails | Error alert with Retry | same | Done |
+| CMP-14 | §3 | Staff detail page | Actions Taken section rendered | `ActionsTaken.test.tsx` | Done |
+| CMP-15 | BR-08 | Closed or Cancelled Ticket on detail page | Record button disabled | same | Done |
 | CMP-16 | FR-06, §4 | Server returns `RESOLUTION_REQUIRES_ACTION_TAKEN` | Directed message shown, not the raw error | `TicketWorkflow.test.tsx` | Issue #55 |
 | CMP-17 | §4 | Different 409 mentioning "action" | Directed message not shown (branches on code) | same | Issue #55 |
 | CMP-18 | §4 | Unrelated status failure | Existing fallback message | same | Issue #55 |
-| CMP-19 | §5 | Requester detail page | Read-only section below Comments | `ActionsTaken.test.tsx` | Issue #54 |
+| CMP-19 | §5 | Requester detail page | Read-only section below Comments | `ActionsTaken.test.tsx` | Done |
 | CMP-20 | AC-12, FR-10 | Requester Dashboard, fresh account | Zero-valued cards, not omitted | `RequesterDashboard.test.tsx` | Issue #56 |
 | CMP-21 | FR-07 | Requester Dashboard with data | Four cards with counts, recent list | same | Issue #56 |
 | CMP-22 | FR-10 | Requester card links | Each links to `/tickets?status=<STATUS>` | same | Issue #56 |
@@ -173,9 +173,9 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 
 | ID | Requirement / AC | Flow | Expected result | File | Status |
 |---|---|---|---|---|---|
-| E2E-01 | AC-01, AC-03 | IT Staff records an Action Taken; a second IT Staff edits it | Both visible; performer unchanged, editor shown | `e2e/lab-04/actions-taken-flow.spec.ts` | Issue #54 |
+| E2E-01 | AC-01, AC-03 | IT Staff records an Action Taken; a second IT Staff edits it | Both visible; performer unchanged, editor shown | `e2e/lab-04/actions-taken-flow.spec.ts` | Done |
 | E2E-02 | AC-04, AC-05 | Resolve with no action → rejection message → record action → resolve | Message first, then success | `e2e/lab-04/ticket-resolution.spec.ts` | Issue #55 |
-| E2E-03 | AC-09 | Requester opens an owned Ticket | Actions visible, no create or edit control | `e2e/lab-04/actions-taken-flow.spec.ts` | Issue #54 |
+| E2E-03 | AC-09 | Requester opens an owned Ticket | Actions visible, no create or edit control | `e2e/lab-04/actions-taken-flow.spec.ts` | Done |
 | E2E-04 | AC-02, FR-10 | Requester signs in, lands on dashboard, clicks a card | Filtered My Tickets | `e2e/lab-04/dashboards.spec.ts` | Issue #56 |
 | E2E-05 | AC-10, AC-11, FR-09 | IT Staff and Administrator dashboards | Counts match seed; only Administrator sees user counts | same | Issue #56 |
 | E2E-06 | AC-13 | Full Lab 1-3 Playwright suite | Same pass count as before Lab 4 | `e2e/lab-0[1-3]/*` | Issue #57 |
