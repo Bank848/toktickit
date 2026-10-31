@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireRole } from '../../../middleware/requireRole';
 import { staffTicketsRouter } from './tickets';
 import { assignableOwnersRouter } from './assignableOwners';
+import { staffDashboardRouter } from './dashboard';
 
 export const staffRouter = Router();
 
@@ -11,3 +12,4 @@ staffRouter.use(requireRole('IT_STAFF', 'ADMINISTRATOR'));
 
 staffRouter.use('/tickets', staffTicketsRouter);
 staffRouter.use('/assignable-owners', assignableOwnersRouter);
+staffRouter.use('/dashboard', staffDashboardRouter);
