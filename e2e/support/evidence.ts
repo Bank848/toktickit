@@ -4,7 +4,7 @@ import { expect, type Page } from '@playwright/test';
 
 export async function saveEvidenceScreenshot(
   page: Page,
-  lab: 'lab-02' | 'lab-03',
+  lab: 'lab-02' | 'lab-03' | 'lab-04',
   group: string,
   projectName: string,
   name: string,

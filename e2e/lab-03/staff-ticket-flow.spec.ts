@@ -136,6 +136,12 @@ test('IT Staff claims, works, and resolves a ticket; Requester sees comments but
   await expect(page.getByText('Internal-only note for E2E.', { exact: false })).toBeVisible();
   await saveEvidenceScreenshot(page, 'lab-03', 'staff-ticket-detail', projectName, 'notes-and-comments');
 
+  // Lab 4 (FR-06): Resolved needs at least one Action Taken, so record one first.
+  await page.getByRole('button', { name: 'Record Action Taken' }).click();
+  await page.getByLabel('Description', { exact: false }).last().fill('Resolved during the Lab 3 flow.');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByTestId('action-row')).toHaveCount(1, { timeout: 30_000 });
+
   await page.getByLabel('Current Status', { exact: true }).selectOption({ label: 'Resolved' });
   await expect(statusParagraph(page)).toContainText('Resolved');
 

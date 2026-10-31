@@ -19,11 +19,11 @@ test('a Requester is redirected away from Staff and Admin routes', async ({ page
   await login(page, REQUESTER);
 
   await page.goto('/staff/tickets');
-  await expect(page).toHaveURL(/\/tickets$/, { timeout: 30_000 });
+  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
   await saveEvidenceScreenshot(page, 'lab-03', 'staff-queue', projectName, 'forbidden-redirect');
 
   await page.goto('/admin/users');
-  await expect(page).toHaveURL(/\/tickets$/, { timeout: 30_000 });
+  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
   await saveEvidenceScreenshot(page, 'lab-03', 'user-management', projectName, 'forbidden-redirect');
 });
 
@@ -31,7 +31,7 @@ test('an IT Staff member is redirected away from Admin routes', async ({ page },
   const projectName = testInfo.project.name;
   await login(page, IT_STAFF);
   await page.goto('/admin/users');
-  await expect(page).toHaveURL(/\/staff\/tickets$/, { timeout: 30_000 });
+  await expect(page).toHaveURL(/\/staff\/dashboard$/, { timeout: 30_000 });
   await saveEvidenceScreenshot(page, 'lab-03', 'user-management', projectName, 'staff-forbidden-redirect');
 });
 
