@@ -172,12 +172,13 @@ describe('updateTicketStatus', () => {
     const updated = { id: 't1', status: 'RESOLVED' };
     fetchMock.mockResolvedValue(mockJsonResponse(updated));
 
-    const result = await updateTicketStatus('t1', 'RESOLVED');
+    const result = await updateTicketStatus('t1', 'RESOLVED', '"v1"');
 
     expect(result).toEqual(updated);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe(`${API_BASE_URL}/api/v1/staff/tickets/t1/status`);
     expect(init).toMatchObject({ method: 'PATCH', credentials: 'include' });
+    expect(init.headers).toMatchObject({ 'If-Match': '"v1"' });
     expect(JSON.parse(init.body)).toEqual({ status: 'RESOLVED' });
   });
 
@@ -185,7 +186,7 @@ describe('updateTicketStatus', () => {
     const fetchMock = stubFetch();
     fetchMock.mockResolvedValue(mockJsonResponse({ error: { message: 'Invalid status transition' } }, 409));
 
-    await expect(updateTicketStatus('t1', 'CLOSED')).rejects.toMatchObject({
+    await expect(updateTicketStatus('t1', 'CLOSED', '"v1"')).rejects.toMatchObject({
       name: 'ApiError',
       message: 'Invalid status transition',
       status: 409,

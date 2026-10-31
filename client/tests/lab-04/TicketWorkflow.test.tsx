@@ -14,7 +14,7 @@ const STAFF_DETAIL = {
   requestedPriority: 'HIGH', itPriority: 'HIGH', createdAt: '2026-09-01T00:00:00Z',
   updatedAt: '2026-09-01T00:00:00Z', attachmentCount: 0,
   requester: { id: 'r1', displayName: 'Nattapong R.' }, owner: { id: 'owner-1', displayName: 'Jane Staff' },
-  resolutionSummary: null, version: 0,
+  resolutionSummary: null, version: 0, etag: '"2026-09-01T00:00:00.000Z"',
 };
 
 const DIRECTED_MESSAGE = 'This ticket cannot be marked Resolved yet \u2014 record an Action Taken first.';
@@ -70,5 +70,39 @@ describe('Staff status change: resolution gate message (FR-06, ui-spec section 4
     await changeStatusToResolved();
     await waitFor(() => expect(screen.getByText('Failed to update status.')).toBeInTheDocument());
     expect(screen.queryByText(DIRECTED_MESSAGE)).not.toBeInTheDocument();
+  });
+});
+
+describe('Staff status change: If-Match (api-spec 4.4)', () => {
+  beforeEach(mockPage);
+
+  it('sends the ticket etag as If-Match', async () => {
+    const spy = vi.spyOn(staffTicketsApi, 'updateTicketStatus').mockResolvedValue({ ...STAFF_DETAIL, status: 'RESOLVED' } as never);
+    await changeStatusToResolved();
+    await waitFor(() => expect(spy).toHaveBeenCalledWith(TICKET_ID, 'RESOLVED', STAFF_DETAIL.etag));
+  });
+
+  it('on 409 STALE_UPDATE reloads the ticket, shows the stale message, and the retry carries the fresh etag', async () => {
+    const freshDetail = { ...STAFF_DETAIL, etag: '"2026-09-02T00:00:00.000Z"', itPriority: 'URGENT' };
+    const spy = vi.spyOn(staffTicketsApi, 'updateTicketStatus')
+      .mockRejectedValueOnce(new ApiError('changed', 409, [], 'STALE_UPDATE'))
+      .mockResolvedValueOnce({ ...freshDetail, status: 'RESOLVED' } as never);
+    vi.mocked(staffTicketsApi.fetchStaffTicketDetail)
+      .mockResolvedValueOnce(STAFF_DETAIL as never)
+      .mockResolvedValue(freshDetail as never);
+    await changeStatusToResolved();
+    await waitFor(() => expect(screen.getByText(/changed by someone else/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText('IT Priority')).toHaveValue('URGENT'));
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }));
+    await waitFor(() => expect(spy).toHaveBeenLastCalledWith(TICKET_ID, 'RESOLVED', freshDetail.etag));
+  });
+
+  it('on 428 PRECONDITION_REQUIRED shows the server message and does not show the stale text', async () => {
+    vi.spyOn(staffTicketsApi, 'updateTicketStatus').mockRejectedValue(
+      new ApiError('An If-Match header is required', 428, [], 'PRECONDITION_REQUIRED'),
+    );
+    await changeStatusToResolved();
+    await waitFor(() => expect(screen.getByText('An If-Match header is required')).toBeInTheDocument());
+    expect(screen.queryByText(/changed by someone else/i)).not.toBeInTheDocument();
   });
 });
