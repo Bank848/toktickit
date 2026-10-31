@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../../prisma';
 import { HttpError } from '../../../middleware/errorEnvelope';
+import { actionEtag } from '../../../services/actionTaken';
 
 export const STAFF_TICKET_INCLUDE = {
   category: { select: { id: true, name: true } },
@@ -18,6 +19,7 @@ export function serializeStaffTicketDetail(ticket: Prisma.TicketGetPayload<{ inc
     createdAt: ticket.createdAt, updatedAt: ticket.updatedAt, attachmentCount: ticket._count.attachments,
     requester: ticket.requester, owner: ticket.owner, resolutionSummary: ticket.resolutionSummary,
     version: ticket.version,
+    etag: actionEtag(ticket.updatedAt),
   };
 }
 

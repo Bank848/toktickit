@@ -4,6 +4,7 @@ import { prisma } from '../../../prisma';
 import { validateStaffListTicketsQuery } from '../../../validators/staffListTicketsQuery';
 import { ValidationHttpError, HttpError } from '../../../middleware/errorEnvelope';
 import { isValidTransition, STATUS_TRANSITIONS, type TicketStatus } from '../../../services/ticketStatusTransitions';
+import { actionEtag } from '../../../services/actionTaken';
 import { STAFF_TICKET_INCLUDE, serializeStaffTicketDetail, findTicketOrThrow } from './shared';
 import { staffCommentsRouter } from './comments';
 import { staffNotesRouter } from './notes';
@@ -177,21 +178,32 @@ staffTicketsRouter.patch('/:id/status', async (req, res, next) => {
       throw new ValidationHttpError([{ field: 'status', message: 'status must be one of ' + ALL_KNOWN_STATUSES.join(', ') }]);
     }
 
+    const ifMatch = req.header('If-Match')?.trim();
+    if (!ifMatch) {
+      throw new HttpError(428, 'PRECONDITION_REQUIRED', 'An If-Match header is required');
+    }
+
     const ticket = await findTicketOrThrow(req.params.id);
     const to = status as TicketStatus;
 
-    // Fast path: reject an invalid transition before opening a transaction.
-    assertTransitionAllowed(ticket.status as TicketStatus, to);
+    const stale = () => new HttpError(409, 'STALE_UPDATE', 'This ticket was changed by someone else; reload and try again');
+    const expectedUpdatedAt = new Date(ifMatch.replace(/^"(.*)"$/, '$1'));
+    if (Number.isNaN(expectedUpdatedAt.getTime())) throw stale();
 
     const updated = await prisma.$transaction(async (tx) => {
-      // Lock the Ticket row, then re-read its status under the lock. The gate count and the
-      // UPDATE below run under the same lock, and POST/PATCH on actions take FOR UPDATE on the
-      // same row (actions.ts lockTicketOrThrow), so a concurrent Action Taken create cannot slip
-      // between the count and the update, and a concurrent status change is re-validated.
-      const rows = await tx.$queryRaw<{ status: string }[]>`
-        SELECT "status"::text AS "status" FROM "Ticket" WHERE "id" = ${ticket.id} FOR UPDATE`;
+      // Lock the Ticket row, then read status and updatedAt under the lock. The If-Match compare,
+      // transition check, gate count and the conditional UPDATE all run under this one lock, and
+      // POST/PATCH on actions take FOR UPDATE on the same row (actions.ts lockTicketOrThrow), so a
+      // concurrent Action Taken create cannot slip between the count and the update.
+      const rows = await tx.$queryRaw<{ status: string; updatedAt: Date }[]>`
+        SELECT "status"::text AS "status", "updatedAt" FROM "Ticket" WHERE "id" = ${ticket.id} FOR UPDATE`;
       if (rows.length === 0) throw new HttpError(404, 'TICKET_NOT_FOUND', 'Ticket not found');
-      assertTransitionAllowed(rows[0].status as TicketStatus, to);
+      const current = rows[0];
+
+      // Stale first (api-spec 4.4): a caller holding an old view learns the ticket changed
+      // instead of getting an error computed from a state it never saw.
+      if (current.updatedAt.getTime() !== expectedUpdatedAt.getTime()) throw stale();
+      assertTransitionAllowed(current.status as TicketStatus, to);
 
       // FR-06/BR-09: checked after the transition-matrix and terminal-lock checks so an invalid
       // transition or a locked ticket keeps returning its existing error code (api-spec 4.2).
@@ -207,12 +219,16 @@ staffTicketsRouter.patch('/:id/status', async (req, res, next) => {
         }
       }
 
-      return tx.ticket.update({
-        where: { id: ticket.id },
+      // Atomic conditional update: zero rows means the status or updatedAt moved (api-spec 4.4).
+      const { count } = await tx.ticket.updateMany({
+        where: { id: ticket.id, status: current.status as never, updatedAt: expectedUpdatedAt },
         data: { status: to },
-        include: STAFF_TICKET_INCLUDE,
       });
+      if (count === 0) throw stale();
+      return tx.ticket.findUniqueOrThrow({ where: { id: ticket.id }, include: STAFF_TICKET_INCLUDE });
     });
+
+    res.setHeader('ETag', actionEtag(updated.updatedAt));
     res.status(200).json(serializeStaffTicketDetail(updated));
   } catch (error) {
     next(error);

@@ -5,6 +5,7 @@ import { prisma } from '../../src/prisma';
 import { truncateTicketTables } from '../helpers/resetDb';
 import { loginAs } from '../helpers/auth';
 import { SEED_EMAILS } from '../helpers/staffFixtures';
+import { patchStatus as patchStatusRequest } from '../helpers/statusRequest';
 import { generateTicketNumber } from '../../src/services/ticketNumber';
 
 describe('PATCH /api/v1/staff/tickets/:id/status', () => {
@@ -36,7 +37,7 @@ describe('PATCH /api/v1/staff/tickets/:id/status', () => {
   }
 
   async function patchStatus(id: string, status: string) {
-    return request(app).patch(`/api/v1/staff/tickets/${id}/status`).set('Cookie', staffCookie).send({ status });
+    return patchStatusRequest(staffCookie, id, status);
   }
 
   // Table-driven test covering all 13 direct rows of specification.md §4.4 (row 1, NEW->OPEN,

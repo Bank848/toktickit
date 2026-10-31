@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import request from 'supertest';
 import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
+import { patchStatus } from '../helpers/statusRequest';
 import { app } from '../../src/app';
 import { prisma } from '../../src/prisma';
 import { truncateTicketTables } from '../helpers/resetDb';
@@ -40,10 +41,7 @@ describe('FR-06/BR-09 resolution gate', () => {
 
   it('rejects RESOLVED with 409 RESOLUTION_REQUIRES_ACTION_TAKEN when zero Action Taken records exist (AC-04)', async () => {
     const ticket = await createTicket('IN_PROGRESS');
-    const response = await request(app)
-      .patch(`/api/v1/staff/tickets/${ticket.id}/status`)
-      .set('Cookie', staffCookie)
-      .send({ status: 'RESOLVED' });
+    const response = await patchStatus(staffCookie, ticket.id, 'RESOLVED');
     expect(response.status).toBe(409);
     expect(response.body.error.code).toBe('RESOLUTION_REQUIRES_ACTION_TAKEN');
     const reloaded = await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
@@ -55,10 +53,7 @@ describe('FR-06/BR-09 resolution gate', () => {
     await prisma.actionTaken.create({
       data: { ticketId: ticket.id, performedById: staffId, actionAt: new Date(), description: 'Cleared the jam and ran 10 test pages.', result: 'RESOLVED', followUpRequired: false },
     });
-    const response = await request(app)
-      .patch(`/api/v1/staff/tickets/${ticket.id}/status`)
-      .set('Cookie', staffCookie)
-      .send({ status: 'RESOLVED' });
+    const response = await patchStatus(staffCookie, ticket.id, 'RESOLVED');
     expect(response.status).toBe(200);
     expect(response.body.status).toBe('RESOLVED');
   });
@@ -68,10 +63,7 @@ describe('FR-06/BR-09 resolution gate', () => {
     await prisma.actionTaken.create({
       data: { ticketId: ticket.id, performedById: staffId, actionAt: new Date(), description: 'Confirmed fix with requester.', result: 'RESOLVED', followUpRequired: false },
     });
-    const response = await request(app)
-      .patch(`/api/v1/staff/tickets/${ticket.id}/status`)
-      .set('Cookie', staffCookie)
-      .send({ status: 'RESOLVED' });
+    const response = await patchStatus(staffCookie, ticket.id, 'RESOLVED');
     expect(response.status).toBe(200);
   });
 
@@ -80,29 +72,20 @@ describe('FR-06/BR-09 resolution gate', () => {
     await prisma.actionTaken.create({
       data: { ticketId: ticket.id, performedById: staffId, actionAt: new Date(), description: 'Escalated to vendor, vendor confirmed fix over the phone.', result: 'ESCALATED', followUpRequired: false },
     });
-    const response = await request(app)
-      .patch(`/api/v1/staff/tickets/${ticket.id}/status`)
-      .set('Cookie', staffCookie)
-      .send({ status: 'RESOLVED' });
+    const response = await patchStatus(staffCookie, ticket.id, 'RESOLVED');
     expect(response.status).toBe(200);
   });
 
   it('an invalid transition to RESOLVED (e.g. from NEW) still returns the pre-existing error, not the gate error', async () => {
     const ticket = await createTicket('NEW');
-    const response = await request(app)
-      .patch(`/api/v1/staff/tickets/${ticket.id}/status`)
-      .set('Cookie', staffCookie)
-      .send({ status: 'RESOLVED' });
+    const response = await patchStatus(staffCookie, ticket.id, 'RESOLVED');
     expect(response.status).toBe(409);
     expect(response.body.error.code).toBe('INVALID_STATUS_TRANSITION');
   });
 
   it('a status change that does not target RESOLVED is unaffected by the gate even with zero Action Taken records', async () => {
     const ticket = await createTicket('OPEN');
-    const response = await request(app)
-      .patch(`/api/v1/staff/tickets/${ticket.id}/status`)
-      .set('Cookie', staffCookie)
-      .send({ status: 'IN_PROGRESS' });
+    const response = await patchStatus(staffCookie, ticket.id, 'IN_PROGRESS');
     expect(response.status).toBe(200);
   });
 
@@ -111,14 +94,11 @@ describe('FR-06/BR-09 resolution gate', () => {
     await prisma.actionTaken.create({
       data: { ticketId: ticket.id, performedById: staffId, actionAt: new Date(), description: 'First fix.', result: 'RESOLVED', followUpRequired: false },
     });
-    await request(app).patch(`/api/v1/staff/tickets/${ticket.id}/status`).set('Cookie', staffCookie).send({ status: 'RESOLVED' });
-    await request(app).patch(`/api/v1/staff/tickets/${ticket.id}/status`).set('Cookie', staffCookie).send({ status: 'REOPENED' });
-    await request(app).patch(`/api/v1/staff/tickets/${ticket.id}/status`).set('Cookie', staffCookie).send({ status: 'OPEN' });
-    await request(app).patch(`/api/v1/staff/tickets/${ticket.id}/status`).set('Cookie', staffCookie).send({ status: 'IN_PROGRESS' });
-    const response = await request(app)
-      .patch(`/api/v1/staff/tickets/${ticket.id}/status`)
-      .set('Cookie', staffCookie)
-      .send({ status: 'RESOLVED' });
+    await patchStatus(staffCookie, ticket.id, 'RESOLVED');
+    await patchStatus(staffCookie, ticket.id, 'REOPENED');
+    await patchStatus(staffCookie, ticket.id, 'OPEN');
+    await patchStatus(staffCookie, ticket.id, 'IN_PROGRESS');
+    const response = await patchStatus(staffCookie, ticket.id, 'RESOLVED');
     expect(response.status).toBe(200);
   });
 
@@ -133,10 +113,7 @@ describe('FR-06/BR-09 resolution gate', () => {
         result: 'RESOLVED', followUpRequired: false,
       });
     expect(created.status).toBe(201);
-    const response = await request(app)
-      .patch(`/api/v1/staff/tickets/${ticket.id}/status`)
-      .set('Cookie', adminCookie)
-      .send({ status: 'RESOLVED' });
+    const response = await patchStatus(adminCookie, ticket.id, 'RESOLVED');
     expect(response.status).toBe(200);
   });
 
@@ -149,7 +126,7 @@ describe('FR-06/BR-09 resolution gate', () => {
     await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "Ticket" WHERE "id" = ${ticketId} FOR UPDATE`;
       pending = Promise.resolve(
-        request(app).patch(`/api/v1/staff/tickets/${ticketId}/status`).set('Cookie', staffCookie).send({ status: 'RESOLVED' }),
+        patchStatus(staffCookie, ticketId, 'RESOLVED'),
       );
       await new Promise((resolve) => setTimeout(resolve, 500));
       await mutate(tx);
@@ -182,7 +159,7 @@ describe('FR-06/BR-09 resolution gate', () => {
     expect(reloaded.status).toBe('IN_PROGRESS');
   });
 
-  it('a status change committed while the request waits on the Ticket lock is re-validated against the fresh status', async () => {
+  it('a change committed while the request waits on the Ticket lock makes the held If-Match stale (409 STALE_UPDATE)', async () => {
     const ticket = await createTicket('IN_PROGRESS');
     await prisma.actionTaken.create({
       data: { ticketId: ticket.id, performedById: staffId, actionAt: new Date(), description: 'Has a record.', result: 'RESOLVED', followUpRequired: false },
@@ -191,7 +168,7 @@ describe('FR-06/BR-09 resolution gate', () => {
       await tx.ticket.update({ where: { id: ticket.id }, data: { status: 'CLOSED' } });
     });
     expect(response.status).toBe(409);
-    expect(response.body.error.code).toBe('TICKET_LOCKED');
+    expect(response.body.error.code).toBe('STALE_UPDATE');
     const reloaded = await prisma.ticket.findUniqueOrThrow({ where: { id: ticket.id } });
     expect(reloaded.status).toBe('CLOSED');
   });
