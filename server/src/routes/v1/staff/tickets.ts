@@ -4,6 +4,7 @@ import { prisma } from '../../../prisma';
 import { validateStaffListTicketsQuery } from '../../../validators/staffListTicketsQuery';
 import { ValidationHttpError, HttpError } from '../../../middleware/errorEnvelope';
 import { isValidTransition, STATUS_TRANSITIONS, type TicketStatus } from '../../../services/ticketStatusTransitions';
+import { actionEtag } from '../../../services/actionTaken';
 import { STAFF_TICKET_INCLUDE, serializeStaffTicketDetail, findTicketOrThrow } from './shared';
 import { staffCommentsRouter } from './comments';
 import { staffNotesRouter } from './notes';
@@ -157,6 +158,19 @@ staffTicketsRouter.patch('/:id/priority', async (req, res, next) => {
 // target" business rule, not the request-shape validation layer).
 const ALL_KNOWN_STATUSES = Object.keys(STATUS_TRANSITIONS) as TicketStatus[];
 
+function assertTransitionAllowed(from: TicketStatus, to: TicketStatus): void {
+  if (isValidTransition(from, to)) return;
+  // Same distinction as the /priority endpoint (Task 22, Step 6.3): a rejected transition
+  // out of a terminal status (CLOSED/CANCELLED) is a lock violation, not a generic invalid
+  // transition -- api-spec.md requires TICKET_LOCKED here specifically. The one still-valid
+  // escape out of a terminal status, CLOSED -> REOPENED, is accepted by isValidTransition()
+  // and never reaches this branch, so it is unaffected.
+  if (TERMINAL_STATUSES.includes(from as never)) {
+    throw new HttpError(409, 'TICKET_LOCKED', `Cannot change status on a ${from} ticket`);
+  }
+  throw new HttpError(409, 'INVALID_STATUS_TRANSITION', `Cannot change status from ${from} to ${to}`);
+}
+
 staffTicketsRouter.patch('/:id/status', async (req, res, next) => {
   try {
     const { status } = req.body ?? {};
@@ -164,27 +178,57 @@ staffTicketsRouter.patch('/:id/status', async (req, res, next) => {
       throw new ValidationHttpError([{ field: 'status', message: 'status must be one of ' + ALL_KNOWN_STATUSES.join(', ') }]);
     }
 
-    const ticket = await findTicketOrThrow(req.params.id);
-    const from = ticket.status as TicketStatus;
-    const to = status as TicketStatus;
-
-    if (!isValidTransition(from, to)) {
-      // Same distinction as the /priority endpoint (Task 22, Step 6.3): a rejected transition
-      // out of a terminal status (CLOSED/CANCELLED) is a lock violation, not a generic invalid
-      // transition -- api-spec.md requires TICKET_LOCKED here specifically. The one still-valid
-      // escape out of a terminal status, CLOSED -> REOPENED, is accepted by isValidTransition()
-      // above and never reaches this branch, so it is unaffected.
-      if (TERMINAL_STATUSES.includes(from as never)) {
-        throw new HttpError(409, 'TICKET_LOCKED', `Cannot change status on a ${from} ticket`);
-      }
-      throw new HttpError(409, 'INVALID_STATUS_TRANSITION', `Cannot change status from ${from} to ${to}`);
+    const ifMatch = req.header('If-Match')?.trim();
+    if (!ifMatch) {
+      throw new HttpError(428, 'PRECONDITION_REQUIRED', 'An If-Match header is required');
     }
 
-    const updated = await prisma.ticket.update({
-      where: { id: ticket.id },
-      data: { status: to },
-      include: STAFF_TICKET_INCLUDE,
+    const ticket = await findTicketOrThrow(req.params.id);
+    const to = status as TicketStatus;
+
+    const stale = () => new HttpError(409, 'STALE_UPDATE', 'This ticket was changed by someone else; reload and try again');
+    const expectedUpdatedAt = new Date(ifMatch.replace(/^"(.*)"$/, '$1'));
+    if (Number.isNaN(expectedUpdatedAt.getTime())) throw stale();
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // Lock the Ticket row, then read status and updatedAt under the lock. The If-Match compare,
+      // transition check, gate count and the conditional UPDATE all run under this one lock, and
+      // POST/PATCH on actions take FOR UPDATE on the same row (actions.ts lockTicketOrThrow), so a
+      // concurrent Action Taken create cannot slip between the count and the update.
+      const rows = await tx.$queryRaw<{ status: string; updatedAt: Date }[]>`
+        SELECT "status"::text AS "status", "updatedAt" FROM "Ticket" WHERE "id" = ${ticket.id} FOR UPDATE`;
+      if (rows.length === 0) throw new HttpError(404, 'TICKET_NOT_FOUND', 'Ticket not found');
+      const current = rows[0];
+
+      // Stale first (api-spec 4.4): a caller holding an old view learns the ticket changed
+      // instead of getting an error computed from a state it never saw.
+      if (current.updatedAt.getTime() !== expectedUpdatedAt.getTime()) throw stale();
+      assertTransitionAllowed(current.status as TicketStatus, to);
+
+      // FR-06/BR-09: checked after the transition-matrix and terminal-lock checks so an invalid
+      // transition or a locked ticket keeps returning its existing error code (api-spec 4.2).
+      // Counts records regardless of Result (D-02) -- never filter by result: 'RESOLVED' here.
+      if (to === 'RESOLVED') {
+        const actionCount = await tx.actionTaken.count({ where: { ticketId: ticket.id } });
+        if (actionCount === 0) {
+          throw new HttpError(
+            409,
+            'RESOLUTION_REQUIRES_ACTION_TAKEN',
+            'Record at least one Action Taken before resolving this ticket',
+          );
+        }
+      }
+
+      // Atomic conditional update: zero rows means the status or updatedAt moved (api-spec 4.4).
+      const { count } = await tx.ticket.updateMany({
+        where: { id: ticket.id, status: current.status as never, updatedAt: expectedUpdatedAt },
+        data: { status: to },
+      });
+      if (count === 0) throw stale();
+      return tx.ticket.findUniqueOrThrow({ where: { id: ticket.id }, include: STAFF_TICKET_INCLUDE });
     });
+
+    res.setHeader('ETag', actionEtag(updated.updatedAt));
     res.status(200).json(serializeStaffTicketDetail(updated));
   } catch (error) {
     next(error);

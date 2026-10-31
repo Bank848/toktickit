@@ -30,7 +30,7 @@ export interface ListStaffTicketsResult {
 
 async function throwApiError(response: Response, fallbackMessage: string): Promise<never> {
   const body = await response.json().catch(() => null);
-  throw new ApiError(body?.error?.message ?? fallbackMessage, response.status, body?.error?.fieldErrors ?? []);
+  throw new ApiError(body?.error?.message ?? fallbackMessage, response.status, body?.error?.fieldErrors ?? [], body?.error?.code);
 }
 
 export async function fetchStaffTickets(query: StaffListTicketsQuery = {}): Promise<ListStaffTicketsResult> {
@@ -97,10 +97,11 @@ export async function updateTicketPriority(ticketId: string, itPriority: string)
   return response.json();
 }
 
-export async function updateTicketStatus(ticketId: string, status: string): Promise<StaffTicketDetailDto> {
+// The status endpoint requires If-Match (api-spec 4.4): pass the etag of the Ticket the user is viewing.
+export async function updateTicketStatus(ticketId: string, status: string, etag: string): Promise<StaffTicketDetailDto> {
   const response = await fetch(`${API_BASE_URL}/api/v1/staff/tickets/${ticketId}/status`, {
     method: 'PATCH', credentials: 'include',
-    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }),
+    headers: { 'Content-Type': 'application/json', 'If-Match': etag }, body: JSON.stringify({ status }),
   });
   if (!response.ok) return throwApiError(response, 'Failed to update status');
   return response.json();

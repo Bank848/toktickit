@@ -13,7 +13,7 @@ const DETAIL = {
   requestedPriority: 'HIGH', itPriority: 'HIGH', createdAt: '2026-09-01T00:00:00Z',
   updatedAt: '2026-09-01T00:00:00Z', attachmentCount: 0,
   requester: { id: 'r1', displayName: 'Nattapong R.' }, owner: { id: 'owner-1', displayName: 'Jane Staff' },
-  resolutionSummary: null, version: 0,
+  resolutionSummary: null, version: 0, etag: '"2026-09-01T00:00:00.000Z"',
 };
 
 function renderPage() {
@@ -58,7 +58,7 @@ describe('StaffTicketDetailPage', () => {
     expect(optionValues.sort()).toEqual(['', 'CANCELLED', 'IN_PROGRESS', 'WAITING_FOR_REQUESTER'].sort());
 
     fireEvent.change(select, { target: { value: 'IN_PROGRESS' } });
-    await waitFor(() => expect(api.updateTicketStatus).toHaveBeenCalledWith('t1', 'IN_PROGRESS'));
+    await waitFor(() => expect(api.updateTicketStatus).toHaveBeenCalledWith('t1', 'IN_PROGRESS', DETAIL.etag));
   });
 
   it('never visually displays a status the ticket does not have -- the select falls back to the disabled placeholder, not the first transition option (N17)', async () => {
