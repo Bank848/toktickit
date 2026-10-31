@@ -108,6 +108,17 @@ export function StaffTicketDetailPage() {
   useEffect(() => { loadNotes(); }, [loadNotes]);
   useEffect(() => { loadAttachments(); }, [loadAttachments]);
 
+  const RESOLUTION_GATE_MESSAGE = 'This ticket cannot be marked Resolved yet — record an Action Taken first.';
+
+  // Branches on the error code only, never on message text (ui-spec section 4): another 409 may
+  // legitimately mention "action" or "resolve".
+  function statusErrorMessage(error: unknown, fallback: string): string {
+    if (error instanceof ApiError && error.code === 'RESOLUTION_REQUIRES_ACTION_TAKEN') {
+      return RESOLUTION_GATE_MESSAGE;
+    }
+    return error instanceof ApiError ? error.message : fallback;
+  }
+
   async function runFieldUpdate(
     field: FieldKey,
     value: string,
@@ -120,7 +131,8 @@ export function StaffTicketDetailPage() {
       const updated = await update(ticketId, value);
       setTicket(updated);
     } catch (error) {
-      setFieldErrors((prev) => ({ ...prev, [field]: error instanceof ApiError ? error.message : fallbackMessage }));
+      const message = field === 'status' ? statusErrorMessage(error, fallbackMessage) : (error instanceof ApiError ? error.message : fallbackMessage);
+      setFieldErrors((prev) => ({ ...prev, [field]: message }));
     }
   }
 

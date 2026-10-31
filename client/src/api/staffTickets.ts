@@ -30,7 +30,7 @@ export interface ListStaffTicketsResult {
 
 async function throwApiError(response: Response, fallbackMessage: string): Promise<never> {
   const body = await response.json().catch(() => null);
-  throw new ApiError(body?.error?.message ?? fallbackMessage, response.status, body?.error?.fieldErrors ?? []);
+  throw new ApiError(body?.error?.message ?? fallbackMessage, response.status, body?.error?.fieldErrors ?? [], body?.error?.code);
 }
 
 export async function fetchStaffTickets(query: StaffListTicketsQuery = {}): Promise<ListStaffTicketsResult> {
