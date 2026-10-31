@@ -9,24 +9,26 @@ Counts and states are the GitHub review states as returned (`APPROVED`, `CHANGES
 ## Reviewer identity
 
 - Author of the Lab 4 pull requests in this repository: Bank848 (Bank).
-- Reviewers of those pull requests: ArmmyC (#58, #59) and TauForge (#60, #61, #62).
+- Reviewers of those pull requests: ArmmyC (#58, #59) and TauForge (#60, #61, #62, #63).
+- Release PR into `main`: [#64](https://github.com/Bank848/toktickit/pull/64), reviewer ArmmyC requested.
 - Reviews written by Bank848 on teammates' Lab 4 pull requests: see "Reviews given" below.
 
 ## Reviews received (Bank848/toktickit, base `lab4-staging`)
 
 | PR | Issue | Title | Reviewer | Reviews (in order) | Merged |
 |---|---|---|---|---|---|
-| [#58](https://github.com/Bank848/toktickit/pull/58) | #52 | docs(lab-04): Sprint 4 engineering contract | ArmmyC | 6 x CHANGES_REQUESTED (2026-10-08 to 2026-10-29) | yes |
+| [#58](https://github.com/Bank848/toktickit/pull/58) | #52 | docs(lab-04): Sprint 4 engineering contract | ArmmyC | 6 x CHANGES_REQUESTED (2026-10-08 to 2026-10-29), 12 x COMMENTED, then APPROVED (2026-10-30) | yes |
 | [#59](https://github.com/Bank848/toktickit/pull/59) | #53 | feat(lab-04): Action Taken foundation (model, migration, seed, API) | ArmmyC | 3 x CHANGES_REQUESTED, then APPROVED (2026-10-30) | yes |
 | [#60](https://github.com/Bank848/toktickit/pull/60) | #54 | feat(lab-04): Action Taken UI | TauForge | APPROVED (2026-10-31) | yes |
 | [#61](https://github.com/Bank848/toktickit/pull/61) | #55 | feat(lab-04): ticket resolution gate | TauForge | APPROVED (2026-10-31) | yes |
 | [#62](https://github.com/Bank848/toktickit/pull/62) | #56 | feat(lab-04): role dashboards | TauForge | APPROVED (2026-10-31) | yes |
-| this PR | #57 | feat(lab-04): final hardening and regression | pending | no review at the time of writing | no |
+| [#63](https://github.com/Bank848/toktickit/pull/63) | #57 | feat(lab-04): final hardening and regression | TauForge | APPROVED (2026-10-31) | yes |
 
-The data pulled for #58 contains no APPROVED review from ArmmyC. The last review on that PR is a
-CHANGES_REQUESTED review dated 2026-10-29T15:30:27Z, followed by Bank848's PR comment of
-2026-10-30 saying both remaining findings were closed and asking for a merge into `lab4-staging`.
-The PR is recorded as merged.
+#58 was merged on 2026-10-30 after ArmmyC's final review, an APPROVED review on head `18266aa` dated
+2026-10-30T07:38:19Z. That review says the stale-update and test-path findings are fixed, the PR is
+linked to Issue #52 and contains only the four files of the issue, and accepts D-07 as a documented
+team interpretation based on the handout context. An earlier version of this record said #58 had no
+APPROVED review; that was wrong, it was written from data pulled before the approval was read.
 
 ### PR #58 (contract and test plan)
 
@@ -50,8 +52,8 @@ CMP-33 and E2E-07 named as the UI-style coverage; secondary ordering key `id`; i
 internal plan file removed. For the append-only point, Bank848 recorded the team's reading as D-07
 (Public Comments, Internal Notes and the TicketEvent trail are append-only; Action Taken stays
 editable with a frozen performer and a logged edit) and asked ArmmyC to confirm or correct it.
-ArmmyC's later reviews state that no instructor-approved decision for D-07 was found, so that point
-was still open at the final review. The Development-panel link for Issue #52 was added after the
+ArmmyC's later reviews state that no instructor-approved decision for D-07 was found. The final
+review accepts D-07 as a documented team interpretation. The Development-panel link for Issue #52 was added after the
 first review, as requested.
 
 Later rounds (2026-10-29): ArmmyC reported the issue link, target branch and file scope as fixed,
@@ -76,14 +78,17 @@ asked for finished Issue #53 rows in `tests.md` to be marked Done, which was fix
 fourth review is APPROVED. The `actionAt` offset question was recorded in `api-spec.md` and tested
 by API-52.
 
-### PRs #60 to #62
+### PRs #60 to #63
 
 Each carries one APPROVED review from TauForge with no inline comments and no requested changes.
 Bank848 added one PR comment on each. On #61 the comment states that API-47 (exactly one
 TicketEvent per status change) was left open because it needs a migration for a status-change event
 type. On #62 the comment states that the Unassigned card excludes CLOSED and CANCELLED Tickets while
 its `ownerId=unassigned` link lists every status, so the card number can be lower than the list
-total, and that the behaviour was left unchanged. Both items are carried into `docs/lab-04/tests.md`.
+total, and that the behaviour was left unchanged. Both items are carried into `docs/lab-04/tests.md`. #63 (final hardening) got one APPROVED review from
+TauForge on 2026-10-31. The review text quoted test counts and fixes from TauForge's own PR #56
+(406 server tests, owner select, checkbox CSS), so Bank848 posted a comment with the real numbers for
+#63: 375 server tests, 219 client tests, 45 of 54 Playwright scenarios passing.
 
 ## Reviews given
 
@@ -135,7 +140,7 @@ raised:
 
 ## Approvals
 
-Every pull request of this repository merged in Sprint 4 except #58 has an APPROVED review in the
-pulled data (#59 from ArmmyC, #60 to #62 from TauForge). #58 merged with six CHANGES_REQUESTED
-reviews on record and no APPROVED review, as described above. This PR (#57 work) is open as a draft
-and has no review yet.
+Every pull request of this repository merged in Sprint 4 has an APPROVED review in the pulled data:
+#58 and #59 from ArmmyC, #60 to #63 from TauForge. #58 and #59 each went through several
+CHANGES_REQUESTED rounds first. The release PR [#64](https://github.com/Bank848/toktickit/pull/64)
+(`lab4-staging` into `main`) is open and waiting for review.
