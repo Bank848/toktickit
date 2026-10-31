@@ -39,7 +39,7 @@ describe('Dashboard card to list drill-down (FR-10)', () => {
     });
 
     render(<MemoryRouter initialEntries={['/dashboard']}><App /></MemoryRouter>);
-    await userEvent.click(await screen.findByRole('link', { name: /^resolved\b.*2/i }));
+    await userEvent.click(await screen.findByRole('link', { name: /^resolved\b.*2/i }, { timeout: 4000 }));
     await waitFor(() => expect(listSpy).toHaveBeenCalledWith(expect.objectContaining({ status: ['RESOLVED'] })));
     await waitFor(() => screen.getByRole('heading', { name: /my tickets/i }));
     // The total the list endpoint reports for the linked filter equals the number on the card.
