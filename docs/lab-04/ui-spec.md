@@ -69,7 +69,7 @@ Required is checked with an empty Follow-up Note, and while Action Date/Time is 
 | Submitting | All fields and Cancel disabled, Save `aria-busy="true"` |
 | Save error | `role="alert"` danger alert inside the form with the server message (or `Failed to save Action Taken`), form stays open, every entered value is preserved so the user can fix and resubmit |
 | Retry | Opening the form creates one `Idempotency-Key` (UUID); every resubmit of that form reuses it, so a retry after a lost response cannot create a second record. Closing and reopening the form makes a new key |
-| Stale edit | Edit sends `If-Match` with the `updatedAt` it loaded. On 409 `STALE_UPDATE` the form stays open, shows `This record was changed by someone else. Reload to see the latest version.` and a Reload button that refetches the list; entered values are kept |
+| Stale edit | Edit sends `If-Match` with the record's `etag` field, copied unchanged from the list. On 409 `STALE_UPDATE` the form stays open, shows `This record was changed by someone else. Reload to see the latest version.` and a Reload button that refetches the list; entered values are kept |
 | Success | Form closes, the list shows the new or updated record, no page reload |
 
 Server validation errors for fields the client already blocks (empty description, missing note,

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { fetchTicketDetail, ApiError, type TicketDetailDto } from '../api/tickets';
 import { AttachmentSection } from '../components/AttachmentSection';
 import { CommentSection } from '../components/CommentSection';
+import { ActionsTakenReadOnlySection } from '../components/ActionsTakenReadOnlySection';
 import { TicketStatusBadge, PriorityBadge } from '../components/TicketStatusBadge';
 import { Icon } from '../components/Icon';
 
@@ -166,6 +167,12 @@ export function TicketDetailPage() {
           <div className="card mt-3">
             <div className="card-body">
               <CommentSection ticketId={ticket.id} />
+            </div>
+          </div>
+
+          <div className="card mt-3">
+            <div className="card-body">
+              <ActionsTakenReadOnlySection ticketId={ticket.id} />
             </div>
           </div>
         </>
