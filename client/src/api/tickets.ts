@@ -44,6 +44,8 @@ export interface TicketDetailDto {
   owner: { id: string; displayName: string } | null;
   resolutionSummary: string | null;
   version: number;
+  /** Quoted updatedAt validator; staff detail responses carry it (api-spec 4.4). */
+  etag?: string;
 }
 
 export interface TicketListItemDto {
