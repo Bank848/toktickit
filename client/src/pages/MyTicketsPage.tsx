@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { fetchTickets, type TicketListItemDto, type ListTicketsMeta } from '../api/tickets';
 import { fetchCategories, type CategoryDto } from '../api/lookups';
 import { TicketStatusBadge, STATUS_OPTIONS } from '../components/TicketStatusBadge';
@@ -34,11 +34,23 @@ function isFilterActive(query: QueryState): boolean {
 
 export function MyTicketsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [categories, setCategories] = useState<CategoryDto[]>([]);
 
   const [searchInput, setSearchInput] = useState('');
-  const [query, setQuery] = useState<QueryState>(DEFAULT_QUERY);
+  // Hydrated from the URL (FR-10) so a dashboard link lands here pre-filtered, and re-read whenever
+  // the query string changes (effect below), because following a dashboard link while this page is
+  // already mounted does not remount it. Changing a filter in the page does not rewrite the URL.
+  const [query, setQuery] = useState<QueryState>(() => ({ ...DEFAULT_QUERY, status: searchParams.getAll('status') }));
+  const lastSearch = useRef(searchParams.toString());
+  useEffect(() => {
+    const current = searchParams.toString();
+    if (current === lastSearch.current) return;
+    lastSearch.current = current;
+    setSearchInput('');
+    setQuery({ ...DEFAULT_QUERY, status: searchParams.getAll('status') });
+  }, [searchParams]);
 
   const [tickets, setTickets] = useState<TicketListItemDto[]>([]);
   const [meta, setMeta] = useState<ListTicketsMeta>({ page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 1 });

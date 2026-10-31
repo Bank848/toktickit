@@ -36,6 +36,15 @@ enum TicketEventType {
   COMMENT_ADDED
   ATTACHMENT_ADDED
   ATTACHMENT_REMOVED
+  ACTION_TAKEN_ADDED
+  ACTION_TAKEN_UPDATED
+}
+
+enum ActionResult {
+  RESOLVED
+  ESCALATED
+  NO_ACTION_NEEDED
+  PENDING_FOLLOW_UP
 }
 
 model User {
@@ -57,6 +66,8 @@ model User {
   events             TicketEvent[]
   sessions           Session[]
   internalNotes      InternalNote[]
+  performedActions   ActionTaken[]  @relation("ActionPerformer")
+  editedActions      ActionTaken[]  @relation("ActionEditor")
 }
 
 model Session {
@@ -116,10 +127,13 @@ model Ticket {
   internalNotes InternalNote[]
   attachments   Attachment[]
   events        TicketEvent[]
+  actionsTaken  ActionTaken[]
 
   @@index([requesterId, createdAt])
   @@index([status])
   @@index([categoryId])
+  @@index([ownerId, status])
+  @@index([updatedAt])
 }
 
 model Comment {
@@ -176,6 +190,31 @@ model TicketEvent {
   createdAt DateTime        @default(now())
 
   @@index([ticketId, createdAt])
+}
+
+model ActionTaken {
+  id               String       @id @default(uuid())
+  ticketId         String
+  ticket           Ticket       @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+
+  performedById    String
+  performedBy      User         @relation("ActionPerformer", fields: [performedById], references: [id], onDelete: Restrict)
+  lastEditedById   String?
+  lastEditedBy     User?        @relation("ActionEditor", fields: [lastEditedById], references: [id], onDelete: Restrict)
+
+  actionAt         DateTime
+  description      String       @db.VarChar(2000)
+  result           ActionResult
+  followUpRequired Boolean      @default(false)
+  followUpNote     String?      @db.VarChar(1000)
+  attachmentNotes  String?      @db.VarChar(500)
+  idempotencyKey   String?      @db.VarChar(64)
+
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([ticketId, actionAt])
+  @@unique([ticketId, performedById, idempotencyKey])
 }
 
 model TicketCounter {

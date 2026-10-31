@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Outlet, Navigate, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { HOME_ROUTE } from '../lib/homeRoute';
 
 const ROLE_LABEL: Record<string, string> = {
   REQUESTER: 'Requester',
@@ -8,16 +9,11 @@ const ROLE_LABEL: Record<string, string> = {
   ADMINISTRATOR: 'Administrator',
 };
 
-const HOME_ROUTE: Record<string, string> = {
-  REQUESTER: '/tickets',
-  IT_STAFF: '/staff/tickets',
-  ADMINISTRATOR: '/admin/users',
-};
-
-function requiredRoleFor(pathname: string): string | null {
-  if (pathname.startsWith('/staff')) return 'IT_STAFF';
-  if (pathname.startsWith('/admin')) return 'ADMINISTRATOR';
-  if (pathname.startsWith('/tickets')) return 'REQUESTER';
+// Administrators may use the staff screens too (specification.md section 7).
+function allowedRolesFor(pathname: string): string[] | null {
+  if (pathname.startsWith('/staff')) return ['IT_STAFF', 'ADMINISTRATOR'];
+  if (pathname.startsWith('/admin')) return ['ADMINISTRATOR'];
+  if (pathname.startsWith('/tickets') || pathname.startsWith('/dashboard')) return ['REQUESTER'];
   return null;
 }
 
@@ -36,8 +32,8 @@ export function AppShell() {
   if (currentUser.mustChangePassword) {
     return <Navigate to="/change-password" replace />;
   }
-  const requiredRole = requiredRoleFor(location.pathname);
-  if (requiredRole && requiredRole !== currentUser.role) {
+  const allowedRoles = allowedRolesFor(location.pathname);
+  if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
     return <Navigate to={HOME_ROUTE[currentUser.role]} replace />;
   }
 
@@ -78,6 +74,11 @@ export function AppShell() {
                 {currentUser.role === 'REQUESTER' && (
                   <>
                     <li className="nav-item">
+                      <NavLink to="/dashboard" className="nav-link" onClick={() => setNavOpen(false)}>
+                        Dashboard
+                      </NavLink>
+                    </li>
+                    <li className="nav-item">
                       <NavLink to="/tickets" end className="nav-link" onClick={() => setNavOpen(false)}>
                         My Tickets
                       </NavLink>
@@ -88,6 +89,13 @@ export function AppShell() {
                       </NavLink>
                     </li>
                   </>
+                )}
+                {(currentUser.role === 'IT_STAFF' || currentUser.role === 'ADMINISTRATOR') && (
+                  <li className="nav-item">
+                    <NavLink to="/staff/dashboard" className="nav-link" onClick={() => setNavOpen(false)}>
+                      Dashboard
+                    </NavLink>
+                  </li>
                 )}
                 {currentUser.role === 'IT_STAFF' && (
                   <li className="nav-item">

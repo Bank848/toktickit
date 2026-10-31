@@ -10,6 +10,7 @@ import { ApiError } from '../api/tickets';
 import { displayCommentBody } from '../lib/commentDisplay';
 import { TicketStatusBadge, PriorityBadge, STATUS_OPTIONS, PRIORITY_OPTIONS } from '../components/TicketStatusBadge';
 import { Icon } from '../components/Icon';
+import { ActionsTakenSection } from '../components/ActionsTakenSection';
 
 // Humanized labels for the option lists below, kept in sync with the badges via the same source
 // maps (ui-spec.md never shows raw enum strings like WAITING_FOR_REQUESTER to a user).
@@ -107,6 +108,22 @@ export function StaffTicketDetailPage() {
   useEffect(() => { loadNotes(); }, [loadNotes]);
   useEffect(() => { loadAttachments(); }, [loadAttachments]);
 
+  const RESOLUTION_GATE_MESSAGE = 'This ticket cannot be marked Resolved yet — record an Action Taken first.';
+
+  // Branches on the error code only, never on message text (ui-spec section 4): another 409 may
+  // legitimately mention "action" or "resolve".
+  const STALE_TICKET_MESSAGE = 'This ticket was changed by someone else. The latest version is shown; try again.';
+
+  function statusErrorMessage(error: unknown, fallback: string): string {
+    if (error instanceof ApiError && error.code === 'RESOLUTION_REQUIRES_ACTION_TAKEN') {
+      return RESOLUTION_GATE_MESSAGE;
+    }
+    if (error instanceof ApiError && error.code === 'STALE_UPDATE') {
+      return STALE_TICKET_MESSAGE;
+    }
+    return error instanceof ApiError ? error.message : fallback;
+  }
+
   async function runFieldUpdate(
     field: FieldKey,
     value: string,
@@ -119,7 +136,12 @@ export function StaffTicketDetailPage() {
       const updated = await update(ticketId, value);
       setTicket(updated);
     } catch (error) {
-      setFieldErrors((prev) => ({ ...prev, [field]: error instanceof ApiError ? error.message : fallbackMessage }));
+      if (field === 'status' && error instanceof ApiError && error.code === 'STALE_UPDATE') {
+        // Reload instead of overwriting (api-spec 4.4); the next attempt carries the fresh etag.
+        fetchStaffTicketDetail(ticketId).then(setTicket).catch(() => undefined);
+      }
+      const message = field === 'status' ? statusErrorMessage(error, fallbackMessage) : (error instanceof ApiError ? error.message : fallbackMessage);
+      setFieldErrors((prev) => ({ ...prev, [field]: message }));
     }
   }
 
@@ -133,7 +155,11 @@ export function StaffTicketDetailPage() {
   }
 
   async function handleStatusChange(status: string) {
-    await runFieldUpdate('status', status, updateTicketStatus, 'Failed to update status.');
+    await runFieldUpdate(
+      'status', status,
+      (id, value) => updateTicketStatus(id, value, ticket?.etag ?? ''),
+      'Failed to update status.',
+    );
   }
 
   async function handlePostComment() {
@@ -394,6 +420,10 @@ export function StaffTicketDetailPage() {
             {attachment.status === 'REMOVED' && <span className="text-body-secondary">Removed</span>}
           </div>
         ))}
+      </section>
+
+      <section className="mt-4">
+        <ActionsTakenSection ticketId={ticket.id} ticketLocked={ticketLocked} />
       </section>
     </div>
   );

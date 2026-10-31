@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import request from 'supertest';
+import { patchStatus } from '../helpers/statusRequest';
 import { app } from '../../src/app';
 import { prisma } from '../../src/prisma';
 import { truncateTicketTables } from '../helpers/resetDb';
@@ -107,10 +108,7 @@ describe('PATCH /api/v1/staff/tickets/:id/owner', () => {
   // AC-18 cross-check: exercises PATCH .../status, implemented in Task 7.
   it('rejects setting status directly to OPEN on a NEW unowned ticket via the status endpoint (AC-18, cross-checked here)', async () => {
     const ticket = await createTicket();
-    const response = await request(app)
-      .patch(`/api/v1/staff/tickets/${ticket.id}/status`)
-      .set('Cookie', staffCookie)
-      .send({ status: 'OPEN' });
+    const response = await patchStatus(staffCookie, ticket.id, 'OPEN');
     expect(response.status).toBe(409);
     expect(response.body.error.code).toBe('INVALID_STATUS_TRANSITION');
   });

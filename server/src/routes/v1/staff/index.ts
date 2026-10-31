@@ -2,13 +2,14 @@ import { Router } from 'express';
 import { requireRole } from '../../../middleware/requireRole';
 import { staffTicketsRouter } from './tickets';
 import { assignableOwnersRouter } from './assignableOwners';
+import { staffDashboardRouter } from './dashboard';
 
 export const staffRouter = Router();
 
-// Every /staff/* route requires IT_STAFF -- mounted once here (A-06/A-07: Administrator gets
-// no ticket-route access at all in Lab 3, and this is the single gate for the whole namespace
-// so no future sub-route can forget it).
-staffRouter.use(requireRole('IT_STAFF'));
+// Every /staff/* route requires IT_STAFF or ADMINISTRATOR (api-spec.md section 1.2; Lab 4 widened the Lab 3
+// IT_STAFF-only gate). Mounted once here so no future sub-route can forget it; a REQUESTER gets 403.
+staffRouter.use(requireRole('IT_STAFF', 'ADMINISTRATOR'));
 
 staffRouter.use('/tickets', staffTicketsRouter);
 staffRouter.use('/assignable-owners', assignableOwnersRouter);
+staffRouter.use('/dashboard', staffDashboardRouter);

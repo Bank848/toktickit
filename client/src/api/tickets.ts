@@ -8,12 +8,14 @@ export interface FieldError {
 export class ApiError extends Error {
   status: number;
   fieldErrors: FieldError[];
+  code?: string;
 
-  constructor(message: string, status: number, fieldErrors: FieldError[] = []) {
+  constructor(message: string, status: number, fieldErrors: FieldError[] = [], code?: string) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.fieldErrors = fieldErrors;
+    this.code = code;
   }
 }
 
@@ -42,6 +44,8 @@ export interface TicketDetailDto {
   owner: { id: string; displayName: string } | null;
   resolutionSummary: string | null;
   version: number;
+  /** Quoted updatedAt validator; staff detail responses carry it (api-spec 4.4). */
+  etag?: string;
 }
 
 export interface TicketListItemDto {

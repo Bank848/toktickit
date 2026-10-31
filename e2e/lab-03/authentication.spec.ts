@@ -58,8 +58,8 @@ test('mandatory first-login password change, then logout invalidates the session
   await page.getByLabel('Confirm new password', { exact: true }).fill(NEW_PASSWORD);
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
 
-  // Mandatory-change users land on their role's home route without a second login (AC-09).
-  await expect(page).toHaveURL(/\/(tickets|staff\/tickets|admin\/users)$/, { timeout: 30_000 });
+  // Mandatory-change users land on their role's home route (a dashboard since Lab 4) without a second login (AC-09).
+  await expect(page).toHaveURL(/\/(dashboard|staff\/dashboard)$/, { timeout: 30_000 });
   await assertNoHorizontalOverflow(page, 'Role home (post change-password)');
 
   // --- Logout invalidates the session (AC-07) ---
@@ -124,7 +124,9 @@ test('a Lab-2-seeded Requester logs in after the Lab 3 migration and sees their 
   await page.getByLabel('Password', { exact: true }).fill(LAB2_SEEDED_REQUESTER.password);
   await page.getByRole('button', { name: 'Sign In', exact: true }).click();
 
-  await expect(page).toHaveURL(/\/tickets$/, { timeout: 30_000 });
+  // Lab 4 lands every role on its dashboard (FR-10); My Tickets is one click away.
+  await expect(page).toHaveURL(/\/dashboard$/, { timeout: 30_000 });
+  await page.goto('/tickets');
   await expect(page.getByRole('heading', { name: 'My Tickets' })).toBeVisible();
 
   // The seed script (server/prisma/seed.ts) creates a pre-existing ticket for this Requester --
