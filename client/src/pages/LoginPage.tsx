@@ -3,12 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { login, LoginRequestError } from '../api/auth';
 import { Icon } from '../components/Icon';
-
-const HOME_ROUTE: Record<string, string> = {
-  REQUESTER: '/tickets',
-  IT_STAFF: '/staff/tickets',
-  ADMINISTRATOR: '/admin/users',
-};
+import { HOME_ROUTE } from '../lib/homeRoute';
 
 export function LoginPage() {
   const { setCurrentUser } = useAuth();

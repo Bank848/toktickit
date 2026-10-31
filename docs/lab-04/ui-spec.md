@@ -149,8 +149,12 @@ filter from the URL:
 - **Ticket Queue** reads `status` (repeatable), `itPriority`, and `ownerId` (including the literal
   `unassigned`).
 
-With no query string both screens behave exactly as in Lab 1-3, unfiltered. After the initial load the
-screens manage their own filter state as before; changing a filter does not need to rewrite the URL.
+With no query string both screens behave exactly as in Lab 1-3, unfiltered. The URL is read again
+whenever the query string changes while the screen is mounted (a dashboard link followed from the same
+screen, or browser back and forward), and that replaces the current filters with the ones in the URL.
+Otherwise the screens manage their own filter state as before; changing a filter does not rewrite the URL.
+An unknown `status` value is rejected by the server with 422, so a card link and its list can never
+disagree silently.
 
 ## 10. Accessibility and Polish Checklist
 

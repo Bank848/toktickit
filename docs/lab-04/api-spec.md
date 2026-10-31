@@ -35,6 +35,7 @@ There is no delete endpoint for Action Taken. The Requester namespace has no wri
 |---|---|
 | `PATCH /api/v1/staff/tickets/:id/status` | **Requires** `If-Match` (428 `PRECONDITION_REQUIRED` when missing, 409 `STALE_UPDATE` on mismatch, section 4.4). New failure mode: **409 `RESOLUTION_REQUIRES_ACTION_TAKEN`** when the target status is `RESOLVED` and the Ticket has zero Action Taken records. |
 | Every `/api/v1/staff/*` route | Role gate widened from `IT_STAFF` to `IT_STAFF` or `ADMINISTRATOR`, so an Administrator can reach the IT Staff Dashboard and perform every IT Staff action (specification.md §7). A `REQUESTER` still receives 403 `FORBIDDEN_ROLE`. No IT Staff behavior is removed. |
+| `GET /api/v1/tickets` and `GET /api/v1/staff/tickets` | Each `status` value must be one of the 8 statuses; an unknown value is **422 `VALIDATION_FAILED`** with field `status` (it was silently ignored). Dashboard cards deep-link here with `?status=<STATUS>`, so the list `meta.total` equals the card count. |
 
 ## 2. DTOs
 

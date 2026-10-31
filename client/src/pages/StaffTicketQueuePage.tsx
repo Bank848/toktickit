@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchStaffTickets, fetchAssignableOwners, type StaffTicketListItemDto, type UserSummaryDto } from '../api/staffTickets';
 import { type ListTicketsMeta } from '../api/tickets';
 import { TicketStatusBadge, PriorityBadge, STATUS_OPTIONS } from '../components/TicketStatusBadge';
@@ -38,12 +38,32 @@ function isFilterActive(query: QueryState): boolean {
   return query.status.length > 0 || query.itPriority !== '' || query.ownerId !== '' || query.q !== '' || query.sort !== DEFAULT_SORT;
 }
 
+function queryFromUrl(searchParams: URLSearchParams): QueryState {
+  return {
+    ...DEFAULT_QUERY,
+    status: searchParams.getAll('status'),
+    itPriority: searchParams.get('itPriority') ?? DEFAULT_QUERY.itPriority,
+    ownerId: searchParams.get('ownerId') ?? DEFAULT_QUERY.ownerId,
+  };
+}
+
 export function StaffTicketQueuePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [owners, setOwners] = useState<UserSummaryDto[]>([]);
   const [searchInput, setSearchInput] = useState('');
-  const [query, setQuery] = useState<QueryState>(DEFAULT_QUERY);
+  // Hydrated from the URL (FR-10) and re-read whenever the query string changes, because following a
+  // dashboard link while this page is already mounted does not remount it.
+  const [query, setQuery] = useState<QueryState>(() => queryFromUrl(searchParams));
+  const lastSearch = useRef(searchParams.toString());
+  useEffect(() => {
+    const current = searchParams.toString();
+    if (current === lastSearch.current) return;
+    lastSearch.current = current;
+    setSearchInput('');
+    setQuery(queryFromUrl(searchParams));
+  }, [searchParams]);
   const [tickets, setTickets] = useState<StaffTicketListItemDto[]>([]);
   const [meta, setMeta] = useState<ListTicketsMeta>({ page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 1 });
   const [loadState, setLoadState] = useState<LoadState>('loading');
