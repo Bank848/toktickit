@@ -9,11 +9,13 @@ import { generateTicketNumber } from '../../src/services/ticketNumber';
 
 describe('PATCH /api/v1/staff/tickets/:id/status', () => {
   let staffCookie: string;
+  let staffId: string;
   let requesterId: string;
   let categoryId: number;
 
   beforeAll(async () => {
     staffCookie = await loginAs(SEED_EMAILS.itStaff1);
+    staffId = (await prisma.user.findUniqueOrThrow({ where: { email: SEED_EMAILS.itStaff1 } })).id;
     requesterId = (await prisma.user.findUniqueOrThrow({ where: { email: SEED_EMAILS.requester } })).id;
     categoryId = (await prisma.category.findFirstOrThrow({ where: { isActive: true } })).id;
   });
@@ -58,6 +60,16 @@ describe('PATCH /api/v1/staff/tickets/:id/status', () => {
 
   it.each(VALID_DIRECT_TRANSITIONS)('allows %s -> %s (AC-19)', async (from, to) => {
     const ticket = await createTicket(from);
+    if (to === 'RESOLVED') {
+      // FR-06/BR-09 resolution gate (Task 6): a status change targeting RESOLVED requires at
+      // least one Action Taken record on the ticket, regardless of Result.
+      await prisma.actionTaken.create({
+        data: {
+          ticketId: ticket.id, performedById: staffId, actionAt: new Date(),
+          description: 'Resolved for transition-matrix test coverage.', result: 'RESOLVED', followUpRequired: false,
+        },
+      });
+    }
     const response = await patchStatus(ticket.id, to);
     expect(response.status).toBe(200);
     expect(response.body.status).toBe(to);

@@ -157,6 +157,19 @@ staffTicketsRouter.patch('/:id/priority', async (req, res, next) => {
 // target" business rule, not the request-shape validation layer).
 const ALL_KNOWN_STATUSES = Object.keys(STATUS_TRANSITIONS) as TicketStatus[];
 
+function assertTransitionAllowed(from: TicketStatus, to: TicketStatus): void {
+  if (isValidTransition(from, to)) return;
+  // Same distinction as the /priority endpoint (Task 22, Step 6.3): a rejected transition
+  // out of a terminal status (CLOSED/CANCELLED) is a lock violation, not a generic invalid
+  // transition -- api-spec.md requires TICKET_LOCKED here specifically. The one still-valid
+  // escape out of a terminal status, CLOSED -> REOPENED, is accepted by isValidTransition()
+  // and never reaches this branch, so it is unaffected.
+  if (TERMINAL_STATUSES.includes(from as never)) {
+    throw new HttpError(409, 'TICKET_LOCKED', `Cannot change status on a ${from} ticket`);
+  }
+  throw new HttpError(409, 'INVALID_STATUS_TRANSITION', `Cannot change status from ${from} to ${to}`);
+}
+
 staffTicketsRouter.patch('/:id/status', async (req, res, next) => {
   try {
     const { status } = req.body ?? {};
@@ -165,25 +178,40 @@ staffTicketsRouter.patch('/:id/status', async (req, res, next) => {
     }
 
     const ticket = await findTicketOrThrow(req.params.id);
-    const from = ticket.status as TicketStatus;
     const to = status as TicketStatus;
 
-    if (!isValidTransition(from, to)) {
-      // Same distinction as the /priority endpoint (Task 22, Step 6.3): a rejected transition
-      // out of a terminal status (CLOSED/CANCELLED) is a lock violation, not a generic invalid
-      // transition -- api-spec.md requires TICKET_LOCKED here specifically. The one still-valid
-      // escape out of a terminal status, CLOSED -> REOPENED, is accepted by isValidTransition()
-      // above and never reaches this branch, so it is unaffected.
-      if (TERMINAL_STATUSES.includes(from as never)) {
-        throw new HttpError(409, 'TICKET_LOCKED', `Cannot change status on a ${from} ticket`);
-      }
-      throw new HttpError(409, 'INVALID_STATUS_TRANSITION', `Cannot change status from ${from} to ${to}`);
-    }
+    // Fast path: reject an invalid transition before opening a transaction.
+    assertTransitionAllowed(ticket.status as TicketStatus, to);
 
-    const updated = await prisma.ticket.update({
-      where: { id: ticket.id },
-      data: { status: to },
-      include: STAFF_TICKET_INCLUDE,
+    const updated = await prisma.$transaction(async (tx) => {
+      // Lock the Ticket row, then re-read its status under the lock. The gate count and the
+      // UPDATE below run under the same lock, and POST/PATCH on actions take FOR UPDATE on the
+      // same row (actions.ts lockTicketOrThrow), so a concurrent Action Taken create cannot slip
+      // between the count and the update, and a concurrent status change is re-validated.
+      const rows = await tx.$queryRaw<{ status: string }[]>`
+        SELECT "status"::text AS "status" FROM "Ticket" WHERE "id" = ${ticket.id} FOR UPDATE`;
+      if (rows.length === 0) throw new HttpError(404, 'TICKET_NOT_FOUND', 'Ticket not found');
+      assertTransitionAllowed(rows[0].status as TicketStatus, to);
+
+      // FR-06/BR-09: checked after the transition-matrix and terminal-lock checks so an invalid
+      // transition or a locked ticket keeps returning its existing error code (api-spec 4.2).
+      // Counts records regardless of Result (D-02) -- never filter by result: 'RESOLVED' here.
+      if (to === 'RESOLVED') {
+        const actionCount = await tx.actionTaken.count({ where: { ticketId: ticket.id } });
+        if (actionCount === 0) {
+          throw new HttpError(
+            409,
+            'RESOLUTION_REQUIRES_ACTION_TAKEN',
+            'Record at least one Action Taken before resolving this ticket',
+          );
+        }
+      }
+
+      return tx.ticket.update({
+        where: { id: ticket.id },
+        data: { status: to },
+        include: STAFF_TICKET_INCLUDE,
+      });
     });
     res.status(200).json(serializeStaffTicketDetail(updated));
   } catch (error) {
