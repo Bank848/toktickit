@@ -7,6 +7,8 @@ import { SystemCheckPage } from './pages/SystemCheckPage';
 import { CreateTicketPage } from './pages/CreateTicketPage';
 import { MyTicketsPage } from './pages/MyTicketsPage';
 import { TicketDetailPage } from './pages/TicketDetailPage';
+import { RequesterDashboardPage } from './pages/RequesterDashboardPage';
+import { StaffDashboardPage } from './pages/StaffDashboardPage';
 import { StaffTicketQueuePage } from './pages/StaffTicketQueuePage';
 import { StaffTicketDetailPage } from './pages/StaffTicketDetailPage';
 import { AdminUserManagementPage } from './pages/AdminUserManagementPage';
@@ -19,6 +21,8 @@ function App() {
         <Route path="/change-password" element={<ChangePasswordPage />} />
         <Route path="/system-check" element={<SystemCheckPage />} />
         <Route element={<AppShell />}>
+          <Route path="/dashboard" element={<RequesterDashboardPage />} />
+          <Route path="/staff/dashboard" element={<StaffDashboardPage />} />
           <Route path="/tickets" element={<MyTicketsPage />} />
           <Route path="/tickets/new" element={<CreateTicketPage />} />
           <Route path="/tickets/:id" element={<TicketDetailPage />} />
@@ -26,7 +30,8 @@ function App() {
           <Route path="/staff/tickets/:id" element={<StaffTicketDetailPage />} />
           <Route path="/admin/users" element={<AdminUserManagementPage />} />
         </Route>
-        <Route path="/" element={<Navigate to="/tickets" replace />} />
+        {/* AppShell sends each role on to its own HOME_ROUTE landing page. */}
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AuthProvider>
   );

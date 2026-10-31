@@ -5,12 +5,7 @@ import { changePassword, ChangePasswordRequestError } from '../api/auth';
 import { Icon } from '../components/Icon';
 import { PasswordRulesChecklist } from '../components/PasswordRulesChecklist';
 import { passwordRuleStatus } from '../lib/passwordRules';
-
-const HOME_ROUTE: Record<string, string> = {
-  REQUESTER: '/tickets',
-  IT_STAFF: '/staff/tickets',
-  ADMINISTRATOR: '/admin/users',
-};
+import { HOME_ROUTE } from '../lib/homeRoute';
 
 export function ChangePasswordPage() {
   const { currentUser, isLoading, setCurrentUser } = useAuth();
