@@ -299,6 +299,7 @@ a.btn.disabled {
 .badge-tone-warning { background: #fff6da; color: #8a6d1b; border-color: #8a6d1b; }
 .badge-tone-danger  { background: rgba(179, 38, 30, 0.08); color: #b3261e; border-color: #b3261e; }
 .badge-tone-dark    { background: #1f2937; color: #ffffff; }
+.badge-tone-pale    { background: #f4faf6; color: #1f2937; border-color: #0b7a46; }
 
 /* App header / navbar */
 .app-navbar {
