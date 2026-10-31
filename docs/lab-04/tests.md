@@ -27,6 +27,10 @@ other rows stay on their issue until their tests exist and pass.
   (handout path)
 - `client/tests/lab-04/RequesterDashboard.test.tsx` and `client/tests/lab-04/StaffDashboard.test.tsx`
   — the two dashboards (handout paths)
+- `client/tests/lab-04/AppShell.nav.test.tsx` — Dashboard nav entries, `HOME_ROUTE` landing for every
+  role (LoginPage, ChangePasswordPage, root path) and wrong-role redirects
+- `client/tests/lab-04/DashboardDrillDown.test.tsx` — a card click reaches the list with the matching
+  filter; both lists re-read the URL filter when the query string changes on a mounted page
 - `client/tests/lab-04/*.test.tsx` beside them — URL filter hydration, navigation, datetime helper
   and accessibility, which the handout does not name
 - `e2e/lab-04/actions-taken-flow.spec.ts` and `e2e/lab-04/ticket-resolution.spec.ts` — the handout's
@@ -67,14 +71,14 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | UNIT-10 | BR-06 | `attachmentNotes` 501 characters; omitted | Rejected; omitted accepted as null | same | Done |
 | UNIT-11 | D-06, BR-14 | Creating an ActionTaken row | `Ticket.updatedAt` unchanged | `actionTakenModel.test.ts` | Done |
 | UNIT-12 | BR-03, BR-04 | `lastEditedById` may differ from `performedById` | Both persist independently | same | Done |
-| UNIT-13 | FR-10, AC-12 | New Requester, zero Tickets | All 8 status counts `0`, empty list | `dashboardMetrics.service.test.ts` | Issue #56 |
-| UNIT-14 | AC-02, BR-12 | Two Requesters' Tickets | Each sees only their own counts and list | same | Issue #56 |
-| UNIT-15 | FR-07 | More than 5 Tickets | `recentTickets` holds 5, newest `updatedAt` first | same | Issue #56 |
-| UNIT-16 | AC-10 | Unassigned count | Equals Tickets with `ownerId` null and non-terminal status | same | Issue #56 |
-| UNIT-17 | FR-08 | Owned-by-me count | Counts every status including `CLOSED` and `CANCELLED` | same | Issue #56 |
-| UNIT-18 | BR-12 | Two staff users | Each sees their own owned-by-me count | same | Issue #56 |
-| UNIT-19 | FR-08 | Status and priority counts | Span all Requesters, zero-filled | same | Issue #56 |
-| UNIT-20 | FR-09, AC-11 | `userCounts` flag | Present only when requested, all 3 roles zero-filled, an inactive user of each role never counted | same | Issue #56 |
+| UNIT-13 | FR-10, AC-12 | New Requester, zero Tickets | All 8 status counts `0`, empty list | `dashboardMetrics.service.test.ts` | Done |
+| UNIT-14 | AC-02, BR-12 | Two Requesters' Tickets | Each sees only their own counts and list | same | Done |
+| UNIT-15 | FR-07 | More than 5 Tickets | `recentTickets` holds 5, newest `updatedAt` first | same | Done |
+| UNIT-16 | AC-10 | Unassigned count | Equals Tickets with `ownerId` null and non-terminal status | same | Done |
+| UNIT-17 | FR-08 | Owned-by-me count | Counts every status including `CLOSED` and `CANCELLED` | same | Done |
+| UNIT-18 | BR-12 | Two staff users | Each sees their own owned-by-me count | same | Done |
+| UNIT-19 | FR-08 | Status and priority counts | Span all Requesters, zero-filled | same | Done |
+| UNIT-20 | FR-09, AC-11 | `userCounts` flag | Present only when requested, all 3 roles zero-filled, an inactive user of each role never counted | same | Done |
 
 ### 2.2 API
 
@@ -105,14 +109,14 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | API-23 | §5 | Any transition not targeting `RESOLVED`, zero actions | Unaffected | same | Issue #55 |
 | API-24 | §5 | `RESOLVED` → `REOPENED` → `OPEN` → `IN_PROGRESS` → `RESOLVED` | Second pass satisfied by the earlier record | same | Issue #55 |
 | API-25 | FR-01, §7 | Administrator creates an action and resolves a Ticket | Same behavior as IT Staff | same | Issue #55 |
-| API-26 | AC-12, FR-10 | New Requester calls `GET /dashboard` | Every count 0, `recentTickets` is `[]` | `requester-dashboard.api.test.ts` | Issue #56 |
-| API-27 | AC-02, FR-07 | Requester dashboard with mixed data | Only own Tickets counted and listed | `requester-dashboard.api.test.ts` | Issue #56 |
-| API-28 | §7 | IT Staff on `/dashboard`; Requester on `/staff/dashboard` | 403 both | `requester-dashboard.api.test.ts`, `staff-dashboard.api.test.ts` | Issue #56 |
-| API-29 | AC-10, FR-08 | IT Staff dashboard unassigned count | Matches direct count | `staff-dashboard.api.test.ts` | Issue #56 |
-| API-30 | AC-11 | IT Staff caller | No `userCounts` key | `staff-dashboard.api.test.ts` | Issue #56 |
-| API-31 | AC-11, FR-09 | Administrator caller, with one inactive account seeded per role | `userCounts` with 3 roles counting `isActive = true` accounts only | `staff-dashboard.api.test.ts` | Issue #56 |
-| API-32 | BR-12 | `?requesterId=` and `?userId=` query overrides | Ignored on both routes | `requester-dashboard.api.test.ts`, `staff-dashboard.api.test.ts` | Issue #56 |
-| API-33 | §7 | Administrator reaches existing staff write routes | Allowed after the gate widened to `IT_STAFF` or `ADMINISTRATOR` | same | Issue #56 |
+| API-26 | AC-12, FR-10 | New Requester calls `GET /dashboard` | Every count 0, `recentTickets` is `[]` | `requester-dashboard.api.test.ts` | Done |
+| API-27 | AC-02, FR-07 | Requester dashboard with mixed data | Only own Tickets counted and listed | `requester-dashboard.api.test.ts` | Done |
+| API-28 | §7 | IT Staff on `/dashboard`; Requester on `/staff/dashboard` | 403 both | `requester-dashboard.api.test.ts`, `staff-dashboard.api.test.ts` | Done |
+| API-29 | AC-10, FR-08 | IT Staff dashboard unassigned count | Matches direct count | `staff-dashboard.api.test.ts` | Done |
+| API-30 | AC-11 | IT Staff caller | No `userCounts` key | `staff-dashboard.api.test.ts` | Done |
+| API-31 | AC-11, FR-09 | Administrator caller, with one inactive account seeded per role | `userCounts` with 3 roles counting `isActive = true` accounts only | `staff-dashboard.api.test.ts` | Done |
+| API-32 | BR-12 | `?requesterId=` and `?userId=` query overrides | Ignored on both routes | `requester-dashboard.api.test.ts`, `staff-dashboard.api.test.ts` | Done |
+| API-33 | §7 | Administrator reaches existing staff write routes | Allowed after the gate widened to `IT_STAFF` or `ADMINISTRATOR` | same | Done |
 | API-34 | AC-13 | Lab 3 valid-transition table with the gate in place | Every row still passes with `If-Match` sent (RESOLVED rows seed one action) | `server/tests/lab-03/staffTicketStatus.api.test.ts` | Done |
 | API-35 | §9.5 | Lab 4 migration over Lab 3 seeded data | Every Lab 3 row and id intact, including Attachment rows with every metadata field (filename, mime type, size, storage key, ticket, uploader, createdAt, soft-delete fields); Tickets have zero actions | `server/tests/lab-04/migration.test.ts` | Done |
 | API-37 | 6.1, api-spec 4.4 | List response carries a distinct `etag` per record; `PATCH` an action with an `If-Match` older than the stored `updatedAt` | 409 `STALE_UPDATE`, record unchanged | `actions-taken.api.test.ts` | Done |
@@ -130,6 +134,8 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | API-49 | BR-08, 6.1 | `PATCH` an action under the same race | 409 `TICKET_LOCKED`; record unchanged and no `ACTION_TAKEN_UPDATED` event | same | Done |
 | API-50 | §7, api-spec 1.2 | Administrator lists, creates (with `Idempotency-Key`) and edits (with `If-Match`) Action Taken | 200 / 201 / 200; `performedBy` is the Administrator; a later IT Staff edit changes only `lastEditedBy` | `actions-taken.api.test.ts` | Done |
 | API-51 | §7, api-spec 1.2 | Requester calls list, create and edit on the staff action routes | 403 `FORBIDDEN_ROLE` each; no row written | same | Done |
+| API-52 | FR-10 | `GET /tickets?status=<STATUS>` for each of the 8 statuses, with a different number of Tickets per status | `meta.total` equals the matching `statusCounts` entry on `GET /dashboard`, and every row has that status | `requester-dashboard.api.test.ts` | Done |
+| API-53 | FR-10 | `GET /tickets?status=BOGUS` and `GET /staff/tickets?status=BOGUS`; repeated `status` parameters | 422 `VALIDATION_FAILED`, field `status`; repeated values are an OR | `requester-dashboard.api.test.ts`, `staff-dashboard.api.test.ts` | Done |
 | API-52 | api-spec 3.1 | `POST` with `actionAt` `2026-09-20T17:00:00+07:00`, then `PATCH` with `-05:00` | Accepted; stored and returned as the same UTC instant with `Z` | same | Done |
 | PERF-01 | 10 | Seed 2,000 Tickets and 5,000 Action Taken records in `toktickit_test`; call `GET /dashboard`, `GET /staff/dashboard` and the staff actions list 30 times each | 95th percentile under 500 ms on the dev machine; query count per dashboard call is constant (no per-Ticket query) | `server/tests/lab-04/performance.smoke.test.ts` | Issue #57 |
 | API-36 | §9.6 | Seed verification script | Required seed Tickets present (zero, one, many actions; follow-up; every status and priority) | `server/prisma/verify-seed-lab4.ts` | Done |
@@ -157,20 +163,21 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | CMP-17 | §4 | Different 409 mentioning "action" | Directed message not shown (branches on code) | same | Done |
 | CMP-18 | §4 | Unrelated status failure | Existing fallback message | same | Done |
 | CMP-19 | §5 | Requester detail page | Read-only section below Comments | `ActionsTaken.test.tsx` | Done |
-| CMP-20 | AC-12, FR-10 | Requester Dashboard, fresh account | Zero-valued cards, not omitted | `RequesterDashboard.test.tsx` | Issue #56 |
-| CMP-21 | FR-07 | Requester Dashboard with data | Four cards with counts, recent list | same | Issue #56 |
-| CMP-22 | FR-10 | Requester card links | Each links to `/tickets?status=<STATUS>` | same | Issue #56 |
-| CMP-23 | §6 | Requester Dashboard load error | Alert with Retry | same | Issue #56 |
-| CMP-24 | FR-08 | Staff Dashboard status cards | New, Open, In Progress, Waiting, Assigned to me | `StaffDashboard.test.tsx` | Issue #56 |
-| CMP-25 | FR-08 | Staff Dashboard priority cards | Low, Medium, High, Urgent | same | Issue #56 |
-| CMP-26 | AC-11 | IT Staff, no `userCounts` | Role card not rendered | same | Issue #56 |
-| CMP-27 | FR-09 | Administrator with `userCounts` | Role card rendered | same | Issue #56 |
-| CMP-28 | FR-10 | Staff card links | Each links to the filtered Ticket Queue | same | Issue #56 |
-| CMP-29 | FR-10 | My Tickets opened with `?status=` | Initial filter hydrated | `MyTicketsPage.hydration.test.tsx` | Issue #56 |
-| CMP-30 | §9 | My Tickets without a query string | Unchanged unfiltered default | same | Issue #56 |
-| CMP-31 | FR-10 | Ticket Queue with `itPriority`, `ownerId`, `unassigned` | Initial filters hydrated | `StaffTicketQueuePage.hydration.test.tsx` | Issue #56 |
-| CMP-32 | §8 | Navigation shows a Dashboard entry per role; landing route per role; wrong-role dashboard redirects | Matches the §8 table | `AppShell.nav.test.tsx`, `LoginPage` landing case | Issue #56 |
+| CMP-20 | AC-12, FR-10 | Requester Dashboard, fresh account | Zero-valued cards, not omitted | `RequesterDashboard.test.tsx` | Done |
+| CMP-21 | FR-07 | Requester Dashboard with data | Four cards with counts, recent list | same | Done |
+| CMP-22 | FR-10 | Requester card links | Each links to `/tickets?status=<STATUS>` | same | Done |
+| CMP-23 | §6 | Requester Dashboard load error | Alert with Retry | same | Done |
+| CMP-24 | FR-08 | Staff Dashboard status cards | New, Open, In Progress, Waiting, Assigned to me | `StaffDashboard.test.tsx` | Done |
+| CMP-25 | FR-08 | Staff Dashboard priority cards | Low, Medium, High, Urgent | same | Done |
+| CMP-26 | AC-11 | IT Staff, no `userCounts` | Role card not rendered | same | Done |
+| CMP-27 | FR-09 | Administrator with `userCounts` | Role card rendered | same | Done |
+| CMP-28 | FR-10 | Staff card links | Each links to the filtered Ticket Queue | same | Done |
+| CMP-29 | FR-10 | My Tickets opened with `?status=` | Initial filter hydrated | `MyTicketsPage.hydration.test.tsx` | Done |
+| CMP-30 | §9 | My Tickets without a query string | Unchanged unfiltered default | same | Done |
+| CMP-31 | FR-10 | Ticket Queue with `itPriority`, `ownerId`, `unassigned` | Initial filters hydrated | `StaffTicketQueuePage.hydration.test.tsx` | Done |
+| CMP-32 | §8 | Navigation shows a Dashboard entry per role; landing route per role; wrong-role dashboard redirects | Matches the §8 table | `AppShell.nav.test.tsx` (covers the `LoginPage` and `ChangePasswordPage` landing cases too) | Done |
 | CMP-33 | §10 | Axe-style accessibility check on both dashboards and the Actions Taken form | No serious violation | `client/tests/lab-04/a11y.test.tsx` | Issue #57 |
+| CMP-34 | FR-10 | Click a Requester card, then follow dashboard links while My Tickets or the Ticket Queue is already mounted | The list is fetched with the card's filter, and re-reads `status`, `itPriority` and `ownerId` when the query string changes | `DashboardDrillDown.test.tsx` | Done |
 
 ### 2.4 End-to-End (Playwright)
 
