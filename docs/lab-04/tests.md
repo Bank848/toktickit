@@ -43,7 +43,8 @@ deliberately extended, not weakened: the "allows each valid direct transition" t
 `server/tests/lab-03/staffTicketStatus.api.test.ts` now seeds one Action Taken before any transition
 that targets `RESOLVED`, because FR-06 changes the precondition for exactly those rows. Every Lab 3
 status request in `server/tests/lab-03` also gains the `If-Match` header through its request helper,
-because the status endpoint now requires it (api-spec.md section 4.4); no assertion changes.
+because the status endpoint now requires it (api-spec.md section 4.4); no assertion changes. Three
+Lab 3 E2E specs are updated for the dashboard landing route and the resolution gate (section 5.2).
 
 **Harness note.** Server tests run against the isolated `toktickit_test` database with migration and
 seed in global setup; Playwright runs against `toktickit_e2e` on the dedicated E2E port, both as in
@@ -105,10 +106,10 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | API-19 | AC-05 | `RESOLVED` from `IN_PROGRESS` with one action | 200 | same | Done |
 | API-20 | AC-05 | `RESOLVED` from `WAITING_FOR_REQUESTER` with one action | 200 | same | Done |
 | API-21 | D-02 | Only action has `result` `ESCALATED` | 200; gate ignores `result` | same | Done |
-| API-22 | §5 | Invalid transition to `RESOLVED` (from `NEW`) | Existing `INVALID_STATUS_TRANSITION`, not the gate error | same | Issue #55 |
-| API-23 | §5 | Any transition not targeting `RESOLVED`, zero actions | Unaffected | same | Issue #55 |
-| API-24 | §5 | `RESOLVED` → `REOPENED` → `OPEN` → `IN_PROGRESS` → `RESOLVED` | Second pass satisfied by the earlier record | same | Issue #55 |
-| API-25 | FR-01, §7 | Administrator creates an action and resolves a Ticket | Same behavior as IT Staff | same | Issue #55 |
+| API-22 | §5 | Invalid transition to `RESOLVED` (from `NEW`) | Existing `INVALID_STATUS_TRANSITION`, not the gate error | same | Done |
+| API-23 | §5 | Any transition not targeting `RESOLVED`, zero actions | Unaffected | same | Done |
+| API-24 | §5 | `RESOLVED` → `REOPENED` → `OPEN` → `IN_PROGRESS` → `RESOLVED` | Second pass satisfied by the earlier record | same | Done |
+| API-25 | FR-01, §7 | Administrator creates an action and resolves a Ticket | Same behavior as IT Staff | same | Done |
 | API-26 | AC-12, FR-10 | New Requester calls `GET /dashboard` | Every count 0, `recentTickets` is `[]` | `requester-dashboard.api.test.ts` | Done |
 | API-27 | AC-02, FR-07 | Requester dashboard with mixed data | Only own Tickets counted and listed | `requester-dashboard.api.test.ts` | Done |
 | API-28 | §7 | IT Staff on `/dashboard`; Requester on `/staff/dashboard` | 403 both | `requester-dashboard.api.test.ts`, `staff-dashboard.api.test.ts` | Done |
@@ -127,7 +128,7 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | API-42 | 8.5 | `POST` twice at the same time with one key | One row; both calls return the same record id | same | Done |
 | API-43 | 8.5 | Same key with a different body; `POST` with no key | 409 `IDEMPOTENCY_KEY_REUSED`; 428 `PRECONDITION_REQUIRED`; nothing written | same | Done |
 | API-44 | 5.2, spec 9.5.1 | Failed apply: run the migration with a deliberately broken last statement in a disposable schema; then apply, add records, run `down.sql`, and re-apply | After the failed apply no new table, enum or index remains and a clean retry succeeds; after rollback Lab 3 rows are intact and `ActionTaken` is gone; after re-apply the schema equals the original and a real `pg_dump --data-only --table="ActionTaken"` export restored with `psql -f` brings the same records back (ids, text, timestamps, `idempotencyKey`, `performedById`, `createdAt` order); the test fails if `pg_dump`/`psql` cannot be found (set `PG_BIN_DIR`) | `server/tests/lab-04/migration.recovery.test.ts` | Done |
-| API-47 | 6.1, api-spec 4.4 | Two `PATCH ../status` requests sent together with the same `If-Match` and valid transitions | Exactly one 200 and one 409 `STALE_UPDATE`; one `TicketEvent`; the Ticket equals the 200 body | `ticketStatusIfMatch.api.test.ts` (one-200/one-409 and body equality only; no status `TicketEvent` type exists in the schema, so the event count is not asserted) | Issue #55 |
+| API-47 | 6.1, api-spec 4.4 | Two `PATCH ../status` requests sent together with the same `If-Match` and valid transitions | Exactly one 200 and one 409 `STALE_UPDATE`; one `TicketEvent`; the Ticket equals the 200 body | `ticketStatusIfMatch.api.test.ts` (one-200/one-409 and body equality only; no status `TicketEvent` type exists in the schema, so the event count is not asserted) | Done |
 | API-45 | Part 7, D-07 | Edit an action twice | `performedBy` never changes, `lastEditedBy` is the latest editor, two `ACTION_TAKEN_UPDATED` events exist, no delete route | `actions-taken.api.test.ts` | Done |
 | API-46 | Part 7 | Two actions and two Tickets inserted with identical `createdAt` / `updatedAt` | Action list order is stable by `id` ascending; `recentTickets` is stable by `id` descending over repeated calls | `actions-taken.api.test.ts`, `requester-dashboard.api.test.ts`, `staff-dashboard.api.test.ts` | Issue #53, #56 |
 | API-48 | BR-08, 6.1 | `POST` an action while a concurrent request is changing the Ticket to `CLOSED` (change held uncommitted until a second connection sees the request blocked on the `Ticket` `FOR UPDATE` lock in `pg_stat_activity`, then committed) | 409 `TICKET_LOCKED`; no `ActionTaken` row and no `ACTION_TAKEN_ADDED` event | `actions-taken.api.test.ts` | Done |
@@ -137,7 +138,7 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | API-52 | FR-10 | `GET /tickets?status=<STATUS>` for each of the 8 statuses, with a different number of Tickets per status | `meta.total` equals the matching `statusCounts` entry on `GET /dashboard`, and every row has that status | `requester-dashboard.api.test.ts` | Done |
 | API-53 | FR-10 | `GET /tickets?status=BOGUS` and `GET /staff/tickets?status=BOGUS`; repeated `status` parameters | 422 `VALIDATION_FAILED`, field `status`; repeated values are an OR | `requester-dashboard.api.test.ts`, `staff-dashboard.api.test.ts` | Done |
 | API-52 | api-spec 3.1 | `POST` with `actionAt` `2026-09-20T17:00:00+07:00`, then `PATCH` with `-05:00` | Accepted; stored and returned as the same UTC instant with `Z` | same | Done |
-| PERF-01 | 10 | Seed 2,000 Tickets and 5,000 Action Taken records in `toktickit_test`; call `GET /dashboard`, `GET /staff/dashboard` and the staff actions list 30 times each | 95th percentile under 500 ms on the dev machine; query count per dashboard call is constant (no per-Ticket query) | `server/tests/lab-04/performance.smoke.test.ts` | Issue #57 |
+| PERF-01 | 10 | Seed 2,000 Tickets and 5,000 Action Taken records in `toktickit_test`; call `GET /dashboard`, `GET /staff/dashboard` and the staff actions list 30 times each | 95th percentile under 500 ms on the dev machine; query count per dashboard call is constant (no per-Ticket query) | `server/tests/lab-04/performance.smoke.test.ts` | Done |
 | API-36 | §9.6 | Seed verification script | Required seed Tickets present (zero, one, many actions; follow-up; every status and priority) | `server/prisma/verify-seed-lab4.ts` | Done |
 
 ### 2.3 Component (client)
@@ -176,7 +177,7 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | CMP-30 | §9 | My Tickets without a query string | Unchanged unfiltered default | same | Done |
 | CMP-31 | FR-10 | Ticket Queue with `itPriority`, `ownerId`, `unassigned` | Initial filters hydrated | `StaffTicketQueuePage.hydration.test.tsx` | Done |
 | CMP-32 | §8 | Navigation shows a Dashboard entry per role; landing route per role; wrong-role dashboard redirects | Matches the §8 table | `AppShell.nav.test.tsx` (covers the `LoginPage` and `ChangePasswordPage` landing cases too) | Done |
-| CMP-33 | §10 | Axe-style accessibility check on both dashboards and the Actions Taken form | No serious violation | `client/tests/lab-04/a11y.test.tsx` | Issue #57 |
+| CMP-33 | §10 | Axe-style accessibility check on both dashboards and the Actions Taken form | No serious violation | `client/tests/lab-04/a11y.test.tsx` | Done |
 | CMP-34 | FR-10 | Click a Requester card, then follow dashboard links while My Tickets or the Ticket Queue is already mounted | The list is fetched with the card's filter, and re-reads `status`, `itPriority` and `ownerId` when the query string changes | `DashboardDrillDown.test.tsx` | Done |
 
 ### 2.4 End-to-End (Playwright)
@@ -184,12 +185,12 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | ID | Requirement / AC | Flow | Expected result | File | Status |
 |---|---|---|---|---|---|
 | E2E-01 | AC-01, AC-03 | IT Staff records an Action Taken; a second IT Staff edits it | Both visible; performer unchanged, editor shown | `e2e/lab-04/actions-taken-flow.spec.ts` | Done |
-| E2E-02 | AC-04, AC-05 | Resolve with no action → rejection message → record action → resolve | Message first, then success | `e2e/lab-04/ticket-resolution.spec.ts` | Issue #55 |
+| E2E-02 | AC-04, AC-05 | Resolve with no action → rejection message → record action → resolve | Message first, then success | `e2e/lab-04/ticket-resolution.spec.ts` | Done |
 | E2E-03 | AC-09 | Requester opens an owned Ticket | Actions visible, no create or edit control | `e2e/lab-04/actions-taken-flow.spec.ts` | Done |
-| E2E-04 | AC-02, FR-10 | Requester signs in, lands on dashboard, clicks a card | Filtered My Tickets | `e2e/lab-04/dashboards.spec.ts` | Issue #56 |
-| E2E-05 | AC-10, AC-11, FR-09 | IT Staff and Administrator dashboards | Counts match seed; only Administrator sees user counts | same | Issue #56 |
-| E2E-06 | AC-13 | Full Lab 1-3 Playwright suite | Same pass count as before Lab 4 | `e2e/lab-0[1-3]/*` | Issue #57 |
-| E2E-07 | §10 | Screenshots at 375, 768, 1280 px of every new or changed screen, console clean | No clipped control, no console error | `e2e/lab-04/visual-states.spec.ts` | Issue #57 |
+| E2E-04 | AC-02, FR-10 | Requester signs in, lands on dashboard, clicks a card | Filtered My Tickets | `e2e/lab-04/dashboards.spec.ts` | Done |
+| E2E-05 | AC-10, AC-11, FR-09 | IT Staff and Administrator dashboards | Counts match seed; only Administrator sees user counts | same | Done |
+| E2E-06 | AC-13 | Full Lab 1-3 Playwright suite | Same pass count as before Lab 4 | `e2e/lab-0[1-3]/*` | Partial, see section 5 |
+| E2E-07 | §10 | Screenshots at 375, 768, 1280 px of every new or changed screen, console clean | No clipped control, no console error | `e2e/lab-04/visual-states.spec.ts` | Done |
 
 **UI-style coverage (labsheet 10).** The ui-spec conformance check is carried by CMP-33 (accessibility
 of both dashboards and the Actions Taken form) and E2E-07 (every new or changed screen at 375, 768 and
@@ -235,5 +236,67 @@ Every requirement appears in at least one row above.
   passing before that issue's pull request is marked ready for review.
 - The documented final run records the exact pass counts for the server, client, and Playwright suites,
   the configuration used, and the commit hash (Issue #57).
-- No Lab 1-3 test is deleted or loosened to make a Lab 4 test pass. The one extended Lab 3 test is
-  listed in §1 with its reason.
+- No Lab 1-3 test is deleted or loosened to make a Lab 4 test pass. The extended Lab 3 tests (one
+  server table in §1, three E2E specs in §5) are listed with their reasons.
+
+## 5. Final Run and Known Limitations (Issue #57)
+
+### 5.1 Final run
+
+Run on 2026-10-31 on commit `304dd6c` (the last code commit; later commits on the branch change only
+docs and screenshots). Throwaway PostgreSQL 18 cluster on 127.0.0.1:5547, database URL passed through
+the environment only.
+
+| Suite | Command | Result |
+|---|---|---|
+| Server (Lab 1-4) | `npx vitest run --testTimeout=60000 --hookTimeout=180000` | 53 files, 375 tests, all pass |
+| Client (Lab 1-4) | `npx vitest run` | 33 files, 219 tests, all pass |
+| Playwright (Lab 2-4) | temporary config, Microsoft Edge, desktop 1440x900, tablet 834x1112, mobile 390x844, one worker | 54 scenarios: 45 passed, 6 skipped by design, 3 failed |
+
+The two longer timeouts are needed on the test machine: two Lab 3 seed tests exceed Vitest's 5 second
+default, and `migration.recovery.test.ts` once exceeded the 60 second hook default. No config file was
+changed. Playwright browsers are not installed on the machine, so the run used the installed Edge
+through a temporary, uncommitted config that starts the server and Vite the same way as
+`playwright.config.ts`.
+
+The 6 skipped scenarios are the tablet and mobile copies of the three `visual-states.spec.ts` tests
+in `e2e/lab-04`, which take their own screenshots at 375, 768 and 1280 px from the desktop project.
+
+### 5.2 E2E-06 (Lab 1-3 regression)
+
+Status: Partial. There is no recorded "before Lab 4" pass count in the repository, so "same pass
+count" cannot be shown literally. The observed result is:
+
+- All Lab 3 specs pass in all three viewport projects after three small updates, each tied to a
+  behaviour Lab 4 changes on purpose: `authentication.spec.ts` and `visual-states.spec.ts` now expect
+  the role dashboard as the landing and redirect route (FR-10) instead of the ticket list or queue,
+  and `staff-ticket-flow.spec.ts` records one Action Taken before moving the Ticket to Resolved
+  (FR-06). No assertion was removed.
+- `e2e/lab-02/requester-ticket-flow.spec.ts` fails in all three projects. It opens `/select-requester`
+  and expects the "Select Development Requester" screen, which Lab 3 removed when session login
+  replaced it (no reference to that page remains in `client/src`). The failure is older than Lab 4 and
+  is not caused by it. The spec was left unchanged in this PR. Rewriting it to log in as a seeded
+  Requester is a separate Lab 2 test repair.
+
+### 5.3 Known limitations (documented, behaviour not changed)
+
+- **API-47 status TicketEvent.** The schema has no status-change event type, so a status change does
+  not write a `TicketEvent`. Adding one needs a migration and is deferred. API-47 asserts the
+  one-200 and one-409 result and body equality only.
+- **Unassigned card versus list.** The Unassigned card on the staff dashboard counts unassigned
+  Tickets that are not CLOSED or CANCELLED (api-spec section 4, AC-10). Its link
+  `/staff/tickets?ownerId=unassigned` lists unassigned Tickets in every status, so the card number can
+  be lower than the list total. The specification does not say which behaviour is intended, so both
+  are left as they are. The other dashboard cards match their lists (API-27, E2E-04, E2E-05).
+
+### 5.4 Visual and accessibility evidence (E2E-07, CMP-33)
+
+Screenshots are under `artifacts/lab-04/screenshots/` for the Requester dashboard (1280 loaded, 768
+loaded, 375 loaded, 375 error, 375 empty), the IT Staff and Administrator dashboards (375, 768, 1280
+each) and the Actions Taken form, saved state and Requester read-only view (375, 768, 1280 each). Each
+image was opened and checked by eye. At 375 px the navigation collapses to the menu button, cards
+wrap to two columns, and no control is clipped or overflows horizontally. The spec also fails the run
+on any unexpected console error and checks keyboard order and a visible focus ring on the dashboard
+cards. The axe-core check (CMP-33) runs in jsdom with the color-contrast and region rules turned off
+because jsdom has no layout, so contrast was judged from the screenshots only and is not
+machine-verified.
