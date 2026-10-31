@@ -71,7 +71,7 @@ describe('ActionsTakenSection (staff)', () => {
     const row = screen.getByTestId('action-row');
     expect(within(row).getByText('Pakorn W.')).toBeInTheDocument();
     expect(within(row).getByText('Resolved')).toBeInTheDocument();
-    expect(within(row).getByText(/follow-up required/i)).toBeInTheDocument();
+    expect(within(row).getByText(/follow-up required/i)).toHaveClass('badge', 'badge-tone-pale');
     expect(within(row).getByText(/call back tomorrow/i)).toBeInTheDocument();
   });
 
