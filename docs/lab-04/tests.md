@@ -14,7 +14,9 @@ other rows stay on their issue until their tests exist and pass.
 - `server/tests/lab-04/actions-taken.api.test.ts` — staff create, edit, list and the Requester
   read-only route (handout path)
 - `server/tests/lab-04/resolutionGate.api.test.ts` — FR-06/BR-09 gate, run under the Ticket row lock
-  (Issue #55). `If-Match` on the status endpoint (API-34, API-40, API-47) is not covered yet
+  (Issue #55)
+- `server/tests/lab-04/ticketStatusIfMatch.api.test.ts` — `If-Match` on the status endpoint (API-40,
+  API-47 partly)
 - `server/tests/lab-04/ticket-workflow.api.test.ts` — handout path for the same gate and `If-Match` tests
 - `server/tests/lab-04/requester-dashboard.api.test.ts` — `GET /dashboard` and scoping (handout path)
 - `server/tests/lab-04/staff-dashboard.api.test.ts` — `GET /staff/dashboard`, `userCounts` (handout path)
@@ -111,17 +113,17 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | API-31 | AC-11, FR-09 | Administrator caller, with one inactive account seeded per role | `userCounts` with 3 roles counting `isActive = true` accounts only | `staff-dashboard.api.test.ts` | Issue #56 |
 | API-32 | BR-12 | `?requesterId=` and `?userId=` query overrides | Ignored on both routes | `requester-dashboard.api.test.ts`, `staff-dashboard.api.test.ts` | Issue #56 |
 | API-33 | §7 | Administrator reaches existing staff write routes | Allowed after the gate widened to `IT_STAFF` or `ADMINISTRATOR` | same | Issue #56 |
-| API-34 | AC-13 | Lab 3 valid-transition table with the gate in place | Every row still passes with `If-Match` sent (RESOLVED rows seed one action) | `server/tests/lab-03/staffTicketStatus.api.test.ts` | Issue #55 |
+| API-34 | AC-13 | Lab 3 valid-transition table with the gate in place | Every row still passes with `If-Match` sent (RESOLVED rows seed one action) | `server/tests/lab-03/staffTicketStatus.api.test.ts` | Done |
 | API-35 | §9.5 | Lab 4 migration over Lab 3 seeded data | Every Lab 3 row and id intact, including Attachment rows with every metadata field (filename, mime type, size, storage key, ticket, uploader, createdAt, soft-delete fields); Tickets have zero actions | `server/tests/lab-04/migration.test.ts` | Done |
 | API-37 | 6.1, api-spec 4.4 | List response carries a distinct `etag` per record; `PATCH` an action with an `If-Match` older than the stored `updatedAt` | 409 `STALE_UPDATE`, record unchanged | `actions-taken.api.test.ts` | Done |
 | API-38 | 6.1 | Two editors `PATCH` the same action with the same `If-Match`, sent together | Exactly one 200 and one 409; the stored record equals the 200 body | same | Done |
 | API-39 | 6.1 | `PATCH` an action with no `If-Match` | 428 `PRECONDITION_REQUIRED`, record unchanged | same | Done |
-| API-40 | 6.1 | Status change to `IN_PROGRESS` after another user changed the Ticket: once with the stale `If-Match`, once with no header | Stale header: 409 `STALE_UPDATE`. No header: 428 `PRECONDITION_REQUIRED`. Status unchanged and no `TicketEvent` in both cases | `ticket-workflow.api.test.ts` | Issue #55 |
+| API-40 | 6.1 | Status change to `IN_PROGRESS` after another user changed the Ticket: once with the stale `If-Match`, once with no header | Stale header: 409 `STALE_UPDATE`. No header: 428 `PRECONDITION_REQUIRED`. Status unchanged and no `TicketEvent` in both cases | `ticketStatusIfMatch.api.test.ts` | Done |
 | API-41 | 8.5, api-spec 4.5 | `POST` the same body twice with the same `Idempotency-Key` (second call simulates a retry after a lost response) | 201 then 200 with `Idempotent-Replayed: true`; one row, one `ACTION_TAKEN_ADDED` event | `actions-taken.api.test.ts` | Done |
 | API-42 | 8.5 | `POST` twice at the same time with one key | One row; both calls return the same record id | same | Done |
 | API-43 | 8.5 | Same key with a different body; `POST` with no key | 409 `IDEMPOTENCY_KEY_REUSED`; 428 `PRECONDITION_REQUIRED`; nothing written | same | Done |
 | API-44 | 5.2, spec 9.5.1 | Failed apply: run the migration with a deliberately broken last statement in a disposable schema; then apply, add records, run `down.sql`, and re-apply | After the failed apply no new table, enum or index remains and a clean retry succeeds; after rollback Lab 3 rows are intact and `ActionTaken` is gone; after re-apply the schema equals the original and a real `pg_dump --data-only --table="ActionTaken"` export restored with `psql -f` brings the same records back (ids, text, timestamps, `idempotencyKey`, `performedById`, `createdAt` order); the test fails if `pg_dump`/`psql` cannot be found (set `PG_BIN_DIR`) | `server/tests/lab-04/migration.recovery.test.ts` | Done |
-| API-47 | 6.1, api-spec 4.4 | Two `PATCH ../status` requests sent together with the same `If-Match` and valid transitions | Exactly one 200 and one 409 `STALE_UPDATE`; one `TicketEvent`; the Ticket equals the 200 body | `ticket-workflow.api.test.ts` | Issue #55 |
+| API-47 | 6.1, api-spec 4.4 | Two `PATCH ../status` requests sent together with the same `If-Match` and valid transitions | Exactly one 200 and one 409 `STALE_UPDATE`; one `TicketEvent`; the Ticket equals the 200 body | `ticketStatusIfMatch.api.test.ts` (one-200/one-409 and body equality only; no status `TicketEvent` type exists in the schema, so the event count is not asserted) | Issue #55 |
 | API-45 | Part 7, D-07 | Edit an action twice | `performedBy` never changes, `lastEditedBy` is the latest editor, two `ACTION_TAKEN_UPDATED` events exist, no delete route | `actions-taken.api.test.ts` | Done |
 | API-46 | Part 7 | Two actions and two Tickets inserted with identical `createdAt` / `updatedAt` | Action list order is stable by `id` ascending; `recentTickets` is stable by `id` descending over repeated calls | `actions-taken.api.test.ts`, `requester-dashboard.api.test.ts`, `staff-dashboard.api.test.ts` | Issue #53, #56 |
 | API-48 | BR-08, 6.1 | `POST` an action while a concurrent request is changing the Ticket to `CLOSED` (change held uncommitted until a second connection sees the request blocked on the `Ticket` `FOR UPDATE` lock in `pg_stat_activity`, then committed) | 409 `TICKET_LOCKED`; no `ActionTaken` row and no `ACTION_TAKEN_ADDED` event | `actions-taken.api.test.ts` | Done |
