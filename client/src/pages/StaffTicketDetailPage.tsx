@@ -10,6 +10,7 @@ import { ApiError } from '../api/tickets';
 import { displayCommentBody } from '../lib/commentDisplay';
 import { TicketStatusBadge, PriorityBadge, STATUS_OPTIONS, PRIORITY_OPTIONS } from '../components/TicketStatusBadge';
 import { Icon } from '../components/Icon';
+import { ActionsTakenSection } from '../components/ActionsTakenSection';
 
 // Humanized labels for the option lists below, kept in sync with the badges via the same source
 // maps (ui-spec.md never shows raw enum strings like WAITING_FOR_REQUESTER to a user).
@@ -394,6 +395,10 @@ export function StaffTicketDetailPage() {
             {attachment.status === 'REMOVED' && <span className="text-body-secondary">Removed</span>}
           </div>
         ))}
+      </section>
+
+      <section className="mt-4">
+        <ActionsTakenSection ticketId={ticket.id} ticketLocked={ticketLocked} />
       </section>
     </div>
   );

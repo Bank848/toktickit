@@ -14,10 +14,11 @@ const HOME_ROUTE: Record<string, string> = {
   ADMINISTRATOR: '/admin/users',
 };
 
-function requiredRoleFor(pathname: string): string | null {
-  if (pathname.startsWith('/staff')) return 'IT_STAFF';
-  if (pathname.startsWith('/admin')) return 'ADMINISTRATOR';
-  if (pathname.startsWith('/tickets')) return 'REQUESTER';
+// Administrators may use the staff screens too (specification.md section 7).
+function allowedRolesFor(pathname: string): string[] | null {
+  if (pathname.startsWith('/staff')) return ['IT_STAFF', 'ADMINISTRATOR'];
+  if (pathname.startsWith('/admin')) return ['ADMINISTRATOR'];
+  if (pathname.startsWith('/tickets')) return ['REQUESTER'];
   return null;
 }
 
@@ -36,8 +37,8 @@ export function AppShell() {
   if (currentUser.mustChangePassword) {
     return <Navigate to="/change-password" replace />;
   }
-  const requiredRole = requiredRoleFor(location.pathname);
-  if (requiredRole && requiredRole !== currentUser.role) {
+  const allowedRoles = allowedRolesFor(location.pathname);
+  if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
     return <Navigate to={HOME_ROUTE[currentUser.role]} replace />;
   }
 
