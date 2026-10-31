@@ -10,7 +10,7 @@ Counts and states are the GitHub review states as returned (`APPROVED`, `CHANGES
 
 - Author of the Lab 4 pull requests in this repository: Bank848 (Bank).
 - Reviewers of those pull requests: ArmmyC (#58, #59) and TauForge (#60, #61, #62, #63).
-- Release PR into `main`: [#64](https://github.com/Bank848/toktickit/pull/64), reviewer ArmmyC requested.
+- Release PR into `main`: [#64](https://github.com/Bank848/toktickit/pull/64), reviewers ArmmyC and TauForge requested.
 - Reviews written by Bank848 on teammates' Lab 4 pull requests: see "Reviews given" below.
 
 ## Reviews received (Bank848/toktickit, base `lab4-staging`)
