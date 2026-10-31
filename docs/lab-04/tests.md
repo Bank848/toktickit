@@ -13,8 +13,9 @@ other rows stay on their issue until their tests exist and pass.
 - `server/tests/lab-04/actionTakenRequest.validator.test.ts` — request validator, pure unit tests
 - `server/tests/lab-04/actions-taken.api.test.ts` — staff create, edit, list and the Requester
   read-only route (handout path)
-- `server/tests/lab-04/ticket-workflow.api.test.ts` — FR-06/BR-09 gate and `If-Match` on the status
-  endpoint (handout path)
+- `server/tests/lab-04/resolutionGate.api.test.ts` — FR-06/BR-09 gate, run under the Ticket row lock
+  (Issue #55). `If-Match` on the status endpoint (API-34, API-40, API-47) is not covered yet
+- `server/tests/lab-04/ticket-workflow.api.test.ts` — handout path for the same gate and `If-Match` tests
 - `server/tests/lab-04/requester-dashboard.api.test.ts` — `GET /dashboard` and scoping (handout path)
 - `server/tests/lab-04/staff-dashboard.api.test.ts` — `GET /staff/dashboard`, `userCounts` (handout path)
 - `server/tests/lab-04/dashboardMetrics.service.test.ts` — metric queries, service level
@@ -94,10 +95,10 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | API-15 | FR-03, BR-11, AC-09 | Requester lists an owned Ticket's actions | Every field of every record visible | `actions-taken.api.test.ts` | Done |
 | API-16 | D-24 | Requester reads another user's Ticket | 404 `TICKET_NOT_ACCESSIBLE`, same body as unknown id | same | Done |
 | API-17 | AC-09 | Requester `POST` and `PATCH` on their actions path | 404, not 403 or 405 | same | Done |
-| API-18 | FR-06, BR-09, AC-04 | `RESOLVED` with zero actions | 409 `RESOLUTION_REQUIRES_ACTION_TAKEN`, status unchanged | `ticket-workflow.api.test.ts` | Issue #55 |
-| API-19 | AC-05 | `RESOLVED` from `IN_PROGRESS` with one action | 200 | same | Issue #55 |
-| API-20 | AC-05 | `RESOLVED` from `WAITING_FOR_REQUESTER` with one action | 200 | same | Issue #55 |
-| API-21 | D-02 | Only action has `result` `ESCALATED` | 200; gate ignores `result` | same | Issue #55 |
+| API-18 | FR-06, BR-09, AC-04 | `RESOLVED` with zero actions | 409 `RESOLUTION_REQUIRES_ACTION_TAKEN`, status unchanged | `resolutionGate.api.test.ts` | Done |
+| API-19 | AC-05 | `RESOLVED` from `IN_PROGRESS` with one action | 200 | same | Done |
+| API-20 | AC-05 | `RESOLVED` from `WAITING_FOR_REQUESTER` with one action | 200 | same | Done |
+| API-21 | D-02 | Only action has `result` `ESCALATED` | 200; gate ignores `result` | same | Done |
 | API-22 | §5 | Invalid transition to `RESOLVED` (from `NEW`) | Existing `INVALID_STATUS_TRANSITION`, not the gate error | same | Issue #55 |
 | API-23 | §5 | Any transition not targeting `RESOLVED`, zero actions | Unaffected | same | Issue #55 |
 | API-24 | §5 | `RESOLVED` → `REOPENED` → `OPEN` → `IN_PROGRESS` → `RESOLVED` | Second pass satisfied by the earlier record | same | Issue #55 |
@@ -150,9 +151,9 @@ least two `TZ` values, so a conversion bug cannot hide in a runner that happens 
 | CMP-13 | §5 | Requester list fetch fails | Error alert with Retry | same | Done |
 | CMP-14 | §3 | Staff detail page | Actions Taken section rendered | `ActionsTaken.test.tsx` | Done |
 | CMP-15 | BR-08 | Closed or Cancelled Ticket on detail page | Record button disabled | same | Done |
-| CMP-16 | FR-06, §4 | Server returns `RESOLUTION_REQUIRES_ACTION_TAKEN` | Directed message shown, not the raw error | `TicketWorkflow.test.tsx` | Issue #55 |
-| CMP-17 | §4 | Different 409 mentioning "action" | Directed message not shown (branches on code) | same | Issue #55 |
-| CMP-18 | §4 | Unrelated status failure | Existing fallback message | same | Issue #55 |
+| CMP-16 | FR-06, §4 | Server returns `RESOLUTION_REQUIRES_ACTION_TAKEN` | Directed message shown, not the raw error | `TicketWorkflow.test.tsx` | Done |
+| CMP-17 | §4 | Different 409 mentioning "action" | Directed message not shown (branches on code) | same | Done |
+| CMP-18 | §4 | Unrelated status failure | Existing fallback message | same | Done |
 | CMP-19 | §5 | Requester detail page | Read-only section below Comments | `ActionsTaken.test.tsx` | Done |
 | CMP-20 | AC-12, FR-10 | Requester Dashboard, fresh account | Zero-valued cards, not omitted | `RequesterDashboard.test.tsx` | Issue #56 |
 | CMP-21 | FR-07 | Requester Dashboard with data | Four cards with counts, recent list | same | Issue #56 |
