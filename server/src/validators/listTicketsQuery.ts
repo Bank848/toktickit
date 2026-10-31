@@ -1,6 +1,9 @@
 import { FieldError } from '../middleware/errorEnvelope';
 
 const SORT_WHITELIST = ['createdAt:desc', 'createdAt:asc', 'updatedAt:desc', 'ticketNo:asc'] as const;
+const STATUS_WHITELIST = [
+  'NEW', 'OPEN', 'IN_PROGRESS', 'WAITING_FOR_REQUESTER', 'RESOLVED', 'CLOSED', 'REOPENED', 'CANCELLED',
+] as const;
 type Sort = typeof SORT_WHITELIST[number];
 
 export interface ValidatedListTicketsQuery {
@@ -18,6 +21,14 @@ export function validateListTicketsQuery(query: Record<string, unknown>): Result
   const errors: FieldError[] = [];
 
   const status = Array.isArray(query.status) ? query.status.map(String) : query.status ? [String(query.status)] : [];
+
+  // Dashboard cards deep-link here with ?status=<STATUS> (FR-10); an unknown value is a 422, never a silent no-match.
+  for (const value of status) {
+    if (!(STATUS_WHITELIST as readonly string[]).includes(value)) {
+      errors.push({ field: 'status', message: 'status must be one of ' + STATUS_WHITELIST.join(', ') });
+      break;
+    }
+  }
 
   let categoryId: number | null = null;
   if (query.categoryId !== undefined) {

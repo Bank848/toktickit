@@ -2,6 +2,9 @@ import { FieldError } from '../middleware/errorEnvelope';
 
 const SORT_WHITELIST = ['createdAt:desc', 'createdAt:asc', 'updatedAt:desc', 'ticketNo:asc'] as const;
 const PRIORITY_WHITELIST = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
+const STATUS_WHITELIST = [
+  'NEW', 'OPEN', 'IN_PROGRESS', 'WAITING_FOR_REQUESTER', 'RESOLVED', 'CLOSED', 'REOPENED', 'CANCELLED',
+] as const;
 type Sort = typeof SORT_WHITELIST[number];
 type Priority = typeof PRIORITY_WHITELIST[number];
 
@@ -21,6 +24,14 @@ export function validateStaffListTicketsQuery(query: Record<string, unknown>): R
   const errors: FieldError[] = [];
 
   const status = Array.isArray(query.status) ? query.status.map(String) : query.status ? [String(query.status)] : [];
+
+  // Dashboard cards deep-link here with ?status=<STATUS> (FR-10); an unknown value is a 422, never a silent no-match.
+  for (const value of status) {
+    if (!(STATUS_WHITELIST as readonly string[]).includes(value)) {
+      errors.push({ field: 'status', message: 'status must be one of ' + STATUS_WHITELIST.join(', ') });
+      break;
+    }
+  }
 
   let itPriority: Priority | null = null;
   if (query.itPriority !== undefined) {
